@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Atelier Vocabulaire · Français avancé</title>
+
+  <!-- ── PWA ───────────────────────────────────────────────────────────────── -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#007AFF" />
+
+  <!-- iOS / Safari -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Vocab" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+
+  <!-- Service Worker registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(r => console.log('SW registered:', r.scope))
+          .catch(e => console.warn('SW error:', e));
+      });
+    }
+  </script>
+  <!-- ─────────────────────────────────────────────────────────────────────── -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js" crossorigin></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #F2F2F7; font-family: -apple-system,'SF Pro Text','Helvetica Neue',sans-serif; -webkit-font-smoothing: antialiased; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    #root { min-height: 100vh; }
+    @keyframes fadeSlideIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes pop { 0%{transform:scale(0.7);opacity:0} 60%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+    @keyframes shimmer { 0%{opacity:0.5} 50%{opacity:1} 100%{opacity:0.5} }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+// ─── CONFIGURATION ────────────────────────────────────────────────────────────
+// ✏️  Colle ici l'URL "raw" de ton GitHub Gist contenant le JSON vocabulaire.
+// Laisse null pour utiliser uniquement le localStorage / l'import manuel.
+const VOCAB_URL = "https://gist.githubusercontent.com/nicolasbretagnepro-max/caf58ca177791bd21d8df3b700115c56/raw/";
+// Gist de Nicolas — vocabulaire_enrichi v6 (708 mots)
+
+// ─── SEED (30 mots de démo, utilisés uniquement si aucune autre source) ──────
+const SEED_WORDS = [
+  {"word":"Abduction","nature":"nom","definition":"Nom. « Abduction » désigne : inférence vers l'explication la plus plausible.","definition_compacte":"inférence vers l'explication la plus plausible","example":"L'enquêteur procède par abduction : la fenêtre ouverte rend l'hypothèse d'un complice plus plausible."},
+  {"word":"Abnégation","nature":"nom","definition":"Nom. « Abnégation » désigne : sacrifice volontaire de soi-même, de son intérêt.","definition_compacte":"sacrifice volontaire de soi-même","example":""},
+  {"word":"Aboulie","nature":"nom","definition":"Nom. « Aboulie » désigne : affaiblissement pathologique de la volonté.","definition_compacte":"affaiblissement de la volonté","example":""},
+  {"word":"Abscons","nature":"adjectif","definition":"Adjectif. « Abscons » qualifie : difficile à comprendre ; obscur.","definition_compacte":"difficile à comprendre ; obscur","example":""},
+  {"word":"Acerbe","nature":"adjectif","definition":"Adjectif. « Acerbe » qualifie : qui blesse par son âpreté ; mordant.","definition_compacte":"mordant, très critique","example":""},
+  {"word":"Acrimonie","nature":"nom","definition":"Nom. « Acrimonie » désigne : aigreur agressive dans le langage ou le comportement.","definition_compacte":"aigreur agressive","example":""},
+  {"word":"Altérité","nature":"nom","definition":"Nom. « Altérité » désigne : caractère de ce qui est autre ; reconnaissance de l'autre.","definition_compacte":"reconnaissance de l'autre dans sa différence","example":""},
+  {"word":"Anaphore","nature":"nom","definition":"Nom. « Anaphore » désigne : figure de style consistant à répéter un mot en tête de phrases.","definition_compacte":"répétition d'un mot en tête de phrases","example":"Dans son discours, l'anaphore donne de la force au propos en martelant la même formule au début de chaque phrase."},
+  {"word":"Aporie","nature":"nom","definition":"Nom. « Aporie » désigne : contradiction ou difficulté logique qui bloque le raisonnement.","definition_compacte":"contradiction logique insoluble","example":"Le débat tourne à l'aporie : chaque solution proposée résout un problème mais en crée aussitôt un autre."},
+  {"word":"Ataraxie","nature":"nom","definition":"Nom. « Ataraxie » désigne : tranquillité de l'âme, chez les épicuriens et les stoïciens.","definition_compacte":"tranquillité de l'âme","example":""},
+  {"word":"Axiome","nature":"nom","definition":"Nom. « Axiome » désigne : proposition évidente reconnue sans démonstration.","definition_compacte":"vérité première sans démonstration","example":""},
+  {"word":"Biosphère","nature":"nom","definition":"Nom. « Biosphère » désigne : enveloppe de la Terre où les conditions de la vie sont réunies.","definition_compacte":"enveloppe vivante de la Terre","example":"L'article rappelle que la biosphère ne se limite pas aux forêts : elle inclut sols, océans et micro-organismes."},
+  {"word":"Catharsis","nature":"nom","definition":"Nom. « Catharsis » désigne : purification des passions par l'art.","definition_compacte":"purification des passions","example":""},
+  {"word":"Conjecture","nature":"nom","definition":"Nom. « Conjecture » désigne : supposition fondée sur des indices, sans certitude démontrée.","definition_compacte":"supposition sans certitude","example":"Faute de documents décisifs, l'historien avance une conjecture prudente."},
+  {"word":"Connivence","nature":"nom","definition":"Nom. « Connivence » désigne : entente secrète ; complicité.","definition_compacte":"entente secrète, complicité","example":""},
+  {"word":"Corollaire","nature":"nom","definition":"Nom. « Corollaire » désigne : proposition logique découlant d'une autre ; conséquence naturelle.","definition_compacte":"conséquence logique naturelle","example":""},
+  {"word":"Délétère","nature":"adjectif","definition":"Adjectif. « Délétère » qualifie : qui nuit à la santé, toxique ; au sens figuré, néfaste.","definition_compacte":"toxique, néfaste","example":""},
+  {"word":"Empirisme","nature":"nom","definition":"Nom. « Empirisme » désigne : doctrine selon laquelle la connaissance vient de l'expérience.","definition_compacte":"la connaissance vient de l'expérience","example":"Son empirisme le pousse à attendre les chiffres du terrain avant d'adopter une théorie."},
+  {"word":"Épistémologie","nature":"nom","definition":"Nom. « Épistémologie » désigne : étude critique des sciences, de leurs méthodes, de leur valeur.","definition_compacte":"étude critique des sciences","example":""},
+  {"word":"Falsifiabilité","nature":"nom","definition":"Nom. « Falsifiabilité » désigne : possibilité pour une théorie d'être réfutée par un test empirique.","definition_compacte":"possibilité d'être réfutée par l'expérience","example":"Une théorie qui explique tout après coup manque de falsifiabilité."},
+  {"word":"Heuristique","nature":"nom","definition":"Nom. « Heuristique » désigne : méthode pratique qui aide à découvrir ou résoudre un problème.","definition_compacte":"méthode pratique de résolution","example":""},
+  {"word":"Homme de paille","nature":"locution","definition":"Locution. « Homme de paille » : caricaturer la position adverse pour la réfuter plus facilement.","definition_compacte":"caricaturer l'adversaire pour mieux le réfuter","example":"L'éditorialiste attaque un homme de paille lorsqu'il réduit toute critique à un refus borné."},
+  {"word":"Sophisme","nature":"nom","definition":"Nom. « Sophisme » désigne : raisonnement qui n'est logique ou vrai qu'en apparence.","definition_compacte":"raisonnement faux mais convaincant","example":"L'auteur démonte le sophisme : ce n'est pas parce qu'une mesure est populaire qu'elle est juste."},
+  {"word":"Whataboutisme","nature":"nom","definition":"Nom. « Whataboutisme » désigne : éluder une critique en déplaçant le sujet (« et X alors ? »).","definition_compacte":"éluder une critique en déplaçant le sujet","example":"Accusé de fraude, il répond par un whataboutisme classique : « Et les autres alors ? »"},
+  {"word":"(Se) rebiffer","nature":"verbe pronominal","definition":"Verbe pronominal. « se rebiffer » signifie : se cabrer, se raidir, se révolter contre quelque chose.","definition_compacte":"se révolter, se cabrer","example":""},
+  {"word":"Anthropocène","nature":"nom","definition":"Nom. « Anthropocène » désigne : époque marquée par l'impact massif des activités humaines sur la Terre.","definition_compacte":"ère géologique définie par l'empreinte humaine","example":""},
+  {"word":"Atavisme","nature":"nom","definition":"Nom. « Atavisme » désigne : réapparition d'un caractère ancestral ; héritage de comportements.","definition_compacte":"héritage de traits ancestraux","example":""},
+  {"word":"Concession","nature":"nom","definition":"Nom. « Concession » désigne : en argumentation, fait d'admettre un point adverse pour renforcer sa position.","definition_compacte":"admettre un point adverse pour mieux argumenter","example":""},
+  {"word":"Déférence","nature":"nom","definition":"Nom. « Déférence » désigne : considération très respectueuse témoignée à quelqu'un.","definition_compacte":"respect profond envers quelqu'un","example":""},
+  {"word":"Anachorète","nature":"nom","definition":"Nom. « Anachorète » désigne : religieux ou ermite menant une vie solitaire, retirée du monde.","definition_compacte":"ermite retiré du monde","example":""},
+];
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+const norm = (s) =>
+  String(s||"").toLowerCase().normalize("NFD")
+    .replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+
+const uid      = (s,i) => norm(s).replace(/ /g,"-")+"-"+i;
+const shuffle  = (a)   => [...a].sort(()=>Math.random()-0.5);
+const addDays  = (n)   => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString(); };
+const addMin   = (n)   => { const d=new Date(); d.setMinutes(d.getMinutes()+n); return d.toISOString(); };
+
+function inferNature(w) {
+  const d = String(w.definition||"").trimStart();
+  if (/^verbe pronominal/i.test(d)) return "Verbe pronominal";
+  if (/^locution/i.test(d)) return "Locution";
+  if (/^expression/i.test(d)) return "Expression";
+  if (/^adjectif/i.test(d)) return "Adjectif";
+  if (/^adverbe/i.test(d)) return "Adverbe";
+  if (/^verbe\b/i.test(d)) return "Verbe";
+  if (/^nom et adjectif/i.test(d)) return "Nom/Adj";
+  if (/^nom/i.test(d)) return "Nom";
+  const n = String(w.nature||"").trim().toLowerCase();
+  if (n.includes("verbe pronominal")) return "Verbe pronominal";
+  if (n.includes("locution")) return "Locution";
+  if (n.includes("adjectif")) return "Adjectif";
+  if (n.includes("adverbe")) return "Adverbe";
+  if (n.includes("verbe")) return "Verbe";
+  if (n.includes("nom")) return "Nom";
+  return "Mot";
+}
+
+function inferTheme(w) {
+  const t = norm([w.word,w.definition,w.definition_compacte].join(" "));
+  if (/sophisme|argument|raisonnement|logique|preuve|biais|abduction|heuristique|falsifiab|aporie|premisse|whataboutisme|homme de paille/.test(t)) return "Argumentation";
+  if (/recit|narrat|figure|rhetorique|litteraire|style|ironie|anaphore|analepse|anthologie|antiphrase/.test(t)) return "Littérature";
+  if (/religion|foi|divin|spirit|sacre|mystique|bigot|breviaire|anachorete/.test(t)) return "Spiritualité";
+  if (/ecolog|ecosysteme|vivant|climat|polluant|biotope|biosphere|biome|anthropocene/.test(t)) return "Écologie";
+  if (/droit|justice|contrat|pouvoir|politique|institution|coercit|delit/.test(t)) return "Droit & Politique";
+  if (/medecine|psycholog|organe|volonte|neuro|cerveau|catatonie|atrophie|apathie|aboulie/.test(t)) return "Psychologie";
+  if (/philosophie|conscience|doctrine|morale|epistem|ethique|ontolog|axiologie|empirisme|ataraxie|aporie/.test(t)) return "Philosophie";
+  return "Vocabulaire";
+}
+
+function inferLevel(w) {
+  const len = (w.word||"").length;
+  if (len > 14) return "Avancé";
+  if (len > 9)  return "Intermédiaire";
+  return "Courant";
+}
+
+function isGeneric(e) {
+  return !e || /Dans son article|Le chroniqueur emploie|Dans l'analyse|peut servir à décrire|Le texte emploie|Dans le passage|Le passage emploie|Dans l'article|Dans le récit|Le journaliste emploie/i.test(e);
+}
+
+// Génère une phrase contextuelle minimale pour les mots sans exemple
+function makeContextSentence(w) {
+  return `On parle d'« ${w.word} » quand on désigne : ${w.compact || w.definition}.`;
+}
+
+function buildWord(w, i) {
+  const raw = w.example || "";
+  const hasGoodExample = raw.trim().length > 20 && !isGeneric(raw);
+  return {
+    id: uid(w.word,i),
+    word:      w.word || "",
+    definition:w.definition || "",
+    compact:   w.definition_compacte || w.compact || w.definition || "",
+    example:   hasGoodExample ? raw : makeContextSentence({word:w.word, compact: w.definition_compacte||w.definition}),
+    hasRealExample: hasGoodExample,
+    theme:     inferTheme(w),
+    nature:    inferNature(w),
+    level:     inferLevel(w),
+  };
+}
+
+// ─── STORAGE ──────────────────────────────────────────────────────────────────
+const STORE_PROGRESS  = "atelier_vocab_progress_v4";
+const STORE_WORDS     = "atelier_vocab_words_v4";
+const STORE_MILESTONE = "atelier_vocab_milestone_v4";
+
+function loadProgress() {
+  try { return JSON.parse(localStorage.getItem(STORE_PROGRESS)) || { progress:{}, meta:{xp:0,streak:0,lastDay:null} }; }
+  catch { return { progress:{}, meta:{xp:0,streak:0,lastDay:null} }; }
+}
+function saveProgress(s) {
+  try { localStorage.setItem(STORE_PROGRESS, JSON.stringify(s)); } catch {}
+}
+function loadCustomWords() {
+  try { const r=localStorage.getItem(STORE_WORDS); if(!r) return null; const p=JSON.parse(r); return Array.isArray(p)?p:null; }
+  catch { return null; }
+}
+function saveCustomWords(arr) {
+  try {
+    const compact = arr.map(w=>({word:w.word,nature:w.nature,definition:w.definition,definition_compacte:w.definition_compacte||w.compact||"",example:w.example||""}));
+    localStorage.setItem(STORE_WORDS, JSON.stringify(compact)); return true;
+  } catch { return false; }
+}
+function loadSeenMilestones() {
+  try { return JSON.parse(localStorage.getItem(STORE_MILESTONE)) || []; }
+  catch { return []; }
+}
+function saveSeenMilestone(key) {
+  try {
+    const s = loadSeenMilestones();
+    if (!s.includes(key)) { s.push(key); localStorage.setItem(STORE_MILESTONE,JSON.stringify(s)); }
+  } catch {}
+}
+
+// ─── SPACED REPETITION ────────────────────────────────────────────────────────
+function getP(state, id) {
+  if (!state.progress[id])
+    state.progress[id] = { seen:0,correct:0,wrong:0,mastery:0,recog:0,prod:0,streak:0,next:null };
+  return state.progress[id];
+}
+function isDue(state,w) { const x=getP(state,w.id); return !!(x.next && new Date(x.next)<=new Date()); }
+function getRate(state,w) { const x=getP(state,w.id); const t=x.correct+x.wrong; return t?Math.round((x.correct/t)*100):0; }
+
+function wordStatus(state,w) {
+  const x=getP(state,w.id);
+  if (!x.seen) return "Nouveau";
+  if (isDue(state,w)) return "À revoir";
+  if (x.wrong>=2 && getRate(state,w)<70) return "Fragile";
+  if (x.mastery>=5 && x.prod>=2 && getRate(state,w)>=75) return "Maîtrisé";
+  return "En cours";
+}
+
+function gradeWord(state, id, rating, mode="recog") {
+  const ns = { ...state, progress:{...state.progress} };
+  const x  = { ...getP(ns,id) };
+  ns.progress[id] = x;
+  x.seen++;
+  if (mode==="prod") x.prod=Math.min(6,(x.prod||0)+1);
+  else               x.recog=Math.min(6,(x.recog||0)+1);
+  if (rating==="again") {
+    x.wrong++; x.mastery=Math.max(0,x.mastery-1); x.streak=0; x.next=addMin(20);
+  } else {
+    x.correct++; x.streak++;
+    x.mastery=Math.min(6, x.mastery+(rating==="easy"?2:1));
+    const map=[1,1,2,4,7,14,30];
+    x.next=addDays(rating==="hard"?1:map[x.mastery]||14);
+  }
+  const today=new Date().toDateString();
+  const meta={...ns.meta};
+  if (meta.lastDay!==today) {
+    const yesterday=new Date(); yesterday.setDate(yesterday.getDate()-1);
+    meta.streak = meta.lastDay===yesterday.toDateString() ? (meta.streak||0)+1 : 1;
+    meta.lastDay=today;
+  }
+  meta.xp=(meta.xp||0)+(rating==="again"?0:10);
+  ns.meta=meta;
+  saveProgress(ns);
+  return ns;
+}
+
+function candidates(state, words, mode="smart", n=20) {
+  return words.map(w=>{
+    const x=getP(state,w.id);
+    let s=0;
+    if (!x.seen) s+=900;
+    if (isDue(state,w)) s+=800;
+    if (x.wrong) s+=x.wrong*90;
+    if (mode==="production" && x.prod<2) s+=200;
+    s-=x.mastery*35;
+    s+=Math.random()*40; // variété
+    return {w,s};
+  }).sort((a,b)=>b.s-a.s).slice(0,n).map(o=>o.w);
+}
+
+function blankSentence(w) {
+  const e = w.example;
+  const re = new RegExp(w.word.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"i");
+  return re.test(e) ? e.replace(re,"________") : e+" (________)";
+}
+
+// Mot du jour : déterministe pour la journée, favorise les mots avec exemples réels
+function getMotDuJour(words) {
+  if (!words.length) return null;
+  const day = Math.floor(Date.now()/(1000*60*60*24));
+  const pool = words.filter(w=>w.hasRealExample);
+  const src  = pool.length>0 ? pool : words;
+  return src[day % src.length];
+}
+
+// Milestones
+const MILESTONES = [
+  { key:"streak3",    check:(s,_)=>s.meta.streak>=3,   icon:"🔥", text:"3 jours de suite !" },
+  { key:"streak7",    check:(s,_)=>s.meta.streak>=7,   icon:"🔥🔥", text:"7 jours de suite !" },
+  { key:"streak30",   check:(s,_)=>s.meta.streak>=30,  icon:"💥", text:"30 jours d'affilée !" },
+  { key:"mastered10", check:(_,w)=>w.filter(x=>x.mastery>=3).length>=10,  icon:"🎓", text:"10 mots bien mémorisés !" },
+  { key:"mastered50", check:(_,w)=>w.filter(x=>x.mastery>=3).length>=50,  icon:"🏆", text:"50 mots bien mémorisés !" },
+  { key:"mastered100",check:(_,w)=>w.filter(x=>x.mastery>=3).length>=100, icon:"🌟", text:"100 mots mémorisés !" },
+  { key:"xp500",  check:(s,_)=>s.meta.xp>=500,  icon:"⚡", text:"500 XP gagnés !" },
+  { key:"xp2000", check:(s,_)=>s.meta.xp>=2000, icon:"⚡⚡", text:"2000 XP !" },
+];
+
+function checkMilestones(state, progressValues) {
+  const seen = loadSeenMilestones();
+  for (const m of MILESTONES) {
+    if (!seen.includes(m.key) && m.check(state, progressValues)) {
+      saveSeenMilestone(m.key);
+      return m;
+    }
+  }
+  return null;
+}
+
+// ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
+const C = {
+  bg:"#F2F2F7", surface:"rgba(255,255,255,0.88)", solid:"#FFFFFF",
+  border:"rgba(0,0,0,0.08)", text:"#1C1C1E", sub:"#6E6E73", ter:"#AEAEB2",
+  blue:"#007AFF", green:"#34C759", orange:"#FF9500", red:"#FF3B30",
+  purple:"#AF52DE", indigo:"#5856D6", teal:"#5AC8FA",
+};
+const THEME_COLOR = {
+  Argumentation:C.orange, "Littérature":C.purple, "Spiritualité":C.indigo,
+  "Écologie":C.green, "Droit & Politique":C.red, Psychologie:C.teal,
+  Philosophie:C.blue, Vocabulaire:C.sub,
+};
+const STATUS_COLOR = {
+  Nouveau:C.blue,"En cours":C.orange,"À revoir":C.red,Fragile:C.orange,"Maîtrisé":C.green,
+};
+
+// ─── UI ATOMS ─────────────────────────────────────────────────────────────────
+const Pill = ({label,color}) => (
+  <span style={{display:"inline-flex",alignItems:"center",padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,letterSpacing:0.3,background:(color||C.blue)+"18",color:color||C.blue,border:`1px solid ${(color||C.blue)}30`}}>{label}</span>
+);
+const Card = ({children,style}) => (
+  <div style={{background:C.surface,backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,boxShadow:"0 2px 20px rgba(0,0,0,0.06)",padding:"20px 22px",...style}}>{children}</div>
+);
+const Btn = ({label,variant="default",onClick,disabled,full,small,icon}) => {
+  const s={
+    default:{background:"rgba(0,0,0,0.06)",color:C.text},
+    primary:{background:C.blue,color:"#fff"},
+    success:{background:C.green,color:"#fff"},
+    danger: {background:C.red, color:"#fff"},
+    ghost:  {background:"transparent",color:C.blue,border:`1.5px solid ${C.blue}40`},
+  }[variant]||{};
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      ...s,padding:small?"7px 14px":"11px 20px",borderRadius:12,border:s.border||"none",
+      fontSize:small?13:15,fontWeight:600,cursor:disabled?"not-allowed":"pointer",
+      opacity:disabled?0.45:1,transition:"all 0.12s ease",width:full?"100%":"auto",
+      fontFamily:"-apple-system,'SF Pro Text',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+    }}>{icon&&<span>{icon}</span>}{label}</button>
+  );
+};
+const Bar = ({value,color}) => (
+  <div style={{height:6,background:"rgba(0,0,0,0.07)",borderRadius:99,overflow:"hidden"}}>
+    <div style={{height:"100%",borderRadius:99,background:color||C.blue,width:`${Math.min(100,Math.max(0,value))}%`,transition:"width 0.4s ease"}}/>
+  </div>
+);
+
+// Bloc exemple contextualisé — pièce centrale de l'apprentissage
+const ExampleBlock = ({word, showLabel=true, fontSize=15}) => (
+  <div style={{background:`${C.blue}07`,borderLeft:`4px solid ${C.blue}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"12px 0"}}>
+    {showLabel && <p style={{fontSize:11,fontWeight:700,color:C.blue,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 6px"}}>Exemple en contexte</p>}
+    <p style={{fontSize,color:C.text,fontStyle:"italic",lineHeight:1.7,margin:0}}>{word.example}</p>
+  </div>
+);
+
+// ─── MILESTONE TOAST ──────────────────────────────────────────────────────────
+function MilestoneToast({milestone, onDone}) {
+  useEffect(()=>{ const t=setTimeout(onDone,3200); return ()=>clearTimeout(t); },[]);
+  return (
+    <div style={{position:"fixed",top:24,left:"50%",transform:"translateX(-50%)",zIndex:200,
+      background:C.solid,borderRadius:20,padding:"16px 28px",boxShadow:"0 8px 40px rgba(0,0,0,0.18)",
+      display:"flex",alignItems:"center",gap:14,animation:"fadeSlideIn 0.4s ease",minWidth:260,
+      border:`1px solid ${C.border}`}}>
+      <span style={{fontSize:36,animation:"pop 0.4s ease"}}>{milestone.icon}</span>
+      <div>
+        <p style={{fontSize:13,fontWeight:700,color:C.sub,margin:"0 0 2px"}}>Objectif atteint !</p>
+        <p style={{fontSize:16,fontWeight:800,color:C.text,margin:0}}>{milestone.text}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── MOT DU JOUR ──────────────────────────────────────────────────────────────
+function MotDuJour({word, state}) {
+  const [expanded, setExpanded] = useState(false);
+  if (!word) return null;
+  const status = wordStatus(state,word);
+  return (
+    <div style={{background:`linear-gradient(135deg, ${C.blue}14 0%, ${C.purple}10 100%)`,border:`1px solid ${C.blue}25`,borderRadius:18,padding:"18px 20px",marginBottom:4,cursor:"pointer"}} onClick={()=>setExpanded(e=>!e)}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+        <div>
+          <p style={{fontSize:11,fontWeight:700,color:C.blue,textTransform:"uppercase",letterSpacing:1.2,margin:"0 0 4px"}}>✨ Mot du jour</p>
+          <p style={{fontSize:26,fontWeight:800,color:C.text,letterSpacing:-0.8,margin:"0 0 2px",lineHeight:1.1}}>{word.word}</p>
+          <p style={{fontSize:13,color:C.sub,margin:0}}>{word.compact}</p>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+          <Pill label={status} color={STATUS_COLOR[status]}/>
+          <span style={{fontSize:20}}>{expanded?"▲":"▼"}</span>
+        </div>
+      </div>
+      {expanded && (
+        <div style={{marginTop:12,animation:"fadeSlideIn 0.25s ease"}}>
+          <ExampleBlock word={word} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── MODALS ───────────────────────────────────────────────────────────────────
+function ImportModal({open,onClose,onImport,currentCount}) {
+  const [text,setText]=useState("");
+  const [feedback,setFeedback]=useState(null);
+  if (!open) return null;
+  const handleFile=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>setText(ev.target.result); r.readAsText(f,"UTF-8"); };
+  const handleImport=()=>{
+    try {
+      const parsed=JSON.parse(text);
+      if (!Array.isArray(parsed)||!parsed[0]?.word) { setFeedback({type:"error",msg:"Format invalide : tableau avec champ 'word' requis."}); return; }
+      const ok=saveCustomWords(parsed);
+      if (!ok) { setFeedback({type:"error",msg:"Erreur de sauvegarde."}); return; }
+      setFeedback({type:"ok",msg:`✅ ${parsed.length} mots importés !`});
+      setTimeout(()=>{ onImport(parsed); onClose(); setText(""); setFeedback(null); },800);
+    } catch(e) { setFeedback({type:"error",msg:`JSON invalide : ${e.message}`}); }
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}>
+      <div style={{background:C.solid,borderRadius:20,padding:24,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
+        <h2 style={{fontSize:22,fontWeight:800,color:C.text,margin:"0 0 6px"}}>📥 Importer mon vocabulaire</h2>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.5,margin:"0 0 16px"}}>Actuellement : <strong>{currentCount} mots</strong>.<br/><span style={{color:C.green,fontWeight:600}}>✓ Une fois importé, tout est sauvegardé automatiquement.</span></p>
+        <label style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,border:`1.5px dashed ${C.blue}60`,cursor:"pointer",marginBottom:12,background:`${C.blue}06`,color:C.blue,fontWeight:600,fontSize:14}}>
+          📂 Charger le fichier .json directement
+          <input type="file" accept=".json" onChange={handleFile} style={{display:"none"}}/>
+        </label>
+        <p style={{fontSize:12,color:C.ter,textAlign:"center",marginBottom:8}}>— ou coller le contenu JSON —</p>
+        <textarea value={text} onChange={e=>setText(e.target.value)} placeholder='[{"word":"...","definition":"...","definition_compacte":"...","example":"..."}, ...]'
+          style={{width:"100%",minHeight:140,padding:"12px 14px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:13,color:C.text,fontFamily:"ui-monospace,Menlo,monospace",resize:"vertical",outline:"none",boxSizing:"border-box",background:"#F8F8FA"}}/>
+        {feedback&&<p style={{fontSize:14,fontWeight:600,color:feedback.type==="ok"?C.green:C.red,marginTop:10}}>{feedback.msg}</p>}
+        <div style={{display:"flex",gap:10,marginTop:16,justifyContent:"flex-end"}}>
+          <Btn label="Annuler" variant="ghost" onClick={onClose}/>
+          <Btn label="Importer" variant="primary" onClick={handleImport} disabled={!text.trim()}/>
+        </div>
+        <div style={{marginTop:16,padding:"12px 14px",background:`${C.blue}08`,borderRadius:12,fontSize:12,color:C.sub,lineHeight:1.6}}>
+          💡 Fichier attendu : <code>vocabulaire_enrichi_definitions_exemples_v6_final.json</code>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SyncModal({open,onClose,onImportProgress}) {
+  const [text,setText]=useState("");
+  const [feedback,setFeedback]=useState(null);
+  if (!open) return null;
+  const handleFile=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>setText(ev.target.result); r.readAsText(f,"UTF-8"); };
+  const handleImport=()=>{
+    try {
+      const parsed=JSON.parse(text);
+      if (!parsed.progress||!parsed.meta) { setFeedback({type:"error",msg:"Fichier invalide."}); return; }
+      onImportProgress(parsed);
+      setFeedback({type:"ok",msg:"✅ Progression importée !"});
+      setTimeout(()=>{ onClose(); setText(""); setFeedback(null); },800);
+    } catch(e) { setFeedback({type:"error",msg:`JSON invalide : ${e.message}`}); }
+  };
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}>
+      <div style={{background:C.solid,borderRadius:20,padding:24,maxWidth:500,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
+        <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:8}}>📱 Synchroniser sur un autre appareil</h2>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:16}}>
+          <strong>Sur cet appareil :</strong> Stats → Exporter progression.<br/>
+          <strong>Transférer :</strong> AirDrop, iCloud Drive, mail…<br/>
+          <strong>Sur l'autre appareil :</strong> importer ci-dessous.
+        </p>
+        <label style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,border:`1.5px dashed ${C.blue}60`,cursor:"pointer",marginBottom:12,background:`${C.blue}06`,color:C.blue,fontWeight:600,fontSize:14}}>
+          📂 Charger le fichier de progression
+          <input type="file" accept=".json" onChange={handleFile} style={{display:"none"}}/>
+        </label>
+        {text&&<p style={{fontSize:12,color:C.green,marginBottom:8}}>✓ Fichier chargé</p>}
+        {feedback&&<p style={{fontSize:14,fontWeight:600,color:feedback.type==="ok"?C.green:C.red,marginBottom:8}}>{feedback.msg}</p>}
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:8}}>
+          <Btn label="Annuler" variant="ghost" onClick={onClose}/>
+          <Btn label="Importer la progression" variant="primary" onClick={handleImport} disabled={!text.trim()}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResetModal({open,onClose,onConfirm}) {
+  if (!open) return null;
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}>
+      <div style={{background:C.solid,borderRadius:20,padding:28,maxWidth:380,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
+        <h2 style={{fontSize:20,fontWeight:800,color:C.red,marginBottom:10}}>⚠️ Réinitialiser la progression ?</h2>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>Cela supprimera XP, maîtrise et dates. Ton vocabulaire importé sera conservé.</p>
+        <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+          <Btn label="Annuler" variant="ghost" onClick={onClose}/>
+          <Btn label="Réinitialiser" variant="danger" onClick={onConfirm}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB BAR ──────────────────────────────────────────────────────────────────
+const TABS=[
+  {id:"daily",icon:"☀️",label:"Routine"},
+  {id:"learn",icon:"📚",label:"Révision"},
+  {id:"quiz",icon:"⚡️",label:"Quiz"},
+  {id:"library",icon:"🗂",label:"Mots"},
+  {id:"stats",icon:"📊",label:"Stats"},
+];
+function TabBar({active,onSelect,dueCount}) {
+  return (
+    <div style={{display:"flex",gap:2,background:"rgba(255,255,255,0.75)",backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,padding:"5px",marginBottom:20}}>
+      {TABS.map(t=>(
+        <button key={t.id} onClick={()=>onSelect(t.id)} style={{
+          flex:1,padding:"8px 4px",borderRadius:13,border:"none",
+          background:active===t.id?C.blue:"transparent",
+          color:active===t.id?"#fff":C.sub,
+          fontSize:11,fontWeight:600,cursor:"pointer",transition:"all 0.18s ease",
+          fontFamily:"-apple-system,'SF Pro Text',sans-serif",
+          display:"flex",flexDirection:"column",alignItems:"center",gap:2,position:"relative",
+        }}>
+          <span style={{fontSize:18}}>{t.icon}</span>{t.label}
+          {t.id==="learn" && dueCount>0 && (
+            <span style={{position:"absolute",top:4,right:6,background:C.red,color:"#fff",borderRadius:10,fontSize:9,fontWeight:800,padding:"1px 5px",lineHeight:"14px"}}>{dueCount}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── DAILY TAB ────────────────────────────────────────────────────────────────
+const STEPS=["Découverte","Association","Contexte","Production","Boss"];
+
+function DailyTab({words,state,setState,onMilestone}) {
+  const motDuJour = useMemo(()=>getMotDuJour(words),[words]);
+  const pool5  = useMemo(()=>candidates(state,words,"new",5),[]);
+  const pool8  = useMemo(()=>candidates(state,words,"smart",8),[]);
+  const all    = useMemo(()=>[...pool5,...pool8],[]);
+
+  const [step,setStep]=useState(0);
+  const [idx,setIdx]=useState(0);
+  const [hearts,setHearts]=useState(3);
+  const [xpToday,setXpToday]=useState(0);
+  const [done,setDone]=useState(false);
+  const [feedback,setFeedback]=useState(null);
+  const [inputVal,setInputVal]=useState("");
+  const [shown,setShown]=useState(false);
+  const [log,setLog]=useState([]);
+
+  const sources=useMemo(()=>{
+    if(step===0) return pool5.slice(0,5);
+    if(step===4) return all.slice(0,8);
+    return pool8.slice(0,8);
+  },[step]);
+
+  const current=sources[idx];
+
+  const advance=useCallback((ok,mode="recog")=>{
+    if(!current) return;
+    const ns=gradeWord(state,current.id,ok?"good":"again",mode);
+    setState(ns);
+    if(ok) setXpToday(x=>x+10); else setHearts(h=>h-1);
+    setLog(l=>[...l,{word:current,ok}]);
+    setFeedback(ok?"correct":"wrong");
+    // Vérifier milestone
+    const progValues=Object.values(ns.progress);
+    const m=checkMilestones(ns,progValues);
+    if(m) onMilestone(m);
+    setTimeout(()=>{
+      setFeedback(null); setShown(false); setInputVal("");
+      if(idx+1>=sources.length) {
+        if(step+1>=STEPS.length) setDone(true);
+        else { setStep(s=>s+1); setIdx(0); }
+      } else setIdx(i=>i+1);
+    },600);
+  },[current,idx,step,sources.length,state]);
+
+  // Écran de fin
+  if(done) {
+    const uniqueWords=[...new Map(log.map(e=>[e.word.id,e])).values()];
+    const nOk=log.filter(e=>e.ok).length;
+    const nWrong=log.filter(e=>!e.ok).length;
+    const toReview=uniqueWords.filter(e=>!e.ok).map(e=>e.word);
+    const mastered=uniqueWords.filter(e=>e.ok).map(e=>e.word);
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.3s ease"}}>
+        <div style={{textAlign:"center",padding:"28px 0 12px"}}>
+          <div style={{fontSize:60,marginBottom:10}}>🎉</div>
+          <h2 style={{fontSize:26,fontWeight:800,color:C.text,marginBottom:6}}>Routine terminée !</h2>
+          <p style={{color:C.sub,fontSize:15}}>+{xpToday} XP · {nOk} ✓ · {nWrong} ✗</p>
+        </div>
+        {mastered.length>0&&(
+          <Card style={{padding:"14px 18px"}}>
+            <p style={{fontSize:12,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>✓ Bien mémorisés ({mastered.length})</p>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {mastered.map(w=><Pill key={w.id} label={w.word} color={C.green}/>)}
+            </div>
+          </Card>
+        )}
+        {toReview.length>0&&(
+          <Card style={{padding:"14px 18px"}}>
+            <p style={{fontSize:12,fontWeight:700,color:C.orange,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>⚠ À retravailler ({toReview.length})</p>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {toReview.map(w=>(
+                <div key={w.id} style={{padding:"10px 12px",borderRadius:12,background:`${C.orange}08`,border:`1px solid ${C.orange}30`}}>
+                  <p style={{fontWeight:700,color:C.text,fontSize:14,margin:"0 0 2px"}}>{w.word}</p>
+                  <p style={{color:C.sub,fontSize:13,margin:0}}>{w.compact}</p>
+                  {w.hasRealExample&&<p style={{color:C.sub,fontSize:12,fontStyle:"italic",margin:"4px 0 0",lineHeight:1.5}}>{w.example}</p>}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+        <p style={{textAlign:"center",color:C.ter,fontSize:13}}>Reviens demain pour la prochaine session 🌙</p>
+      </div>
+    );
+  }
+
+  if(hearts<=0) return (
+    <div style={{textAlign:"center",padding:"48px 0"}}>
+      <div style={{fontSize:56,marginBottom:16}}>💔</div>
+      <h2 style={{fontSize:24,fontWeight:700,marginBottom:20,color:C.text}}>Plus de cœurs</h2>
+      <Btn label="Reprendre avec 3 cœurs" variant="primary" onClick={()=>setHearts(3)}/>
+    </div>
+  );
+
+  if(!current) return (
+    <div>
+      {motDuJour && <MotDuJour word={motDuJour} state={state}/>}
+      <div style={{color:C.sub,textAlign:"center",padding:48,fontSize:16}}>Reviens demain pour de nouveaux mots 🌙</div>
+    </div>
+  );
+
+  const cardBg=feedback==="correct"?`${C.green}14`:feedback==="wrong"?`${C.red}10`:C.surface;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      {/* Mot du jour (compact, cliquable) */}
+      {step===0 && idx===0 && motDuJour && <MotDuJour word={motDuJour} state={state}/>}
+
+      {/* Barre de progression */}
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <div style={{flex:1,display:"flex",gap:4}}>
+          {STEPS.map((s,i)=>(
+            <div key={i} style={{flex:1,height:5,borderRadius:99,background:i<step?C.green:i===step?C.blue:"rgba(0,0,0,0.1)",transition:"background 0.3s"}}/>
+          ))}
+        </div>
+        <span style={{fontSize:14,color:C.red,fontWeight:700,minWidth:52,textAlign:"right"}}>{"♥".repeat(Math.max(0,hearts))}{"♡".repeat(Math.max(0,3-hearts))}</span>
+        <span style={{fontSize:14,color:C.orange,fontWeight:700}}>+{xpToday}</span>
+      </div>
+      <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>{STEPS[step]} · {idx+1} / {sources.length}</div>
+
+      <div style={{background:cardBg,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",transition:"background 0.4s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
+        {step===0 && <StepDiscover word={current} shown={shown} setShown={setShown} onNext={()=>advance(true)}/>}
+        {step===1 && <StepChoice word={current} words={words} mode="termToDefinition" onAnswer={ok=>advance(ok,"recog")}/>}
+        {step===2 && <StepContext word={current} words={words} onAnswer={ok=>advance(ok,"prod")}/>}
+        {step===3 && <StepProd word={current} inputVal={inputVal} setInputVal={setInputVal} onAnswer={ok=>advance(ok,"prod")}/>}
+        {step===4 && <StepChoice word={current} words={words} mode="mixed" onAnswer={ok=>advance(ok,"recog")}/>}
+      </div>
+    </div>
+  );
+}
+
+// Découverte : exemple EN AVANT
+function StepDiscover({word,shown,setShown,onNext}) {
+  return (
+    <div>
+      <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+        <Pill label={word.nature} color={C.purple}/>
+        <Pill label={word.theme} color={THEME_COLOR[word.theme]}/>
+        <Pill label={word.level} color={C.sub}/>
+      </div>
+      <div style={{fontSize:38,fontWeight:800,color:C.text,letterSpacing:-1.3,marginBottom:14,lineHeight:1.05}}>{word.word}</div>
+      {!shown ? (
+        <>
+          {/* Aperçu de l'exemple AVANT la définition */}
+          <ExampleBlock word={word}/>
+          <Btn label="Voir la définition" variant="primary" full onClick={()=>setShown(true)}/>
+        </>
+      ) : (
+        <>
+          <p style={{fontSize:18,color:C.text,fontWeight:700,marginBottom:6}}>{word.compact}</p>
+          <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:12}}>{word.definition}</p>
+          <ExampleBlock word={word}/>
+          <Btn label="J'ai compris ✓" variant="success" full onClick={onNext}/>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Association : bouton Continuer après erreur
+function StepChoice({word,words,mode,onAnswer}) {
+  const pool    = useMemo(()=>shuffle(words.filter(x=>x.id!==word.id)).slice(0,3),[word.id]);
+  const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
+  const showTerm= useMemo(()=>mode==="termToDefinition"||(mode==="mixed"&&Math.random()>0.5),[mode]);
+  const [selected,setSelected]=useState(null);
+
+  const handleClick=(o)=>{
+    if(selected) return;
+    setSelected(o.id);
+    const ok=o.id===word.id;
+    if(ok) setTimeout(()=>onAnswer(true),900);
+    // Si faux : l'utilisateur clique sur Continuer
+  };
+
+  const getBtnStyle=(o)=>{
+    if(!selected) return {bg:C.solid,border:C.border,color:C.text,weight:500};
+    if(o.id===word.id)   return {bg:`${C.green}22`,border:C.green,color:C.text,weight:700};
+    if(o.id===selected)  return {bg:`${C.red}18`,  border:C.red,  color:C.sub, weight:500};
+    return {bg:C.solid,border:C.border,color:C.ter,weight:500};
+  };
+
+  const wrong = selected && selected!==word.id;
+
+  return (
+    <div>
+      <p style={{fontSize:12,color:C.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>
+        {showTerm?"Quelle est la définition ?":"Quel est le mot ?"}
+      </p>
+      <div style={{fontSize:showTerm?36:18,fontWeight:showTerm?800:500,color:C.text,marginBottom:18,letterSpacing:showTerm?-1.2:0,lineHeight:1.1}}>
+        {showTerm?word.word:word.compact}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        {options.map(o=>{
+          const s=getBtnStyle(o);
+          return (
+            <button key={o.id} onClick={()=>handleClick(o)} disabled={!!selected&&o.id!==word.id&&!wrong} style={{
+              padding:"13px 12px",borderRadius:14,border:`1.5px solid ${s.border}`,
+              background:s.bg,textAlign:"left",cursor:selected?"default":"pointer",
+              fontSize:13,fontWeight:s.weight,color:s.color,lineHeight:1.45,
+              fontFamily:"-apple-system,'SF Pro Text',sans-serif",transition:"all 0.25s ease",
+            }}>
+              {showTerm?o.compact:o.word}{o.id===word.id&&selected?" ✓":""}
+            </button>
+          );
+        })}
+      </div>
+      {wrong && (
+        <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
+          <ExampleBlock word={word}/>
+          <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}><strong style={{color:C.text}}>{word.word}</strong> — {word.definition}</p>
+          <Btn label="J'ai compris →" variant="primary" full onClick={()=>onAnswer(false)}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Contexte : même traitement
+function StepContext({word,words,onAnswer}) {
+  const pool    = useMemo(()=>shuffle(words.filter(x=>x.id!==word.id)).slice(0,3),[word.id]);
+  const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
+  const [selected,setSelected]=useState(null);
+
+  const handleClick=(o)=>{
+    if(selected) return;
+    setSelected(o.id);
+    const ok=o.id===word.id;
+    if(ok) setTimeout(()=>onAnswer(true),900);
+  };
+
+  const wrong=selected&&selected!==word.id;
+
+  return (
+    <div>
+      <p style={{fontSize:12,color:C.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Complète la phrase</p>
+      <div style={{background:`${C.blue}07`,borderLeft:`4px solid ${C.blue}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"0 0 16px"}}>
+        <p style={{fontSize:16,color:C.text,fontStyle:"italic",lineHeight:1.7,margin:0}}>{blankSentence(word)}</p>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        {options.map(o=>{
+          let bg=C.solid,border=C.border,color=C.blue;
+          if(selected) {
+            if(o.id===word.id)         {bg=`${C.green}22`;border=C.green;color=C.green;}
+            else if(o.id===selected)   {bg=`${C.red}18`; border=C.red;  color=C.red;}
+            else color=C.ter;
+          }
+          return (
+            <button key={o.id} onClick={()=>handleClick(o)} disabled={!!selected} style={{
+              padding:"12px 14px",borderRadius:14,border:`1.5px solid ${border}`,
+              background:bg,cursor:selected?"default":"pointer",fontSize:14,fontWeight:700,color,
+              fontFamily:"-apple-system,'SF Pro Text',sans-serif",transition:"all 0.25s ease",
+            }}>
+              {o.word}{o.id===word.id&&selected?" ✓":""}
+            </button>
+          );
+        })}
+      </div>
+      {wrong&&(
+        <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
+          <p style={{fontSize:13,color:C.sub,margin:"0 0 12px"}}><strong style={{color:C.text}}>{word.word}</strong> — {word.compact}</p>
+          <Btn label="J'ai compris →" variant="primary" full onClick={()=>onAnswer(false)}/>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Production : saisie libre
+function StepProd({word,inputVal,setInputVal,onAnswer}) {
+  return (
+    <div>
+      <p style={{fontSize:12,color:C.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Retrouve le mot</p>
+      <div style={{background:`${C.blue}10`,borderRadius:14,padding:"13px 16px",marginBottom:12}}>
+        <p style={{fontSize:15,color:C.text,margin:0}}>{word.compact}</p>
+      </div>
+      <ExampleBlock word={word} showLabel={false} fontSize={13}/>
+      <input value={inputVal} onChange={e=>setInputVal(e.target.value)}
+        onKeyDown={e=>e.key==="Enter"&&onAnswer(norm(inputVal)===norm(word.word))}
+        placeholder="Écris le mot…" autoFocus
+        style={{width:"100%",padding:"12px 16px",borderRadius:13,fontSize:16,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,fontFamily:"-apple-system",outline:"none",marginBottom:12,boxSizing:"border-box"}}/>
+      <div style={{display:"flex",gap:10}}>
+        <Btn label="Valider" variant="primary" full onClick={()=>onAnswer(norm(inputVal)===norm(word.word))}/>
+        <Btn label="Passer" variant="ghost" onClick={()=>onAnswer(false)}/>
+      </div>
+    </div>
+  );
+}
+
+// ─── RÉVISION TAB ─────────────────────────────────────────────────────────────
+function LearnTab({words,state,setState}) {
+  const seenWords=useMemo(()=>words.filter(w=>getP(state,w.id).seen>0),[words,state]);
+  const [pool]=useState(()=>seenWords.length===0?[]:candidates(state,seenWords,"smart",20));
+  const [idx,setIdx]=useState(0);
+  const [shown,setShown]=useState(false);
+  const w=pool[idx];
+
+  if(seenWords.length===0) return (
+    <Card style={{textAlign:"center",padding:"40px 24px"}}>
+      <div style={{fontSize:48,marginBottom:12}}>📚</div>
+      <p style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:8}}>Aucun mot vu pour l'instant</p>
+      <p style={{fontSize:14,color:C.sub,lineHeight:1.6}}>Fais d'abord la <strong>Routine</strong> du jour — les mots appris y apparaîtront ensuite ici pour révision.</p>
+    </Card>
+  );
+  if(!w) return <div style={{textAlign:"center",padding:48,color:C.sub,fontSize:16}}>Session terminée ✅<br/><br/><small>Tous tes mots sont en bonne voie. À demain !</small></div>;
+
+  const x=getP(state,w.id);
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontSize:13,color:C.sub,fontWeight:500}}>{idx+1} / {pool.length}</span>
+        <div style={{display:"flex",gap:6}}>
+          <Pill label={wordStatus(state,w)} color={STATUS_COLOR[wordStatus(state,w)]}/>
+          <Pill label={`${getRate(state,w)}%`} color={C.blue}/>
+        </div>
+      </div>
+      <Card>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+          <Pill label={w.nature} color={C.purple}/><Pill label={w.theme} color={THEME_COLOR[w.theme]}/>
+        </div>
+        <div style={{fontSize:36,fontWeight:800,letterSpacing:-1.3,color:C.text,marginBottom:12,lineHeight:1.05}}>{w.word}</div>
+        {!shown ? (
+          <>
+            <p style={{fontSize:14,color:C.ter,marginBottom:12}}>Retrouve mentalement la définition, puis révèle.</p>
+            {/* L'exemple en contexte — visible avant de révéler */}
+            <ExampleBlock word={w} showLabel={false} fontSize={14}/>
+            <Btn label="Révéler la définition" variant="primary" full onClick={()=>setShown(true)}/>
+          </>
+        ) : (
+          <>
+            <p style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:6}}>{w.compact}</p>
+            <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:10}}>{w.definition}</p>
+            <ExampleBlock word={w}/>
+            <div style={{background:"rgba(0,0,0,0.04)",borderRadius:12,padding:"10px 14px",marginBottom:14}}>
+              <div style={{fontSize:12,color:C.sub,display:"flex",gap:16,marginBottom:6}}>
+                <span>Recog. {x.recog}/6</span><span>Prod. {x.prod}/6</span><span>{getRate(state,w)}%</span>
+              </div>
+              <Bar value={(x.mastery/6)*100} color={C.blue}/>
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {[["Oublié","again",C.red],["Difficile","hard",C.orange],["Bien","good",C.blue],["Facile","easy",C.green]].map(([l,r,c])=>(
+                <button key={r} onClick={()=>{ const ns=gradeWord(state,w.id,r,"recog"); setState(ns); setShown(false); setIdx(i=>i+1); }} style={{
+                  flex:1,padding:"9px 4px",borderRadius:12,border:`1.5px solid ${c}30`,
+                  background:`${c}12`,color:c,fontWeight:700,fontSize:13,cursor:"pointer",
+                  fontFamily:"-apple-system,'SF Pro Text',sans-serif",
+                }}>{l}</button>
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ─── QUIZ TAB ─────────────────────────────────────────────────────────────────
+const QUIZ_SIZES=[5,10,15,20];
+
+function QuizTab({words,state,setState}) {
+  const [maxQ,setMaxQ]=useState(10);
+  const [count,setCount]=useState(0);
+  const [score,setScore]=useState(0);
+  const [done,setDone]=useState(false);
+  const [started,setStarted]=useState(false);
+
+  // Ref pour toujours avoir le dernier state dans les callbacks
+  const stateRef=useRef(state);
+  useEffect(()=>{ stateRef.current=state; },[state]);
+
+  const [w,setW]=useState(null);
+  const [selected,setSelected]=useState(null);
+  const quiz=useMemo(()=>w?{w,options:shuffle([w,...shuffle(words.filter(x=>x.id!==w.id)).slice(0,3)])}:null,[w]);
+
+  const getNext=useCallback(()=>candidates(stateRef.current,words,"smart",1)[0],[words]);
+
+  const startQuiz=()=>{
+    setCount(0); setScore(0); setDone(false); setSelected(null);
+    setW(getNext());
+    setStarted(true);
+  };
+
+  const handleAnswer=(o)=>{
+    if(selected) return;
+    setSelected(o.id);
+    const ok=o.id===w.id;
+    const ns=gradeWord(stateRef.current,w.id,ok?"good":"again","recog");
+    setState(ns);
+    if(ok) setScore(s=>s+1);
+    const next=count+1;
+    if(ok) {
+      // Bonne réponse : avance automatiquement après 900ms
+      setTimeout(()=>{
+        setCount(next);
+        if(next>=maxQ) { setDone(true); setStarted(false); }
+        else { setSelected(null); setW(candidates(stateRef.current,words,"smart",1)[0]); }
+      },900);
+    }
+    // Mauvaise réponse : l'utilisateur clique sur "J'ai compris →"
+  };
+
+  const handleContinue=()=>{
+    const next=count+1;
+    setCount(next);
+    if(next>=maxQ) { setDone(true); setStarted(false); }
+    else { setSelected(null); setW(candidates(stateRef.current,words,"smart",1)[0]); }
+  };
+
+  if(!started&&!done) return (
+    <Card style={{textAlign:"center",padding:"36px 24px"}}>
+      <div style={{fontSize:48,marginBottom:14}}>⚡️</div>
+      <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:8}}>Quiz rapide</h2>
+      <p style={{fontSize:14,color:C.sub,marginBottom:24,lineHeight:1.6}}>Combien de questions ?</p>
+      <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:28,flexWrap:"wrap"}}>
+        {QUIZ_SIZES.map(n=>(
+          <button key={n} onClick={()=>setMaxQ(n)} style={{
+            padding:"10px 22px",borderRadius:14,fontWeight:700,fontSize:15,
+            border:`2px solid ${maxQ===n?C.blue:C.border}`,
+            background:maxQ===n?`${C.blue}14`:C.solid,
+            color:maxQ===n?C.blue:C.sub,cursor:"pointer",
+            fontFamily:"-apple-system,'SF Pro Text',sans-serif",transition:"all 0.15s",
+          }}>{n}</button>
+        ))}
+      </div>
+      <Btn label={`Démarrer — ${maxQ} questions`} variant="primary" onClick={startQuiz}/>
+    </Card>
+  );
+
+  if(done) return (
+    <Card style={{textAlign:"center",padding:"36px 24px"}}>
+      <div style={{fontSize:56,marginBottom:12}}>{score>=maxQ*0.8?"🏆":score>=maxQ*0.5?"👍":"💪"}</div>
+      <h2 style={{fontSize:24,fontWeight:800,color:C.text,marginBottom:8}}>{score} / {maxQ} correct{score>1?"s":""}</h2>
+      <p style={{fontSize:15,color:C.sub,marginBottom:24}}>
+        {score===maxQ?"Parfait !":score>=maxQ*0.8?"Excellent !":score>=maxQ*0.5?"Bien joué !":"Continue, ça vient !"}
+      </p>
+      <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+        <Btn label="Rejouer" variant="primary" onClick={startQuiz}/>
+        <Btn label="Changer le nombre" variant="ghost" onClick={()=>{setDone(false);setStarted(false);}}/>
+      </div>
+    </Card>
+  );
+
+  if(!w||!quiz) return <div style={{color:C.sub,textAlign:"center",padding:48}}>Chargement…</div>;
+
+  const wrong=selected&&selected!==w.id;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div style={{flex:1}}><Bar value={(count/maxQ)*100} color={C.blue}/></div>
+        <span style={{fontSize:13,color:C.sub,fontWeight:600,minWidth:50,textAlign:"right"}}>{count+1} / {maxQ}</span>
+        <span style={{fontSize:13,color:C.green,fontWeight:700}}>✓ {score}</span>
+      </div>
+      <Card>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+          <Pill label={w.nature} color={C.purple}/><Pill label={w.theme} color={THEME_COLOR[w.theme]}/>
+        </div>
+        <div style={{fontSize:38,fontWeight:800,letterSpacing:-1.3,color:C.text,marginBottom:18,lineHeight:1.05}}>{w.word}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {quiz.options.map(o=>{
+            let bg=C.solid,border=C.border,color=C.text,weight=500;
+            if(selected) {
+              if(o.id===w.id)         {bg=`${C.green}22`;border=C.green;weight=700;}
+              else if(o.id===selected){bg=`${C.red}18`; border=C.red;  color=C.sub;}
+              else color=C.ter;
+            }
+            return (
+              <button key={o.id} onClick={()=>handleAnswer(o)} disabled={!!selected} style={{
+                padding:"13px 12px",borderRadius:14,border:`1.5px solid ${border}`,
+                background:bg,textAlign:"left",cursor:selected?"default":"pointer",
+                fontSize:13,fontWeight:weight,color,lineHeight:1.45,
+                fontFamily:"-apple-system,'SF Pro Text',sans-serif",transition:"all 0.25s",
+              }}>
+                {o.compact}{o.id===w.id&&selected?" ✓":""}
+              </button>
+            );
+          })}
+        </div>
+        {wrong&&(
+          <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
+            <ExampleBlock word={w}/>
+            <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}>{w.definition}</p>
+            <Btn label="J'ai compris →" variant="primary" full onClick={handleContinue}/>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ─── LIBRARY TAB ──────────────────────────────────────────────────────────────
+function LibraryTab({words,state}) {
+  const [query,setQuery]=useState("");
+  const [filter,setFilter]=useState("Tous");
+  const [selected,setSelected]=useState(null);
+
+  const themes=useMemo(()=>["Tous","Nouveau","À revoir","Maîtrisé","Fragile",...Array.from(new Set(words.map(w=>w.theme))).sort()],[words]);
+  const visible=useMemo(()=>{
+    const q=norm(query);
+    return words.filter(w=>{
+      const hay=norm([w.word,w.compact,w.definition,w.theme,w.nature].join(" "));
+      return (!q||hay.includes(q))&&(filter==="Tous"||w.theme===filter||wordStatus(state,w)===filter);
+    }).sort((a,b)=>a.word.localeCompare(b.word,"fr"));
+  },[query,filter,state,words]);
+
+  const sel=selected?words.find(w=>w.id===selected):null;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",gap:8}}>
+        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="🔍  Rechercher…"
+          style={{flex:1,padding:"10px 14px",borderRadius:12,fontSize:14,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,fontFamily:"-apple-system",outline:"none",boxSizing:"border-box"}}/>
+        <select value={filter} onChange={e=>setFilter(e.target.value)}
+          style={{padding:"10px 12px",borderRadius:12,fontSize:13,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,fontFamily:"-apple-system",outline:"none"}}>
+          {themes.map(t=><option key={t}>{t}</option>)}
+        </select>
+      </div>
+      <p style={{fontSize:12,color:C.ter,margin:0}}>{visible.length} mots</p>
+
+      {sel ? (
+        <Card>
+          <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",color:C.blue,fontSize:14,cursor:"pointer",padding:0,marginBottom:10,fontWeight:500,fontFamily:"-apple-system"}}>← Retour</button>
+          <div style={{fontSize:28,fontWeight:800,color:C.text,letterSpacing:-0.8,marginBottom:10}}>{sel.word}</div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+            <Pill label={sel.nature} color={C.purple}/>
+            <Pill label={sel.theme} color={THEME_COLOR[sel.theme]}/>
+            <Pill label={wordStatus(state,sel)} color={STATUS_COLOR[wordStatus(state,sel)]}/>
+          </div>
+          <p style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>{sel.compact}</p>
+          <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:10}}>{sel.definition}</p>
+          <ExampleBlock word={sel}/>
+        </Card>
+      ) : (
+        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:560,overflowY:"auto"}}>
+          {visible.map(w=>{
+            const st=wordStatus(state,w);
+            return (
+              <div key={w.id} onClick={()=>setSelected(w.id)} style={{padding:"12px 14px",borderRadius:14,cursor:"pointer",background:C.surface,border:`1.5px solid ${C.border}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                  <span style={{fontWeight:700,fontSize:15,color:C.text}}>{w.word}</span>
+                  <Pill label={st} color={STATUS_COLOR[st]}/>
+                </div>
+                <div style={{fontSize:13,color:C.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{w.compact}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── STATS TAB ────────────────────────────────────────────────────────────────
+function StatsTab({words,state,onOpenImport,onReset,onExport,onSync}) {
+  const total    = words.length;
+  const mastered = words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
+  const dueN     = words.filter(w=>isDue(state,w)).length;
+  const fragile  = words.filter(w=>wordStatus(state,w)==="Fragile").length;
+  const seen     = words.filter(w=>getP(state,w.id).seen>0).length;
+
+  const themeStats=useMemo(()=>{
+    const map={};
+    words.forEach(w=>{
+      if(!map[w.theme]) map[w.theme]={total:0,mastered:0};
+      map[w.theme].total++;
+      if(wordStatus(state,w)==="Maîtrisé") map[w.theme].mastered++;
+    });
+    return Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
+  },[words,state]);
+
+  const StatCard=({icon,label,value,color,sub})=>(
+    <div style={{background:C.surface,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,padding:"14px 16px",boxShadow:"0 1px 8px rgba(0,0,0,0.05)"}}>
+      <div style={{fontSize:20,marginBottom:4}}>{icon}</div>
+      <div style={{fontSize:24,fontWeight:800,color:color||C.text,fontVariantNumeric:"tabular-nums"}}>{value}</div>
+      <div style={{fontSize:12,color:C.sub,marginTop:2,fontWeight:500}}>{label}</div>
+      {sub&&<div style={{fontSize:11,color:C.ter,marginTop:2}}>{sub}</div>}
+    </div>
+  );
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+        <StatCard icon="📖" label="Total" value={total} color={C.blue}/>
+        <StatCard icon="✅" label="Maîtrisés" value={mastered} color={C.green} sub="mastery≥5, taux≥75%"/>
+        <StatCard icon="🔄" label="À revoir" value={dueN} color={C.red}/>
+        <StatCard icon="⚠️" label="Fragiles" value={fragile} color={C.orange} sub="≥2 erreurs, taux<70%"/>
+        <StatCard icon="👁" label="Vus" value={seen} color={C.purple}/>
+        <StatCard icon="🔥" label="Série" value={`${state.meta.streak||0}j`} color={C.orange}/>
+      </div>
+
+      <Card>
+        <h3 style={{fontSize:16,fontWeight:700,color:C.text,marginTop:0,marginBottom:12}}>Progression globale</h3>
+        <Bar value={total?(mastered/total)*100:0} color={C.green}/>
+        <p style={{fontSize:13,color:C.sub,marginTop:8,marginBottom:0}}>{mastered} / {total} mots maîtrisés · {seen} vus · {state.meta.xp||0} XP</p>
+      </Card>
+
+      <Card>
+        <h3 style={{fontSize:16,fontWeight:700,color:C.text,marginTop:0,marginBottom:14}}>Par thème</h3>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {themeStats.map(([theme,{total:t,mastered:m}])=>(
+            <div key={theme}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+                <span style={{fontSize:13,fontWeight:600,color:C.text}}>{theme}</span>
+                <span style={{fontSize:12,color:C.sub}}>{m}/{t}</span>
+              </div>
+              <Bar value={t?(m/t)*100:0} color={THEME_COLOR[theme]||C.blue}/>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <h3 style={{fontSize:16,fontWeight:700,color:C.text,marginTop:0,marginBottom:8}}>Mes données</h3>
+        <p style={{fontSize:13,color:C.sub,marginTop:0,marginBottom:12,lineHeight:1.5}}>
+          <strong>{total} mots</strong> chargés · progression sauvegardée automatiquement.
+        </p>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <Btn label="📥 Mettre à jour le vocabulaire" variant="primary" full onClick={onOpenImport}/>
+          <div style={{display:"flex",gap:8}}>
+            <Btn label="⬆️ Exporter progression" variant="ghost" full onClick={onExport}/>
+            <Btn label="⬇️ Importer progression" variant="ghost" full onClick={onSync}/>
+          </div>
+          <Btn label="🔄 Réinitialiser la progression" variant="ghost" full onClick={onReset}/>
+        </div>
+        <p style={{fontSize:12,color:C.ter,marginTop:10,lineHeight:1.5}}>
+          💡 Multi-appareils : exporte ta progression ici, transfère via AirDrop/iCloud, importe sur l'autre appareil.
+        </p>
+      </Card>
+    </div>
+  );
+}
+
+// ─── ROOT ──────────────────────────────────────────────────────────────────────
+function App() {
+  const [tab,setTab]=useState("daily");
+  const [state,setState]=useState(loadProgress);
+  const [rawWords,setRawWords]=useState(()=>loadCustomWords()||SEED_WORDS);
+  const [showImport,setShowImport]=useState(false);
+  const [fetchStatus,setFetchStatus]=useState(null); // null | "loading" | "done" | "error"
+
+  // Auto-chargement depuis VOCAB_URL si pas de mots en localStorage
+  useEffect(()=>{
+    if (!VOCAB_URL) return;
+    if (loadCustomWords()) return; // déjà des mots en cache → rien à faire
+    setFetchStatus("loading");
+    fetch(VOCAB_URL)
+      .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(data=>{
+        if (!Array.isArray(data) || !data[0]?.word) throw new Error("Format invalide");
+        saveCustomWords(data);
+        setRawWords(data);
+        setFetchStatus("done");
+        setTimeout(()=>setFetchStatus(null), 3000);
+      })
+      .catch(err=>{
+        console.warn("Chargement vocabulaire échoué :", err);
+        setFetchStatus("error");
+      });
+  },[]);
+  const [showReset,setShowReset]=useState(false);
+  const [showSync,setShowSync]=useState(false);
+  const [milestone,setMilestone]=useState(null);
+
+  const words=useMemo(()=>rawWords.map(buildWord),[rawWords]);
+  const total=words.length;
+  const mastered=words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
+  const usingCustom=!!loadCustomWords();
+  const dueCount=useMemo(()=>words.filter(w=>isDue(state,w)&&getP(state,w.id).seen>0).length,[words,state]);
+
+  const handleReset=()=>{
+    const fresh={progress:{},meta:{xp:0,streak:0,lastDay:null}};
+    saveProgress(fresh); setState(fresh); setShowReset(false);
+  };
+  const handleImportProgress=(data)=>{
+    const ns={progress:data.progress||{},meta:data.meta||{xp:0,streak:0,lastDay:null}};
+    saveProgress(ns); setState(ns); setShowSync(false);
+  };
+  const handleExport=()=>{
+    const data={progress:state.progress,meta:state.meta,exportedAt:new Date().toISOString()};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url; a.download=`vocab_progression_${new Date().toISOString().slice(0,10)}.json`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"-apple-system,'SF Pro Text','Helvetica Neue',sans-serif",WebkitFontSmoothing:"antialiased"}}>
+      {milestone&&<MilestoneToast milestone={milestone} onDone={()=>setMilestone(null)}/>}
+
+      <div style={{maxWidth:760,margin:"0 auto",padding:"24px 18px 80px"}}>
+        {/* Header */}
+        <div style={{marginBottom:20}}>
+          <p style={{fontSize:11,fontWeight:700,letterSpacing:1.4,color:C.sub,textTransform:"uppercase",margin:"0 0 4px"}}>Atelier vocabulaire</p>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",flexWrap:"wrap",gap:10}}>
+            <h1 style={{fontSize:28,fontWeight:800,color:C.text,letterSpacing:-1.2,margin:0}}>Français avancé</h1>
+            <div style={{display:"flex",gap:6}}>
+              <div style={{background:`${C.orange}18`,color:C.orange,borderRadius:11,padding:"5px 11px",fontSize:12,fontWeight:700}}>🔥 {state.meta.streak||0}j</div>
+              <div style={{background:`${C.blue}12`, color:C.blue, borderRadius:11,padding:"5px 11px",fontSize:12,fontWeight:700}}>⚡ {state.meta.xp||0} XP</div>
+            </div>
+          </div>
+          <p style={{fontSize:13,color:C.sub,marginTop:4,marginBottom:0}}>
+            {total} mots {usingCustom?"(import perso ✓)":"(démo)"} · {mastered} maîtrisés
+          </p>
+          {fetchStatus==="loading" && (
+            <div style={{marginTop:8,padding:"8px 14px",borderRadius:10,background:`${C.blue}10`,color:C.blue,fontSize:13,fontWeight:600,display:"inline-flex",alignItems:"center",gap:8}}>
+              <span style={{animation:"shimmer 1.2s ease infinite",display:"inline-block"}}>⏳</span> Chargement du vocabulaire…
+            </div>
+          )}
+          {fetchStatus==="done" && (
+            <div style={{marginTop:8,padding:"8px 14px",borderRadius:10,background:`${C.green}12`,color:C.green,fontSize:13,fontWeight:600}}>
+              ✅ {rawWords.length} mots chargés et mis en cache !
+            </div>
+          )}
+          {fetchStatus==="error" && (
+            <div style={{marginTop:8,padding:"8px 14px",borderRadius:10,background:`${C.red}10`,color:C.red,fontSize:13,fontWeight:600}}>
+              ⚠️ Impossible de charger le vocabulaire distant. <button onClick={()=>setShowImport(true)} style={{background:"none",border:"none",color:C.red,textDecoration:"underline",cursor:"pointer",fontSize:13,fontWeight:600}}>Importer manuellement</button>
+            </div>
+          )}
+          {!usingCustom && !fetchStatus && !VOCAB_URL &&(
+            <button onClick={()=>setShowImport(true)} style={{marginTop:10,padding:"8px 14px",borderRadius:10,background:`${C.blue}12`,color:C.blue,border:`1px solid ${C.blue}30`,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"-apple-system"}}>📥 Importer mes 700+ mots</button>
+          )}
+        </div>
+
+        <TabBar active={tab} onSelect={setTab} dueCount={dueCount}/>
+
+        {tab==="daily"   && <DailyTab   words={words} state={state} setState={setState} onMilestone={setMilestone}/>}
+        {tab==="learn"   && <LearnTab   words={words} state={state} setState={setState}/>}
+        {tab==="quiz"    && <QuizTab    words={words} state={state} setState={setState}/>}
+        {tab==="library" && <LibraryTab words={words} state={state}/>}
+        {tab==="stats"   && <StatsTab   words={words} state={state} onOpenImport={()=>setShowImport(true)} onReset={()=>setShowReset(true)} onExport={handleExport} onSync={()=>setShowSync(true)}/>}
+      </div>
+
+      <ImportModal open={showImport} onClose={()=>setShowImport(false)} currentCount={total} onImport={w=>setRawWords(w)}/>
+      <SyncModal   open={showSync}   onClose={()=>setShowSync(false)}   onImportProgress={handleImportProgress}/>
+      <ResetModal  open={showReset}  onClose={()=>setShowReset(false)}  onConfirm={handleReset}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
