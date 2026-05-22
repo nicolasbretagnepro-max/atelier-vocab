@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Atelier Vocabulaire · Français avancé</title>
 
-  <!-- ── PWA ───────────────────────────────────────────────────────────────── -->
+  <!-- PWA -->
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#007AFF" />
 
@@ -25,32 +25,68 @@
       });
     }
   </script>
-  <!-- ─────────────────────────────────────────────────────────────────────── -->
 
+  <!-- Version single-file : pratique pour test. Pour production, préférer Vite/React buildé. -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js" crossorigin></script>
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #F2F2F7; font-family: -apple-system,'SF Pro Text','Helvetica Neue',sans-serif; -webkit-font-smoothing: antialiased; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    html { background: #F2F2F7; }
+    body {
+      background: #F2F2F7;
+      color: #1C1C1E;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    button, input, textarea, select { font: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 3px solid rgba(0,122,255,0.32);
+      outline-offset: 2px;
+    }
     #root { min-height: 100vh; }
+    .word-title { overflow-wrap: anywhere; word-break: break-word; }
+    .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .scroll-list { display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - 260px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 560px) {
+      .choice-grid { grid-template-columns: 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .hide-small { display: none !important; }
+    }
     @keyframes fadeSlideIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     @keyframes pop { 0%{transform:scale(0.7);opacity:0} 60%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
     @keyframes shimmer { 0%{opacity:0.5} 50%{opacity:1} 100%{opacity:0.5} }
+    @keyframes gentleShake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+    @keyframes successPulse { 0%{transform:scale(1)} 50%{transform:scale(1.012)} 100%{transform:scale(1)} }
+    .question-card { animation: fadeSlideIn 0.22s ease; }
+    .feedback-correct { animation: successPulse 0.36s ease; }
+    .feedback-wrong { animation: gentleShake 0.22s ease; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+    }
   </style>
 </head>
 <body>
 <div id="root"></div>
+
 <script type="text/babel">
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
 // ─── CONFIGURATION ────────────────────────────────────────────────────────────
-// ✏️  Colle ici l'URL "raw" de ton GitHub Gist contenant le JSON vocabulaire.
-// Laisse null pour utiliser uniquement le localStorage / l'import manuel.
 const VOCAB_URL = "https://gist.githubusercontent.com/nicolasbretagnepro-max/caf58ca177791bd21d8df3b700115c56/raw/";
-// Gist de Nicolas — vocabulaire_enrichi v6 (708 mots)
+const FIGURES_URL = "https://gist.githubusercontent.com/nicolasbretagnepro-max/b3b4450a37336f12a9c9c7b3d45c6cba/raw/";
 
-// ─── SEED (30 mots de démo, utilisés uniquement si aucune autre source) ──────
+function dataUrl(url, force = false) {
+  if (!force) return url;
+  const sep = String(url).includes("?") ? "&" : "?";
+  return `${url}${sep}_reload=${Date.now()}`;
+}
+
+// ─── SEED : utilisé uniquement en fallback si aucune donnée distante/cache ────
 const SEED_WORDS = [
   {"word":"Abduction","nature":"nom","definition":"Nom. « Abduction » désigne : inférence vers l'explication la plus plausible.","definition_compacte":"inférence vers l'explication la plus plausible","example":"L'enquêteur procède par abduction : la fenêtre ouverte rend l'hypothèse d'un complice plus plausible."},
   {"word":"Abnégation","nature":"nom","definition":"Nom. « Abnégation » désigne : sacrifice volontaire de soi-même, de son intérêt.","definition_compacte":"sacrifice volontaire de soi-même","example":""},
@@ -81,21 +117,70 @@ const SEED_WORDS = [
   {"word":"Atavisme","nature":"nom","definition":"Nom. « Atavisme » désigne : réapparition d'un caractère ancestral ; héritage de comportements.","definition_compacte":"héritage de traits ancestraux","example":""},
   {"word":"Concession","nature":"nom","definition":"Nom. « Concession » désigne : en argumentation, fait d'admettre un point adverse pour renforcer sa position.","definition_compacte":"admettre un point adverse pour mieux argumenter","example":""},
   {"word":"Déférence","nature":"nom","definition":"Nom. « Déférence » désigne : considération très respectueuse témoignée à quelqu'un.","definition_compacte":"respect profond envers quelqu'un","example":""},
-  {"word":"Anachorète","nature":"nom","definition":"Nom. « Anachorète » désigne : religieux ou ermite menant une vie solitaire, retirée du monde.","definition_compacte":"ermite retiré du monde","example":""},
+  {"word":"Anachorète","nature":"nom","definition":"Nom. « Anachorète » désigne : religieux ou ermite menant une vie solitaire, retirée du monde.","definition_compacte":"ermite retiré du monde","example":""}
+];
+
+const SEED_FIGURES = [
+  {"word":"Comparaison","nature":"nom féminin","definition_courte":"Rapprochement explicite entre deux éléments.","definition":"Figure qui rapproche deux réalités à l'aide d'un outil de comparaison comme « comme », « tel », « semblable à » ou « pareil à ».","example":"Son regard brillait comme une lampe dans la nuit.","example_type":"exemple original imagé","example_cloze":"Son regard brillait […].","example_cloze_type":"exemple original imagé avec figure masquée"},
+  {"word":"Métaphore","nature":"nom féminin","definition_courte":"Comparaison implicite, sans outil comparatif.","definition":"Figure qui désigne une réalité par une autre avec laquelle elle entretient une ressemblance, sans utiliser d'outil de comparaison.","example":"Son regard était une lampe dans la nuit.","example_type":"exemple original imagé","example_cloze":"Son regard était […].","example_cloze_type":"exemple original imagé avec figure masquée"},
+  {"word":"Personnification","nature":"nom féminin","definition_courte":"Attribution de traits humains à une chose.","definition":"Figure qui prête des comportements, des sentiments ou des paroles humaines à un animal, un objet, une idée ou un élément naturel.","example":"Le vent frappait aux volets et murmurait sous la porte.","example_type":"exemple original imagé","example_cloze":"Le vent […] aux volets et […] sous la porte.","example_cloze_type":"exemple original imagé avec figure masquée"},
+  {"word":"Hyperbole","nature":"nom féminin","definition_courte":"Exagération expressive.","definition":"Figure qui amplifie fortement une idée, une émotion ou une réalité pour produire un effet d'intensité.","example":"Je t'ai appelé mille fois depuis ce matin.","example_type":"exemple original","example_cloze":"Je t'ai appelé […] depuis ce matin.","example_cloze_type":"exemple original avec figure masquée"},
+  {"word":"Oxymore","nature":"nom masculin","definition_courte":"Association de deux mots opposés.","definition":"Figure qui rapproche dans une même expression deux termes de sens contradictoire.","example":"Un silence assourdissant tomba sur la salle.","example_type":"exemple original imagé","example_cloze":"Un […] tomba sur la salle.","example_cloze_type":"exemple original imagé avec figure masquée"}
 ];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const norm = (s) =>
-  String(s||"").toLowerCase().normalize("NFD")
-    .replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+  String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 
-const uid      = (s,i) => norm(s).replace(/ /g,"-")+"-"+i;
-const shuffle  = (a)   => [...a].sort(()=>Math.random()-0.5);
-const addDays  = (n)   => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString(); };
-const addMin   = (n)   => { const d=new Date(); d.setMinutes(d.getMinutes()+n); return d.toISOString(); };
+function hashString(str) {
+  let h = 2166136261;
+  for (let i = 0; i < String(str).length; i++) {
+    h ^= String(str).charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+function stableWordId(w) {
+  const label = norm(w.word || "mot").replace(/ /g, "-") || "mot";
+  // ID volontairement fondé sur le mot et la nature, pas sur la définition :
+  // une correction éditoriale du JSON ne doit pas effacer la progression.
+  const signature = [w.word, w.nature || ""].join("|");
+  return `${label}-${hashString(signature)}`;
+}
+
+function shuffle(a) {
+  const arr = [...a];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+const addDays = (n) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString();
+};
+
+const addMin = (n) => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() + n);
+  return d.toISOString();
+};
+
+function localDateKey(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 function inferNature(w) {
-  const d = String(w.definition||"").trimStart();
+  const d = String(w.definition || "").trimStart();
   if (/^verbe pronominal/i.test(d)) return "Verbe pronominal";
   if (/^locution/i.test(d)) return "Locution";
   if (/^expression/i.test(d)) return "Expression";
@@ -104,9 +189,10 @@ function inferNature(w) {
   if (/^verbe\b/i.test(d)) return "Verbe";
   if (/^nom et adjectif/i.test(d)) return "Nom/Adj";
   if (/^nom/i.test(d)) return "Nom";
-  const n = String(w.nature||"").trim().toLowerCase();
+  const n = String(w.nature || "").trim().toLowerCase();
   if (n.includes("verbe pronominal")) return "Verbe pronominal";
   if (n.includes("locution")) return "Locution";
+  if (n.includes("expression")) return "Expression";
   if (n.includes("adjectif")) return "Adjectif";
   if (n.includes("adverbe")) return "Adverbe";
   if (n.includes("verbe")) return "Verbe";
@@ -115,7 +201,7 @@ function inferNature(w) {
 }
 
 function inferTheme(w) {
-  const t = norm([w.word,w.definition,w.definition_compacte].join(" "));
+  const t = norm([w.word, w.definition, w.definition_compacte, w.compact].join(" "));
   if (/sophisme|argument|raisonnement|logique|preuve|biais|abduction|heuristique|falsifiab|aporie|premisse|whataboutisme|homme de paille/.test(t)) return "Argumentation";
   if (/recit|narrat|figure|rhetorique|litteraire|style|ironie|anaphore|analepse|anthologie|antiphrase/.test(t)) return "Littérature";
   if (/religion|foi|divin|spirit|sacre|mystique|bigot|breviaire|anachorete/.test(t)) return "Spiritualité";
@@ -127,9 +213,9 @@ function inferTheme(w) {
 }
 
 function inferLevel(w) {
-  const len = (w.word||"").length;
+  const len = (w.word || "").length;
   if (len > 14) return "Avancé";
-  if (len > 9)  return "Intermédiaire";
+  if (len > 9) return "Intermédiaire";
   return "Courant";
 }
 
@@ -137,151 +223,487 @@ function isGeneric(e) {
   return !e || /Dans son article|Le chroniqueur emploie|Dans l'analyse|peut servir à décrire|Le texte emploie|Dans le passage|Le passage emploie|Dans l'article|Dans le récit|Le journaliste emploie/i.test(e);
 }
 
-// Génère une phrase contextuelle minimale pour les mots sans exemple
 function makeContextSentence(w) {
-  return `On parle d'« ${w.word} » quand on désigne : ${w.compact || w.definition}.`;
+  return `On parle d'« ${w.word} » quand on désigne : ${w.compact || w.definition || "ce mot"}.`;
 }
 
-function buildWord(w, i) {
-  const raw = w.example || "";
-  const hasGoodExample = raw.trim().length > 20 && !isGeneric(raw);
+function normalizeConfusions(value) {
+  if (!value) return [];
+  const arr = Array.isArray(value) ? value : [value];
+  return arr.map(item => {
+    if (typeof item === "string") return { word: item.trim(), difference: "", compact: "", definition: "" };
+    if (!item || typeof item !== "object") return null;
+    return {
+      word: String(item.word || item.mot || item.term || "").trim(),
+      difference: String(item.difference || item.nuance || item.note || item.explanation || "").trim(),
+      compact: String(item.definition_courte || item.definition_compacte || item.compact || "").trim(),
+      definition: String(item.definition || item.full_definition || "").trim(),
+    };
+  }).filter(x => x && x.word);
+}
+
+function tokenSet(s) {
+  return new Set(norm(s).split(" ").filter(x => x.length > 3));
+}
+
+function lexicalOverlap(a, b) {
+  const ta = tokenSet([a.compact, a.definition, a.theme].join(" "));
+  const tb = tokenSet([b.compact, b.definition, b.theme].join(" "));
+  if (!ta.size || !tb.size) return 0;
+  let n = 0;
+  ta.forEach(t => { if (tb.has(t)) n++; });
+  return n / Math.max(ta.size, tb.size);
+}
+
+function findWordByLabel(words, label) {
+  const wanted = norm(label);
+  return (words || []).find(w => norm(w.word) === wanted) || null;
+}
+
+function enrichConfusionItem(item, word, words) {
+  const existing = findWordByLabel(words, item.word);
+  const compact = item.compact || existing?.compact || "";
+  const definition = item.definition || existing?.definition || "";
+  const difference = item.difference || "";
+  if (!difference && !compact && !definition) return null;
   return {
-    id: uid(w.word,i),
-    word:      w.word || "",
-    definition:w.definition || "",
-    compact:   w.definition_compacte || w.compact || w.definition || "",
-    example:   hasGoodExample ? raw : makeContextSentence({word:w.word, compact: w.definition_compacte||w.definition}),
-    hasRealExample: hasGoodExample,
-    theme:     inferTheme(w),
-    nature:    inferNature(w),
-    level:     inferLevel(w),
+    id: existing?.id || `virtual-${norm(item.word)}`,
+    word: item.word,
+    difference,
+    compact,
+    definition,
+    theme: existing?.theme || word.theme,
+    nature: existing?.nature || word.nature,
   };
 }
 
+function inferredConfusions(word, words, limit = 3) {
+  return (words || [])
+    .filter(w => w.id !== word.id)
+    .map(w => {
+      const overlap = lexicalOverlap(word, w);
+      const score = (w.theme === word.theme ? 2 : 0) + (w.nature === word.nature ? 0.5 : 0) + overlap;
+      return { ...w, score, overlap };
+    })
+    .filter(w => w.score >= 2 || w.overlap >= 0.18)
+    .sort((a,b)=>b.score-a.score)
+    .slice(0, limit)
+    .map(w => ({
+      id: w.id,
+      word: w.word,
+      difference: "",
+      compact: w.compact || "",
+      definition: w.definition || "",
+      theme: w.theme,
+      nature: w.nature,
+    }))
+    .filter(x => x.compact || x.definition);
+}
+
+function getConfusionItems(word, words, limit = 3) {
+  const explicit = normalizeConfusions(word.confusions || [])
+    .map(item => enrichConfusionItem(item, word, words || []))
+    .filter(Boolean);
+  if (explicit.length) return explicit.slice(0, limit);
+  return inferredConfusions(word, words, limit);
+}
+
+function inferFigureFamily(w) {
+  const t = norm([w.word, w.definition_courte, w.definition, w.example].join(" "));
+  if (/comparaison|metaphore|personnification|allegorie|symbole|image|ressemblance/.test(t)) return "Figures d'image";
+  if (/metonymie|synecdoque|periphrase|antonomase|catachrese|allusion|remplacement|designe/.test(t)) return "Substitution";
+  if (/hyperbole|adynaton|auxese|tapinose|amplification|exageration|intensite|rabaisse/.test(t)) return "Intensité";
+  if (/litote|euphemisme|attenu/.test(t)) return "Atténuation";
+  if (/ironie|antiphrase|preterition|reticence|aposiopese|sous entendu|contraire/.test(t)) return "Ironie & implicite";
+  if (/paradoxe|oxymore|antithese|opposition|contradictoire|contraste/.test(t)) return "Opposition";
+  if (/chiasme|antimetabole|parallelisme|isocolon|hypozeuxe|construction|structure|syntaxe|abba/.test(t)) return "Construction";
+  if (/anaphore|epiphore|repetition|polyptote|antanaclase|reprise/.test(t)) return "Répétition";
+  if (/allitération|assonance|paronomase|sonorite|phonique|sonore/.test(t)) return "Sonorités";
+  if (/ellipse|zeugma|asyndete|polysyndete|accumulation|enumeration|gradation/.test(t)) return "Rythme & syntaxe";
+  return "Figures de style";
+}
+
+function buildWord(w, kind = "vocab") {
+  // Le corpus est déterminé par la source de chargement, pas par la présence
+  // de definition_courte : le vocabulaire général peut aussi utiliser ce champ.
+  const isFigure = kind === "figure" || w.kind === "figure" || w.type === "figure";
+  const raw = String(w.example || "");
+  const compact = w.definition_compacte || w.definition_courte || w.compact || w.definition || "";
+  const hasGoodExample = raw.trim().length > 20 && !isGeneric(raw);
+  const baseId = stableWordId(w);
+  return {
+    id: isFigure ? `figure-${baseId}` : baseId,
+    kind: isFigure ? "figure" : "vocab",
+    word: String(w.word || "").trim(),
+    definition: String(w.definition || ""),
+    compact: String(compact || ""),
+    example: hasGoodExample ? raw : makeContextSentence({ word: w.word, compact }),
+    hasRealExample: hasGoodExample,
+    cloze: w.cloze || w.example_cloze || w.phrase_trouee || null,
+    exampleType: String(w.example_type || ""),
+    clozeType: String(w.example_cloze_type || ""),
+    confusions: normalizeConfusions(w.confusions || w.mots_proches || w.motsProches || w.near || []),
+    memoryTip: String(w.memory_tip || w.mnemonic || w.astuce || ""),
+    etymology: String(w.etymology || w.etymologie || ""),
+    register: String(w.register || w.registre || ""),
+    theme: isFigure ? inferFigureFamily(w) : inferTheme(w),
+    nature: inferNature(w),
+    level: isFigure ? "Figure" : inferLevel(w)
+  };
+}
+
+function buildWords(rawWords, kind = "vocab") {
+  const seen = new Map();
+  return rawWords
+    .filter(w => w && typeof w.word === "string" && w.word.trim())
+    .map(w => {
+      const built = buildWord(w, kind);
+      const n = seen.get(built.id) || 0;
+      seen.set(built.id, n + 1);
+      return n === 0 ? built : { ...built, id: `${built.id}-${n + 1}` };
+    });
+}
+
+function validateVocabArray(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) return "Le JSON doit être un tableau non vide.";
+  const badIndex = arr.findIndex(item => !item || typeof item.word !== "string" || !item.word.trim());
+  if (badIndex >= 0) return `Entrée invalide à l'index ${badIndex} : champ "word" requis.`;
+  return null;
+}
+
+function uniqueById(arr) {
+  return [...new Map(arr.map(w => [w.id, w])).values()];
+}
+
+function escapeRegExp(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function blankSentence(w) {
+  if (w.cloze && String(w.cloze).includes("________")) return w.cloze;
+  const e = String(w.example || "");
+  const forms = [w.word, String(w.word || "").replace(/^\(Se\)\s*/i, "se ")]
+    .map(x => String(x || "").trim())
+    .filter(Boolean);
+
+  for (const form of forms) {
+    const re = new RegExp(escapeRegExp(form), "i");
+    if (re.test(e)) return e.replace(re, "________");
+  }
+  return `${e} (________)`;
+}
+
+function acceptedAnswers(word) {
+  const base = norm(word.word);
+  const variants = new Set([base]);
+  variants.add(base.replace(/^se /, "").trim());
+  variants.add(base.replace(/^s /, "").trim());
+  variants.add(base.replace(/^le /, "").trim());
+  variants.add(base.replace(/^la /, "").trim());
+  variants.add(base.replace(/^l /, "").trim());
+  variants.add(norm(String(word.word || "").replace(/^\(Se\)\s*/i, "")));
+  return [...variants].filter(Boolean);
+}
+
+function answerMatches(input, word) {
+  const n = norm(input);
+  return acceptedAnswers(word).includes(n);
+}
+
 // ─── STORAGE ──────────────────────────────────────────────────────────────────
-const STORE_PROGRESS  = "atelier_vocab_progress_v4";
-const STORE_WORDS     = "atelier_vocab_words_v4";
-const STORE_MILESTONE = "atelier_vocab_milestone_v4";
+const STORE_PROGRESS  = "atelier_vocab_progress_v5";
+const STORE_WORDS     = "atelier_vocab_words_v6";
+const STORE_FIGURES   = "atelier_vocab_figures_v1";
+const STORE_MILESTONE = "atelier_vocab_milestone_v5";
+const STORE_DAILY     = "atelier_vocab_daily_done_v1";
+const STORE_ACTIVITY  = "atelier_vocab_activity_v1";
+
+const EMPTY_PROGRESS = Object.freeze({ seen:0, correct:0, wrong:0, mastery:0, recog:0, prod:0, streak:0, next:null });
+const DEFAULT_META = Object.freeze({ xp:0, streak:0, lastDay:null });
+
+function normalizeLoadedProgress(data) {
+  if (!data || typeof data !== "object") return { progress:{}, meta:{...DEFAULT_META} };
+  return {
+    progress: data.progress && typeof data.progress === "object" ? data.progress : {},
+    meta: { ...DEFAULT_META, ...(data.meta && typeof data.meta === "object" ? data.meta : {}) }
+  };
+}
 
 function loadProgress() {
-  try { return JSON.parse(localStorage.getItem(STORE_PROGRESS)) || { progress:{}, meta:{xp:0,streak:0,lastDay:null} }; }
-  catch { return { progress:{}, meta:{xp:0,streak:0,lastDay:null} }; }
+  try { return normalizeLoadedProgress(JSON.parse(localStorage.getItem(STORE_PROGRESS))); }
+  catch { return { progress:{}, meta:{...DEFAULT_META} }; }
 }
+
 function saveProgress(s) {
-  try { localStorage.setItem(STORE_PROGRESS, JSON.stringify(s)); } catch {}
+  try { localStorage.setItem(STORE_PROGRESS, JSON.stringify(s)); return true; }
+  catch { return false; }
 }
+
 function loadCustomWords() {
-  try { const r=localStorage.getItem(STORE_WORDS); if(!r) return null; const p=JSON.parse(r); return Array.isArray(p)?p:null; }
-  catch { return null; }
+  try {
+    const r = localStorage.getItem(STORE_WORDS);
+    if (!r) return null;
+    const p = JSON.parse(r);
+    return Array.isArray(p) ? p : null;
+  } catch { return null; }
 }
+
 function saveCustomWords(arr) {
   try {
-    const compact = arr.map(w=>({word:w.word,nature:w.nature,definition:w.definition,definition_compacte:w.definition_compacte||w.compact||"",example:w.example||""}));
-    localStorage.setItem(STORE_WORDS, JSON.stringify(compact)); return true;
+    const compact = arr.map(w => {
+      const shortDef = w.definition_courte || w.definition_compacte || w.compact || "";
+      return {
+        word: w.word,
+        nature: w.nature || "",
+        definition: w.definition || "",
+        definition_courte: shortDef,
+        definition_compacte: shortDef,
+        example: w.example || "",
+        example_type: w.example_type || "",
+        example_cloze: w.example_cloze || w.cloze || w.phrase_trouee || "",
+        example_cloze_type: w.example_cloze_type || "",
+        cloze: w.cloze || w.example_cloze || w.phrase_trouee || "",
+        confusions: w.confusions || w.mots_proches || w.motsProches || [],
+        memory_tip: w.memory_tip || w.mnemonic || w.astuce || "",
+        etymology: w.etymology || w.etymologie || "",
+        register: w.register || w.registre || ""
+      };
+    });
+    localStorage.setItem(STORE_WORDS, JSON.stringify(compact));
+    return true;
   } catch { return false; }
 }
+
+function loadCustomFigures() {
+  try {
+    const r = localStorage.getItem(STORE_FIGURES);
+    if (!r) return null;
+    const p = JSON.parse(r);
+    return Array.isArray(p) ? p : null;
+  } catch { return null; }
+}
+
+function saveCustomFigures(arr) {
+  try {
+    const compact = arr.map(w => ({
+      word: w.word,
+      nature: w.nature || "",
+      definition: w.definition || "",
+      definition_courte: w.definition_courte || w.definition_compacte || w.compact || "",
+      example: w.example || "",
+      example_type: w.example_type || "",
+      example_cloze: w.example_cloze || w.cloze || w.phrase_trouee || "",
+      example_cloze_type: w.example_cloze_type || "",
+      confusions: w.confusions || w.mots_proches || w.motsProches || [],
+      memory_tip: w.memory_tip || w.mnemonic || w.astuce || "",
+      etymology: w.etymology || w.etymologie || "",
+      register: w.register || w.registre || ""
+    }));
+    localStorage.setItem(STORE_FIGURES, JSON.stringify(compact));
+    return true;
+  } catch { return false; }
+}
+
 function loadSeenMilestones() {
   try { return JSON.parse(localStorage.getItem(STORE_MILESTONE)) || []; }
   catch { return []; }
 }
+
 function saveSeenMilestone(key) {
   try {
     const s = loadSeenMilestones();
-    if (!s.includes(key)) { s.push(key); localStorage.setItem(STORE_MILESTONE,JSON.stringify(s)); }
+    if (!s.includes(key)) {
+      s.push(key);
+      localStorage.setItem(STORE_MILESTONE, JSON.stringify(s));
+    }
   } catch {}
 }
 
-// ─── SPACED REPETITION ────────────────────────────────────────────────────────
-function getP(state, id) {
-  if (!state.progress[id])
-    state.progress[id] = { seen:0,correct:0,wrong:0,mastery:0,recog:0,prod:0,streak:0,next:null };
-  return state.progress[id];
+function loadDailyDone() {
+  try { return localStorage.getItem(STORE_DAILY) === localDateKey(); }
+  catch { return false; }
 }
-function isDue(state,w) { const x=getP(state,w.id); return !!(x.next && new Date(x.next)<=new Date()); }
-function getRate(state,w) { const x=getP(state,w.id); const t=x.correct+x.wrong; return t?Math.round((x.correct/t)*100):0; }
 
-function wordStatus(state,w) {
-  const x=getP(state,w.id);
+function saveDailyDone() {
+  try { localStorage.setItem(STORE_DAILY, localDateKey()); } catch {}
+}
+
+function clearDailyDone() {
+  try { localStorage.removeItem(STORE_DAILY); } catch {}
+}
+
+function loadActivity() {
+  try {
+    const data = JSON.parse(localStorage.getItem(STORE_ACTIVITY));
+    return data && typeof data === "object" ? data : {};
+  } catch { return {}; }
+}
+
+function saveActivity(data) {
+  try { localStorage.setItem(STORE_ACTIVITY, JSON.stringify(data)); } catch {}
+}
+
+function recordActivity(rating, mode) {
+  const key = localDateKey();
+  const data = loadActivity();
+  const day = data[key] || { answers:0, correct:0, xp:0, modes:{} };
+  day.answers += 1;
+  if (rating !== "again") day.correct += 1;
+  day.xp += rating === "again" ? 0 : 10;
+  day.modes[mode || "recog"] = (day.modes[mode || "recog"] || 0) + 1;
+  data[key] = day;
+  saveActivity(data);
+}
+
+function recentActivityDays(days = 21) {
+  const data = loadActivity();
+  const out = [];
+  const base = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(base);
+    d.setDate(base.getDate() - i);
+    const key = localDateKey(d);
+    out.push({ key, date: d, ...(data[key] || { answers:0, correct:0, xp:0, modes:{} }) });
+  }
+  return out;
+}
+
+function cleanProgressForWords(state, words) {
+  const valid = new Set(words.map(w => w.id));
+  const progress = {};
+  for (const [id, p] of Object.entries(state.progress || {})) {
+    if (valid.has(id)) progress[id] = p;
+  }
+  return { ...state, progress };
+}
+
+// ─── SPACED REPETITION ────────────────────────────────────────────────────────
+function readP(state, id) {
+  return (state && state.progress && state.progress[id]) || EMPTY_PROGRESS;
+}
+
+function isDue(state, w) {
+  const x = readP(state, w.id);
+  return !!(x.next && new Date(x.next) <= new Date());
+}
+
+function getRate(state, w) {
+  const x = readP(state, w.id);
+  const t = (x.correct || 0) + (x.wrong || 0);
+  return t ? Math.round(((x.correct || 0) / t) * 100) : 0;
+}
+
+function wordStatus(state, w) {
+  const x = readP(state, w.id);
   if (!x.seen) return "Nouveau";
-  if (isDue(state,w)) return "À revoir";
-  if (x.wrong>=2 && getRate(state,w)<70) return "Fragile";
-  if (x.mastery>=5 && x.prod>=2 && getRate(state,w)>=75) return "Maîtrisé";
+  if ((x.wrong || 0) >= 2 && getRate(state, w) < 70) return "Fragile";
+  if (isDue(state, w)) return "À revoir";
+  if ((x.mastery || 0) >= 5 && (x.prod || 0) >= 2 && getRate(state, w) >= 75) return "Maîtrisé";
   return "En cours";
 }
 
-function gradeWord(state, id, rating, mode="recog") {
-  const ns = { ...state, progress:{...state.progress} };
-  const x  = { ...getP(ns,id) };
+function gradeWord(state, id, rating, mode = "recog") {
+  const ns = { ...state, progress:{ ...(state.progress || {}) } };
+  const x = { ...EMPTY_PROGRESS, ...readP(ns, id) };
   ns.progress[id] = x;
-  x.seen++;
-  if (mode==="prod") x.prod=Math.min(6,(x.prod||0)+1);
-  else               x.recog=Math.min(6,(x.recog||0)+1);
-  if (rating==="again") {
-    x.wrong++; x.mastery=Math.max(0,x.mastery-1); x.streak=0; x.next=addMin(20);
+
+  x.seen = (x.seen || 0) + 1;
+
+  if (rating === "again") {
+    x.wrong = (x.wrong || 0) + 1;
+    x.mastery = Math.max(0, (x.mastery || 0) - 1);
+    x.streak = 0;
+    x.next = addMin(20);
   } else {
-    x.correct++; x.streak++;
-    x.mastery=Math.min(6, x.mastery+(rating==="easy"?2:1));
-    const map=[1,1,2,4,7,14,30];
-    x.next=addDays(rating==="hard"?1:map[x.mastery]||14);
+    x.correct = (x.correct || 0) + 1;
+    x.streak = (x.streak || 0) + 1;
+
+    if (mode === "prod") x.prod = Math.min(6, (x.prod || 0) + 1);
+    else x.recog = Math.min(6, (x.recog || 0) + 1);
+
+    if (rating === "hard") x.mastery = Math.min(6, (x.mastery || 0) + 0.5);
+    if (rating === "good") x.mastery = Math.min(6, (x.mastery || 0) + 1);
+    if (rating === "easy") x.mastery = Math.min(6, (x.mastery || 0) + 2);
+
+    const masteryFloor = Math.floor(x.mastery || 0);
+    const map = [1, 1, 2, 4, 7, 14, 30];
+    x.next = addDays(rating === "hard" ? 1 : map[masteryFloor] || 14);
   }
-  const today=new Date().toDateString();
-  const meta={...ns.meta};
-  if (meta.lastDay!==today) {
-    const yesterday=new Date(); yesterday.setDate(yesterday.getDate()-1);
-    meta.streak = meta.lastDay===yesterday.toDateString() ? (meta.streak||0)+1 : 1;
-    meta.lastDay=today;
+
+  const today = new Date().toDateString();
+  const meta = { ...DEFAULT_META, ...(ns.meta || {}) };
+  if (meta.lastDay !== today) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    meta.streak = meta.lastDay === yesterday.toDateString() ? (meta.streak || 0) + 1 : 1;
+    meta.lastDay = today;
   }
-  meta.xp=(meta.xp||0)+(rating==="again"?0:10);
-  ns.meta=meta;
+  meta.xp = (meta.xp || 0) + (rating === "again" ? 0 : 10);
+  ns.meta = meta;
+  recordActivity(rating, mode);
   saveProgress(ns);
   return ns;
 }
 
-function candidates(state, words, mode="smart", n=20) {
-  return words.map(w=>{
-    const x=getP(state,w.id);
-    let s=0;
-    if (!x.seen) s+=900;
-    if (isDue(state,w)) s+=800;
-    if (x.wrong) s+=x.wrong*90;
-    if (mode==="production" && x.prod<2) s+=200;
-    s-=x.mastery*35;
-    s+=Math.random()*40; // variété
-    return {w,s};
-  }).sort((a,b)=>b.s-a.s).slice(0,n).map(o=>o.w);
+function candidates(state, words, mode = "smart", n = 20, excludeIds = new Set()) {
+  const usable = words.filter(w => !excludeIds.has(w.id));
+  if (!usable.length) return [];
+
+  if (mode === "new") {
+    const unseen = usable.filter(w => readP(state, w.id).seen === 0);
+    return shuffle(unseen.length ? unseen : usable).slice(0, n);
+  }
+
+  return usable.map(w => {
+    const x = readP(state, w.id);
+    let s = 0;
+    if (!x.seen) s += 900;
+    if (isDue(state, w)) s += 800;
+    if (x.wrong) s += x.wrong * 90;
+    if (mode === "production" && (x.prod || 0) < 2) s += 200;
+    s -= (x.mastery || 0) * 35;
+    s += Math.random() * 40;
+    return { w, s };
+  }).sort((a, b) => b.s - a.s).slice(0, n).map(o => o.w);
 }
 
-function blankSentence(w) {
-  const e = w.example;
-  const re = new RegExp(w.word.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"i");
-  return re.test(e) ? e.replace(re,"________") : e+" (________)";
-}
-
-// Mot du jour : déterministe pour la journée, favorise les mots avec exemples réels
 function getMotDuJour(words) {
   if (!words.length) return null;
-  const day = Math.floor(Date.now()/(1000*60*60*24));
-  const pool = words.filter(w=>w.hasRealExample);
-  const src  = pool.length>0 ? pool : words;
+  const day = Math.floor(Date.now() / (1000 * 60 * 60 * 24));
+  const pool = words.filter(w => w.hasRealExample);
+  const src = pool.length > 0 ? pool : words;
   return src[day % src.length];
 }
 
-// Milestones
+function buildDailySession(state, words) {
+  const discover = candidates(state, words, "new", 5);
+  const discoverIds = new Set(discover.map(w => w.id));
+  let review = candidates(state, words, "smart", 8, discoverIds);
+
+  // Si le vocabulaire est très court, exclure les mots de découverte peut vider
+  // les étapes Association/Contexte/Production. Dans ce cas, on réutilise le
+  // même petit corpus plutôt que de bloquer la routine.
+  if (!review.length && words.length) review = candidates(state, words, "smart", Math.min(8, words.length));
+
+  const boss = uniqueById([...discover, ...review]).slice(0, Math.min(8, words.length));
+  return { discover, review, boss };
+}
+
 const MILESTONES = [
   { key:"streak3",    check:(s,_)=>s.meta.streak>=3,   icon:"🔥", text:"3 jours de suite !" },
   { key:"streak7",    check:(s,_)=>s.meta.streak>=7,   icon:"🔥🔥", text:"7 jours de suite !" },
   { key:"streak30",   check:(s,_)=>s.meta.streak>=30,  icon:"💥", text:"30 jours d'affilée !" },
-  { key:"mastered10", check:(_,w)=>w.filter(x=>x.mastery>=3).length>=10,  icon:"🎓", text:"10 mots bien mémorisés !" },
-  { key:"mastered50", check:(_,w)=>w.filter(x=>x.mastery>=3).length>=50,  icon:"🏆", text:"50 mots bien mémorisés !" },
-  { key:"mastered100",check:(_,w)=>w.filter(x=>x.mastery>=3).length>=100, icon:"🌟", text:"100 mots mémorisés !" },
+  { key:"mastered10", check:(s,w)=>w.filter(x=>wordStatus(s,x)==="Maîtrisé").length>=10,  icon:"🎓", text:"10 mots maîtrisés !" },
+  { key:"mastered50", check:(s,w)=>w.filter(x=>wordStatus(s,x)==="Maîtrisé").length>=50,  icon:"🏆", text:"50 mots maîtrisés !" },
+  { key:"mastered100",check:(s,w)=>w.filter(x=>wordStatus(s,x)==="Maîtrisé").length>=100, icon:"🌟", text:"100 mots maîtrisés !" },
   { key:"xp500",  check:(s,_)=>s.meta.xp>=500,  icon:"⚡", text:"500 XP gagnés !" },
-  { key:"xp2000", check:(s,_)=>s.meta.xp>=2000, icon:"⚡⚡", text:"2000 XP !" },
+  { key:"xp2000", check:(s,_)=>s.meta.xp>=2000, icon:"⚡⚡", text:"2000 XP !" }
 ];
 
-function checkMilestones(state, progressValues) {
+function checkMilestones(state, words) {
   const seen = loadSeenMilestones();
   for (const m of MILESTONES) {
-    if (!seen.includes(m.key) && m.check(state, progressValues)) {
+    if (!seen.includes(m.key) && m.check(state, words)) {
       saveSeenMilestone(m.key);
       return m;
     }
@@ -294,66 +716,131 @@ const C = {
   bg:"#F2F2F7", surface:"rgba(255,255,255,0.88)", solid:"#FFFFFF",
   border:"rgba(0,0,0,0.08)", text:"#1C1C1E", sub:"#6E6E73", ter:"#AEAEB2",
   blue:"#007AFF", green:"#34C759", orange:"#FF9500", red:"#FF3B30",
-  purple:"#AF52DE", indigo:"#5856D6", teal:"#5AC8FA",
+  purple:"#AF52DE", indigo:"#5856D6", teal:"#5AC8FA"
 };
 const THEME_COLOR = {
   Argumentation:C.orange, "Littérature":C.purple, "Spiritualité":C.indigo,
   "Écologie":C.green, "Droit & Politique":C.red, Psychologie:C.teal,
   Philosophie:C.blue, Vocabulaire:C.sub,
+  "Figures de style":C.indigo, "Figures d'image":C.purple, Substitution:C.teal, Intensité:C.orange,
+  "Atténuation":C.green, "Ironie & implicite":C.red, Opposition:C.indigo, Construction:C.blue,
+  "Répétition":C.purple, "Sonorités":C.teal, "Rythme & syntaxe":C.orange
 };
 const STATUS_COLOR = {
-  Nouveau:C.blue,"En cours":C.orange,"À revoir":C.red,Fragile:C.orange,"Maîtrisé":C.green,
+  Nouveau:C.blue, "En cours":C.orange, "À revoir":C.red, Fragile:C.orange, "Maîtrisé":C.green
 };
 
 // ─── UI ATOMS ─────────────────────────────────────────────────────────────────
-const Pill = ({label,color}) => (
-  <span style={{display:"inline-flex",alignItems:"center",padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,letterSpacing:0.3,background:(color||C.blue)+"18",color:color||C.blue,border:`1px solid ${(color||C.blue)}30`}}>{label}</span>
+const Pill = ({label, color}) => (
+  <span style={{display:"inline-flex",alignItems:"center",padding:"3px 10px",borderRadius:20,fontSize:11,fontWeight:600,letterSpacing:0.3,background:(color||C.blue)+"18",color:color||C.blue,border:`1px solid ${(color||C.blue)}30`,whiteSpace:"nowrap"}}>{label}</span>
 );
-const Card = ({children,style}) => (
-  <div style={{background:C.surface,backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,boxShadow:"0 2px 20px rgba(0,0,0,0.06)",padding:"20px 22px",...style}}>{children}</div>
+
+const Card = ({children, style, className}) => (
+  <div className={className} style={{background:C.surface,backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,boxShadow:"0 2px 20px rgba(0,0,0,0.06)",padding:"20px 22px",...style}}>{children}</div>
 );
-const Btn = ({label,variant="default",onClick,disabled,full,small,icon}) => {
-  const s={
+
+const Btn = ({label, variant="default", onClick, disabled, full, small, icon}) => {
+  const s = {
     default:{background:"rgba(0,0,0,0.06)",color:C.text},
     primary:{background:C.blue,color:"#fff"},
     success:{background:C.green,color:"#fff"},
     danger: {background:C.red, color:"#fff"},
-    ghost:  {background:"transparent",color:C.blue,border:`1.5px solid ${C.blue}40`},
-  }[variant]||{};
+    ghost:  {background:"transparent",color:C.blue,border:`1.5px solid ${C.blue}40`}
+  }[variant] || {};
   return (
     <button onClick={onClick} disabled={disabled} style={{
       ...s,padding:small?"7px 14px":"11px 20px",borderRadius:12,border:s.border||"none",
       fontSize:small?13:15,fontWeight:600,cursor:disabled?"not-allowed":"pointer",
       opacity:disabled?0.45:1,transition:"all 0.12s ease",width:full?"100%":"auto",
-      fontFamily:"-apple-system,'SF Pro Text',sans-serif",display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+      display:"flex",alignItems:"center",justifyContent:"center",gap:6
     }}>{icon&&<span>{icon}</span>}{label}</button>
   );
 };
-const Bar = ({value,color}) => (
+
+const Bar = ({value, color}) => (
   <div style={{height:6,background:"rgba(0,0,0,0.07)",borderRadius:99,overflow:"hidden"}}>
     <div style={{height:"100%",borderRadius:99,background:color||C.blue,width:`${Math.min(100,Math.max(0,value))}%`,transition:"width 0.4s ease"}}/>
   </div>
 );
 
-// Bloc exemple contextualisé — pièce centrale de l'apprentissage
-const ExampleBlock = ({word, showLabel=true, fontSize=15}) => (
+const ExampleBlock = ({word, showLabel=true, fontSize=15, cloze=false}) => (
   <div style={{background:`${C.blue}07`,borderLeft:`4px solid ${C.blue}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"12px 0"}}>
     {showLabel && <p style={{fontSize:11,fontWeight:700,color:C.blue,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 6px"}}>Exemple en contexte</p>}
-    <p style={{fontSize,color:C.text,fontStyle:"italic",lineHeight:1.7,margin:0}}>{word.example}</p>
+    <p style={{fontSize,color:C.text,fontStyle:"italic",lineHeight:1.7,margin:0}}>{cloze ? blankSentence(word) : word.example}</p>
   </div>
 );
 
+function WordTitle({children, size=38}) {
+  return <div className="word-title" style={{fontSize:size,fontWeight:800,color:C.text,letterSpacing:-1.3,marginBottom:14,lineHeight:1.05}}>{children}</div>;
+}
+
+function ConfusionBlock({word, words, compact=false}) {
+  const items = useMemo(()=>getConfusionItems(word, words || [], compact ? 2 : 3), [word, words, compact]);
+  if (!items.length) return null;
+  return (
+    <div style={{background:`${C.orange}08`,border:`1px solid ${C.orange}24`,borderRadius:14,padding:compact?"10px 12px":"12px 14px",margin:"12px 0"}}>
+      <p style={{fontSize:11,fontWeight:800,color:C.orange,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 8px"}}>À comparer</p>
+      <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        {items.map((item,i)=>{
+          const mainInfo = item.difference || item.compact || item.definition;
+          const secondaryInfo = !compact && item.definition && item.definition !== mainInfo ? item.definition : "";
+          if (!mainInfo) return null;
+          return (
+            <div key={`${item.word}-${i}`} style={{fontSize:13,color:C.sub,lineHeight:1.45}}>
+              <p style={{margin:0}}><strong style={{color:C.text}}>{item.word}</strong> — {mainInfo}</p>
+              {secondaryInfo && <p style={{fontSize:12,color:C.ter,margin:"3px 0 0",lineHeight:1.45}}>{secondaryInfo}</p>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ActivityHeatmap({days=21}) {
+  const items = recentActivityDays(days);
+  const maxAnswers = Math.max(1, ...items.map(d=>d.answers || 0));
+  return (
+    <div style={{display:"grid",gridTemplateColumns:`repeat(${days}, 1fr)`,gap:4,alignItems:"end"}}>
+      {items.map(d=>{
+        const active = (d.answers || 0) > 0;
+        const alpha = active ? 0.18 + 0.52 * ((d.answers || 0) / maxAnswers) : 0.07;
+        return (
+          <div key={d.key} title={`${d.key} · ${d.answers||0} réponse(s)`} style={{height:18,borderRadius:5,background:active?`rgba(52,199,89,${alpha})`:"rgba(0,0,0,0.06)",border:`1px solid ${active?"rgba(52,199,89,0.28)":"rgba(0,0,0,0.04)"}`}} />
+        );
+      })}
+    </div>
+  );
+}
+
+function SessionButton({title, subtitle, icon, color=C.blue, onClick}) {
+  return (
+    <button onClick={onClick} style={{textAlign:"left",background:C.solid,border:`1.5px solid ${color}30`,borderRadius:16,padding:"14px 15px",cursor:"pointer",boxShadow:"0 1px 10px rgba(0,0,0,0.04)"}}>
+      <div style={{display:"flex",gap:10,alignItems:"flex-start"}}>
+        <span style={{fontSize:22,background:`${color}12`,color,borderRadius:12,width:36,height:36,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{icon}</span>
+        <div>
+          <p style={{fontSize:15,fontWeight:800,color:C.text,margin:"0 0 3px"}}>{title}</p>
+          <p style={{fontSize:12,color:C.sub,lineHeight:1.45,margin:0}}>{subtitle}</p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
 // ─── MILESTONE TOAST ──────────────────────────────────────────────────────────
 function MilestoneToast({milestone, onDone}) {
-  useEffect(()=>{ const t=setTimeout(onDone,3200); return ()=>clearTimeout(t); },[]);
+  useEffect(() => {
+    const t = setTimeout(onDone, 3200);
+    return () => clearTimeout(t);
+  }, [onDone]);
   return (
-    <div style={{position:"fixed",top:24,left:"50%",transform:"translateX(-50%)",zIndex:200,
+    <div style={{position:"fixed",top:"calc(24px + env(safe-area-inset-top))",left:"50%",transform:"translateX(-50%)",zIndex:200,
       background:C.solid,borderRadius:20,padding:"16px 28px",boxShadow:"0 8px 40px rgba(0,0,0,0.18)",
       display:"flex",alignItems:"center",gap:14,animation:"fadeSlideIn 0.4s ease",minWidth:260,
       border:`1px solid ${C.border}`}}>
       <span style={{fontSize:36,animation:"pop 0.4s ease"}}>{milestone.icon}</span>
       <div>
-        <p style={{fontSize:13,fontWeight:700,color:C.sub,margin:"0 0 2px"}}>Objectif atteint !</p>
+        <p style={{fontSize:13,fontWeight:700,color:C.sub,margin:"0 0 2px"}}>Objectif atteint</p>
         <p style={{fontSize:16,fontWeight:800,color:C.text,margin:0}}>{milestone.text}</p>
       </div>
     </div>
@@ -364,18 +851,18 @@ function MilestoneToast({milestone, onDone}) {
 function MotDuJour({word, state}) {
   const [expanded, setExpanded] = useState(false);
   if (!word) return null;
-  const status = wordStatus(state,word);
+  const status = wordStatus(state, word);
   return (
     <div style={{background:`linear-gradient(135deg, ${C.blue}14 0%, ${C.purple}10 100%)`,border:`1px solid ${C.blue}25`,borderRadius:18,padding:"18px 20px",marginBottom:4,cursor:"pointer"}} onClick={()=>setExpanded(e=>!e)}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-        <div>
-          <p style={{fontSize:11,fontWeight:700,color:C.blue,textTransform:"uppercase",letterSpacing:1.2,margin:"0 0 4px"}}>✨ Mot du jour</p>
-          <p style={{fontSize:26,fontWeight:800,color:C.text,letterSpacing:-0.8,margin:"0 0 2px",lineHeight:1.1}}>{word.word}</p>
-          <p style={{fontSize:13,color:C.sub,margin:0}}>{word.compact}</p>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:14}}>
+        <div style={{minWidth:0}}>
+          <p style={{fontSize:11,fontWeight:700,color:C.blue,textTransform:"uppercase",letterSpacing:1.2,margin:"0 0 4px"}}>Mot du jour</p>
+          <p className="word-title" style={{fontSize:26,fontWeight:800,color:C.text,letterSpacing:-0.8,margin:"0 0 2px",lineHeight:1.1}}>{word.word}</p>
+          <p style={{fontSize:13,color:C.sub,margin:0,lineHeight:1.45}}>{word.compact}</p>
         </div>
-        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6,flexShrink:0}}>
           <Pill label={status} color={STATUS_COLOR[status]}/>
-          <span style={{fontSize:20}}>{expanded?"▲":"▼"}</span>
+          <span style={{fontSize:18,color:C.sub}}>{expanded?"▲":"▼"}</span>
         </div>
       </div>
       {expanded && (
@@ -388,40 +875,57 @@ function MotDuJour({word, state}) {
 }
 
 // ─── MODALS ───────────────────────────────────────────────────────────────────
-function ImportModal({open,onClose,onImport,currentCount}) {
-  const [text,setText]=useState("");
-  const [feedback,setFeedback]=useState(null);
+function ImportModal({open, onClose, onImport, currentCount}) {
+  const [text,setText] = useState("");
+  const [feedback,setFeedback] = useState(null);
   if (!open) return null;
-  const handleFile=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>setText(ev.target.result); r.readAsText(f,"UTF-8"); };
-  const handleImport=()=>{
+
+  const requestClose = () => {
+    if (text.trim() && !window.confirm("Fermer l'import ? Le contenu saisi sera perdu.")) return;
+    onClose();
+    setText("");
+    setFeedback(null);
+  };
+
+  const handleFile = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => setText(String(ev.target.result || ""));
+    r.readAsText(f, "UTF-8");
+  };
+
+  const handleImport = () => {
     try {
-      const parsed=JSON.parse(text);
-      if (!Array.isArray(parsed)||!parsed[0]?.word) { setFeedback({type:"error",msg:"Format invalide : tableau avec champ 'word' requis."}); return; }
-      const ok=saveCustomWords(parsed);
-      if (!ok) { setFeedback({type:"error",msg:"Erreur de sauvegarde."}); return; }
-      setFeedback({type:"ok",msg:`✅ ${parsed.length} mots importés !`});
-      setTimeout(()=>{ onImport(parsed); onClose(); setText(""); setFeedback(null); },800);
+      const parsed = JSON.parse(text);
+      const error = validateVocabArray(parsed);
+      if (error) { setFeedback({type:"error",msg:error}); return; }
+      const ok = saveCustomWords(parsed);
+      if (!ok) { setFeedback({type:"error",msg:"Erreur de sauvegarde. Le stockage local est peut-être plein."}); return; }
+      setFeedback({type:"ok",msg:`${parsed.length} mots importés.`});
+      setTimeout(()=>{ onImport(parsed); onClose(); setText(""); setFeedback(null); }, 500);
     } catch(e) { setFeedback({type:"error",msg:`JSON invalide : ${e.message}`}); }
   };
+
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={requestClose}>
       <div style={{background:C.solid,borderRadius:20,padding:24,maxWidth:520,width:"100%",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
-        <h2 style={{fontSize:22,fontWeight:800,color:C.text,margin:"0 0 6px"}}>📥 Importer mon vocabulaire</h2>
-        <p style={{fontSize:14,color:C.sub,lineHeight:1.5,margin:"0 0 16px"}}>Actuellement : <strong>{currentCount} mots</strong>.<br/><span style={{color:C.green,fontWeight:600}}>✓ Une fois importé, tout est sauvegardé automatiquement.</span></p>
+        <h2 style={{fontSize:22,fontWeight:800,color:C.text,margin:"0 0 6px"}}>Importer mon vocabulaire</h2>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.5,margin:"0 0 16px"}}>Actuellement : <strong>{currentCount} mots</strong>.<br/><span style={{color:C.green,fontWeight:600}}>Une fois importé, le vocabulaire est sauvegardé localement.</span></p>
         <label style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,border:`1.5px dashed ${C.blue}60`,cursor:"pointer",marginBottom:12,background:`${C.blue}06`,color:C.blue,fontWeight:600,fontSize:14}}>
-          📂 Charger le fichier .json directement
-          <input type="file" accept=".json" onChange={handleFile} style={{display:"none"}}/>
+          Charger le fichier .json directement
+          <input type="file" accept=".json,application/json" onChange={handleFile} style={{display:"none"}}/>
         </label>
         <p style={{fontSize:12,color:C.ter,textAlign:"center",marginBottom:8}}>— ou coller le contenu JSON —</p>
         <textarea value={text} onChange={e=>setText(e.target.value)} placeholder='[{"word":"...","definition":"...","definition_compacte":"...","example":"..."}, ...]'
-          style={{width:"100%",minHeight:140,padding:"12px 14px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:13,color:C.text,fontFamily:"ui-monospace,Menlo,monospace",resize:"vertical",outline:"none",boxSizing:"border-box",background:"#F8F8FA"}}/>
+          style={{width:"100%",minHeight:140,padding:"12px 14px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:13,color:C.text,fontFamily:"ui-monospace,Menlo,monospace",resize:"vertical",outline:"none",background:"#F8F8FA"}}/>
         {feedback&&<p style={{fontSize:14,fontWeight:600,color:feedback.type==="ok"?C.green:C.red,marginTop:10}}>{feedback.msg}</p>}
         <div style={{display:"flex",gap:10,marginTop:16,justifyContent:"flex-end"}}>
-          <Btn label="Annuler" variant="ghost" onClick={onClose}/>
+          <Btn label="Annuler" variant="ghost" onClick={requestClose}/>
           <Btn label="Importer" variant="primary" onClick={handleImport} disabled={!text.trim()}/>
         </div>
         <div style={{marginTop:16,padding:"12px 14px",background:`${C.blue}08`,borderRadius:12,fontSize:12,color:C.sub,lineHeight:1.6}}>
-          💡 Fichier attendu : <code>vocabulaire_enrichi_definitions_exemples_v6_final.json</code>
+          Format attendu : tableau JSON contenant au minimum un champ <code>word</code> par entrée. Champs recommandés : <code>definition_courte</code>, <code>definition</code>, <code>example</code>, <code>example_cloze</code>, <code>confusions</code>, <code>memory_tip</code>, <code>etymology</code>.
         </div>
       </div>
     </div>
@@ -429,36 +933,48 @@ function ImportModal({open,onClose,onImport,currentCount}) {
 }
 
 function SyncModal({open,onClose,onImportProgress}) {
-  const [text,setText]=useState("");
-  const [feedback,setFeedback]=useState(null);
+  const [text,setText] = useState("");
+  const [feedback,setFeedback] = useState(null);
   if (!open) return null;
-  const handleFile=(e)=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>setText(ev.target.result); r.readAsText(f,"UTF-8"); };
-  const handleImport=()=>{
+
+  const requestClose = () => {
+    if (text.trim() && !window.confirm("Fermer l'import ? Le contenu chargé sera perdu.")) return;
+    onClose(); setText(""); setFeedback(null);
+  };
+
+  const handleFile = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => setText(String(ev.target.result || ""));
+    r.readAsText(f,"UTF-8");
+  };
+
+  const handleImport = () => {
     try {
-      const parsed=JSON.parse(text);
-      if (!parsed.progress||!parsed.meta) { setFeedback({type:"error",msg:"Fichier invalide."}); return; }
+      const parsed = JSON.parse(text);
+      if (!parsed.progress || !parsed.meta) { setFeedback({type:"error",msg:"Fichier invalide."}); return; }
       onImportProgress(parsed);
-      setFeedback({type:"ok",msg:"✅ Progression importée !"});
-      setTimeout(()=>{ onClose(); setText(""); setFeedback(null); },800);
+      setFeedback({type:"ok",msg:"Progression importée."});
+      setTimeout(()=>{ onClose(); setText(""); setFeedback(null); }, 500);
     } catch(e) { setFeedback({type:"error",msg:`JSON invalide : ${e.message}`}); }
   };
+
   return (
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}>
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={requestClose}>
       <div style={{background:C.solid,borderRadius:20,padding:24,maxWidth:500,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
-        <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:8}}>📱 Synchroniser sur un autre appareil</h2>
+        <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:8}}>Synchroniser sur un autre appareil</h2>
         <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:16}}>
-          <strong>Sur cet appareil :</strong> Stats → Exporter progression.<br/>
-          <strong>Transférer :</strong> AirDrop, iCloud Drive, mail…<br/>
-          <strong>Sur l'autre appareil :</strong> importer ci-dessous.
+          Sur cet appareil : Stats → Exporter progression. Sur l'autre appareil : importer le fichier ci-dessous.
         </p>
         <label style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,border:`1.5px dashed ${C.blue}60`,cursor:"pointer",marginBottom:12,background:`${C.blue}06`,color:C.blue,fontWeight:600,fontSize:14}}>
-          📂 Charger le fichier de progression
-          <input type="file" accept=".json" onChange={handleFile} style={{display:"none"}}/>
+          Charger le fichier de progression
+          <input type="file" accept=".json,application/json" onChange={handleFile} style={{display:"none"}}/>
         </label>
-        {text&&<p style={{fontSize:12,color:C.green,marginBottom:8}}>✓ Fichier chargé</p>}
+        {text&&<p style={{fontSize:12,color:C.green,marginBottom:8}}>Fichier chargé</p>}
         {feedback&&<p style={{fontSize:14,fontWeight:600,color:feedback.type==="ok"?C.green:C.red,marginBottom:8}}>{feedback.msg}</p>}
         <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:8}}>
-          <Btn label="Annuler" variant="ghost" onClick={onClose}/>
+          <Btn label="Annuler" variant="ghost" onClick={requestClose}/>
           <Btn label="Importer la progression" variant="primary" onClick={handleImport} disabled={!text.trim()}/>
         </div>
       </div>
@@ -471,8 +987,8 @@ function ResetModal({open,onClose,onConfirm}) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={onClose}>
       <div style={{background:C.solid,borderRadius:20,padding:28,maxWidth:380,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
-        <h2 style={{fontSize:20,fontWeight:800,color:C.red,marginBottom:10}}>⚠️ Réinitialiser la progression ?</h2>
-        <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>Cela supprimera XP, maîtrise et dates. Ton vocabulaire importé sera conservé.</p>
+        <h2 style={{fontSize:20,fontWeight:800,color:C.red,marginBottom:10}}>Réinitialiser la progression ?</h2>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>Cela supprimera XP, maîtrise, dates, objectifs déjà affichés et statut de routine du jour. Le vocabulaire importé sera conservé.</p>
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <Btn label="Annuler" variant="ghost" onClick={onClose}/>
           <Btn label="Réinitialiser" variant="danger" onClick={onConfirm}/>
@@ -483,24 +999,25 @@ function ResetModal({open,onClose,onConfirm}) {
 }
 
 // ─── TAB BAR ──────────────────────────────────────────────────────────────────
-const TABS=[
+const TABS = [
+  {id:"home",icon:"⌂",label:"Accueil"},
   {id:"daily",icon:"☀️",label:"Routine"},
   {id:"learn",icon:"📚",label:"Révision"},
   {id:"quiz",icon:"⚡️",label:"Quiz"},
+  {id:"figures",icon:"✒️",label:"Figures"},
   {id:"library",icon:"🗂",label:"Mots"},
-  {id:"stats",icon:"📊",label:"Stats"},
+  {id:"stats",icon:"📊",label:"Stats"}
 ];
+
 function TabBar({active,onSelect,dueCount}) {
   return (
-    <div style={{display:"flex",gap:2,background:"rgba(255,255,255,0.75)",backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,padding:"5px",marginBottom:20}}>
+    <div role="tablist" aria-label="Navigation principale" style={{display:"flex",gap:2,background:"rgba(255,255,255,0.75)",backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,padding:"5px",marginBottom:20}}>
       {TABS.map(t=>(
-        <button key={t.id} onClick={()=>onSelect(t.id)} style={{
+        <button key={t.id} role="tab" aria-selected={active===t.id} onClick={()=>onSelect(t.id)} style={{
           flex:1,padding:"8px 4px",borderRadius:13,border:"none",
-          background:active===t.id?C.blue:"transparent",
-          color:active===t.id?"#fff":C.sub,
+          background:active===t.id?C.blue:"transparent",color:active===t.id?"#fff":C.sub,
           fontSize:11,fontWeight:600,cursor:"pointer",transition:"all 0.18s ease",
-          fontFamily:"-apple-system,'SF Pro Text',sans-serif",
-          display:"flex",flexDirection:"column",alignItems:"center",gap:2,position:"relative",
+          display:"flex",flexDirection:"column",alignItems:"center",gap:2,position:"relative"
         }}>
           <span style={{fontSize:18}}>{t.icon}</span>{t.label}
           {t.id==="learn" && dueCount>0 && (
@@ -512,78 +1029,172 @@ function TabBar({active,onSelect,dueCount}) {
   );
 }
 
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+function Dashboard({words,figures,state,onStartDaily,onStartReview,onStartFragile,onStartDue,onStartQuiz,onStartNuance,onStartFigures}) {
+  const total = words.length;
+  const figuresTotal = figures.length;
+  const figuresSeen = figures.filter(w=>readP(state,w.id).seen>0).length;
+  const seen = words.filter(w=>readP(state,w.id).seen>0).length;
+  const due = words.filter(w=>isDue(state,w)&&readP(state,w.id).seen>0).length;
+  const fragile = words.filter(w=>wordStatus(state,w)==="Fragile").length;
+  const newCount = words.filter(w=>!readP(state,w.id).seen).length;
+  const mastered = words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
+  const today = loadActivity()[localDateKey()] || {answers:0,correct:0,xp:0};
+  const routineDone = loadDailyDone();
+  const recommended = fragile > 0 ? "Réviser les mots fragiles" : due > 0 ? "Revoir les mots dus" : routineDone ? "Faire un quiz court" : "Lancer la routine";
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.25s ease"}}>
+      <Card style={{background:`linear-gradient(135deg, ${C.blue}12 0%, ${C.purple}09 100%)`}}>
+        <p style={{fontSize:11,fontWeight:800,color:C.blue,textTransform:"uppercase",letterSpacing:1,margin:"0 0 6px"}}>Aujourd'hui</p>
+        <h2 style={{fontSize:24,fontWeight:850,color:C.text,letterSpacing:-0.8,margin:"0 0 8px"}}>{recommended}</h2>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.55,margin:"0 0 16px"}}>
+          {due} mot{due>1?"s":""} à revoir · {fragile} fragile{fragile>1?"s":""} · {newCount} nouveau{newCount>1?"x":""} disponible{newCount>1?"s":""}.
+        </p>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
+          <div><p style={{fontSize:20,fontWeight:850,color:C.text,margin:0}}>{seen}</p><p style={{fontSize:11,color:C.sub,margin:0}}>vus</p></div>
+          <div><p style={{fontSize:20,fontWeight:850,color:C.green,margin:0}}>{mastered}</p><p style={{fontSize:11,color:C.sub,margin:0}}>maîtrisés</p></div>
+          <div><p style={{fontSize:20,fontWeight:850,color:C.orange,margin:0}}>{today.answers||0}</p><p style={{fontSize:11,color:C.sub,margin:0}}>réponses</p></div>
+          <div><p style={{fontSize:20,fontWeight:850,color:C.blue,margin:0}}>{today.xp||0}</p><p style={{fontSize:11,color:C.sub,margin:0}}>XP jour</p></div>
+        </div>
+        <Btn label={routineDone ? "Routine déjà faite" : "Commencer la routine"} variant="primary" full onClick={onStartDaily} disabled={routineDone}/>
+      </Card>
+
+      <Card style={{border:`1px solid ${C.indigo}24`,background:`linear-gradient(135deg, ${C.indigo}10 0%, ${C.purple}08 100%)`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+          <div style={{minWidth:0}}>
+            <p style={{fontSize:11,fontWeight:800,color:C.indigo,textTransform:"uppercase",letterSpacing:1,margin:"0 0 4px"}}>Nouveau corpus</p>
+            <h3 style={{fontSize:19,fontWeight:850,color:C.text,margin:"0 0 4px"}}>Figures de style</h3>
+            <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:0}}>Apprends à reconnaître les procédés dans des exemples, puis à les distinguer par leur effet.</p>
+          </div>
+          <Btn label="Ouvrir" variant="primary" onClick={onStartFigures}/>
+        </div>
+      </Card>
+
+      <Card>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:12,marginBottom:12}}>
+          <div>
+            <h3 style={{fontSize:16,fontWeight:800,color:C.text,margin:"0 0 3px"}}>Choisir une session</h3>
+            <p style={{fontSize:13,color:C.sub,margin:0,lineHeight:1.45}}>Adapte la séance au temps disponible.</p>
+          </div>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}><Pill label={`${total} mots`} color={C.blue}/><Pill label={`${figuresTotal} figures`} color={C.indigo}/></div>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}} className="choice-grid">
+          <SessionButton title="Routine complète" subtitle="Découverte, contexte, production et boss." icon="☀️" color={C.blue} onClick={onStartDaily}/>
+          <SessionButton title="Révision rapide" subtitle="Revoir les mots déjà rencontrés." icon="📚" color={C.purple} onClick={onStartReview}/>
+          <SessionButton title="Mots fragiles" subtitle="Priorité aux erreurs récurrentes." icon="⚠" color={C.orange} onClick={onStartFragile}/>
+          <SessionButton title="À revoir" subtitle="Répétition espacée des mots dus." icon="↻" color={C.red} onClick={onStartDue}/>
+          <SessionButton title="Quiz rapide" subtitle="Association mot-définition." icon="⚡" color={C.green} onClick={onStartQuiz}/>
+          <SessionButton title="Mode nuance" subtitle="Distinguer les mots proches." icon="🎯" color={C.indigo} onClick={onStartNuance}/>
+          <SessionButton title="Figures de style" subtitle={`${figuresSeen}/${figuresTotal} vues · exemples à identifier.`} icon="✒️" color={C.purple} onClick={onStartFigures}/>
+        </div>
+      </Card>
+
+      <Card>
+        <h3 style={{fontSize:16,fontWeight:800,color:C.text,margin:"0 0 10px"}}>Régularité</h3>
+        <ActivityHeatmap days={21}/>
+        <p style={{fontSize:12,color:C.ter,lineHeight:1.45,margin:"10px 0 0"}}>Chaque carré représente un jour. Plus il est marqué, plus tu as travaillé ce jour-là.</p>
+      </Card>
+    </div>
+  );
+}
+
 // ─── DAILY TAB ────────────────────────────────────────────────────────────────
-const STEPS=["Découverte","Association","Contexte","Production","Boss"];
+const STEPS = ["Découverte", "Association", "Contexte", "Production", "Boss"];
 
-function DailyTab({words,state,setState,onMilestone}) {
+function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuance}) {
   const motDuJour = useMemo(()=>getMotDuJour(words),[words]);
-  const pool5  = useMemo(()=>candidates(state,words,"new",5),[]);
-  const pool8  = useMemo(()=>candidates(state,words,"smart",8),[]);
-  const all    = useMemo(()=>[...pool5,...pool8],[]);
+  const wordsSignature = useMemo(()=>words.map(w=>w.id).join("|"),[words]);
+  const [session,setSession] = useState(()=>buildDailySession(state,words));
+  const [step,setStep] = useState(0);
+  const [idx,setIdx] = useState(0);
+  const [hearts,setHearts] = useState(3);
+  const [xpToday,setXpToday] = useState(0);
+  const [done,setDone] = useState(()=>loadDailyDone());
+  const [feedback,setFeedback] = useState(null);
+  const [inputVal,setInputVal] = useState("");
+  const [shown,setShown] = useState(false);
+  const [log,setLog] = useState([]);
+  const timerRef = useRef(null);
+  const advancingRef = useRef(false);
 
-  const [step,setStep]=useState(0);
-  const [idx,setIdx]=useState(0);
-  const [hearts,setHearts]=useState(3);
-  const [xpToday,setXpToday]=useState(0);
-  const [done,setDone]=useState(false);
-  const [feedback,setFeedback]=useState(null);
-  const [inputVal,setInputVal]=useState("");
-  const [shown,setShown]=useState(false);
-  const [log,setLog]=useState([]);
+  useEffect(() => {
+    setSession(buildDailySession(state, words));
+    setStep(0); setIdx(0); setHearts(3); setXpToday(0); setFeedback(null); setInputVal(""); setShown(false); setLog([]);
+    advancingRef.current = false;
+    setDone(loadDailyDone());
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [wordsSignature]);
 
-  const sources=useMemo(()=>{
-    if(step===0) return pool5.slice(0,5);
-    if(step===4) return all.slice(0,8);
-    return pool8.slice(0,8);
-  },[step]);
+  const sources = useMemo(() => {
+    if (step === 0) return session.discover.slice(0,5);
+    if (step === 4) return session.boss.slice(0,8);
+    return session.review.slice(0,8);
+  }, [step, session]);
 
-  const current=sources[idx];
+  const current = sources[idx];
 
-  const advance=useCallback((ok,mode="recog")=>{
-    if(!current) return;
-    const ns=gradeWord(state,current.id,ok?"good":"again",mode);
+  const finishRoutine = useCallback(() => {
+    saveDailyDone();
+    setDone(true);
+  }, []);
+
+  const advance = useCallback((ok, mode="recog") => {
+    if (!current || feedback || advancingRef.current) return;
+    advancingRef.current = true;
+    const ns = gradeWord(state, current.id, ok ? "good" : "again", mode);
     setState(ns);
-    if(ok) setXpToday(x=>x+10); else setHearts(h=>h-1);
+    if (ok) setXpToday(x=>x+10); else setHearts(h=>h-1);
     setLog(l=>[...l,{word:current,ok}]);
     setFeedback(ok?"correct":"wrong");
-    // Vérifier milestone
-    const progValues=Object.values(ns.progress);
-    const m=checkMilestones(ns,progValues);
-    if(m) onMilestone(m);
-    setTimeout(()=>{
+
+    const m = checkMilestones(ns, words);
+    if (m) onMilestone(m);
+
+    timerRef.current = setTimeout(() => {
       setFeedback(null); setShown(false); setInputVal("");
-      if(idx+1>=sources.length) {
-        if(step+1>=STEPS.length) setDone(true);
+      advancingRef.current = false;
+      if (idx + 1 >= sources.length) {
+        if (step + 1 >= STEPS.length) finishRoutine();
         else { setStep(s=>s+1); setIdx(0); }
       } else setIdx(i=>i+1);
-    },600);
-  },[current,idx,step,sources.length,state]);
+    }, 600);
+  }, [current, feedback, state, setState, words, onMilestone, idx, sources.length, step, finishRoutine]);
 
-  // Écran de fin
-  if(done) {
-    const uniqueWords=[...new Map(log.map(e=>[e.word.id,e])).values()];
-    const nOk=log.filter(e=>e.ok).length;
-    const nWrong=log.filter(e=>!e.ok).length;
-    const toReview=uniqueWords.filter(e=>!e.ok).map(e=>e.word);
-    const mastered=uniqueWords.filter(e=>e.ok).map(e=>e.word);
+  if (done && log.length === 0) {
+    return (
+      <Card style={{textAlign:"center",padding:"40px 24px"}}>
+        <div style={{fontSize:48,marginBottom:12}}>🌙</div>
+        <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:8}}>Routine du jour terminée</h2>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.6}}>La session quotidienne est verrouillée pour éviter de fausser l'XP et la répétition espacée. Tu peux continuer dans Révision ou Quiz.</p>
+      </Card>
+    );
+  }
+
+  if (done) {
+    const uniqueWords = [...new Map(log.map(e=>[e.word.id,e])).values()];
+    const nOk = log.filter(e=>e.ok).length;
+    const nWrong = log.filter(e=>!e.ok).length;
+    const toReview = uniqueWords.filter(e=>!e.ok).map(e=>e.word);
+    const mastered = uniqueWords.filter(e=>e.ok).map(e=>e.word);
     return (
       <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.3s ease"}}>
         <div style={{textAlign:"center",padding:"28px 0 12px"}}>
           <div style={{fontSize:60,marginBottom:10}}>🎉</div>
-          <h2 style={{fontSize:26,fontWeight:800,color:C.text,marginBottom:6}}>Routine terminée !</h2>
+          <h2 style={{fontSize:26,fontWeight:800,color:C.text,marginBottom:6}}>Routine terminée</h2>
           <p style={{color:C.sub,fontSize:15}}>+{xpToday} XP · {nOk} ✓ · {nWrong} ✗</p>
         </div>
         {mastered.length>0&&(
           <Card style={{padding:"14px 18px"}}>
-            <p style={{fontSize:12,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>✓ Bien mémorisés ({mastered.length})</p>
+            <p style={{fontSize:12,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>Bien mémorisés ({mastered.length})</p>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {mastered.map(w=><Pill key={w.id} label={w.word} color={C.green}/>)}
+              {mastered.map(w=><Pill key={w.id} label={w.word} color={C.green}/>) }
             </div>
           </Card>
         )}
         {toReview.length>0&&(
           <Card style={{padding:"14px 18px"}}>
-            <p style={{fontSize:12,fontWeight:700,color:C.orange,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>⚠ À retravailler ({toReview.length})</p>
+            <p style={{fontSize:12,fontWeight:700,color:C.orange,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>À retravailler ({toReview.length})</p>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {toReview.map(w=>(
                 <div key={w.id} style={{padding:"10px 12px",borderRadius:12,background:`${C.orange}08`,border:`1px solid ${C.orange}30`}}>
@@ -595,12 +1206,23 @@ function DailyTab({words,state,setState,onMilestone}) {
             </div>
           </Card>
         )}
-        <p style={{textAlign:"center",color:C.ter,fontSize:13}}>Reviens demain pour la prochaine session 🌙</p>
+        <Card style={{padding:"16px 18px",background:`${C.blue}08`}}>
+          <p style={{fontSize:12,fontWeight:800,color:C.blue,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 6px"}}>Prochaine action recommandée</p>
+          <p style={{fontSize:14,color:C.text,lineHeight:1.55,margin:"0 0 12px"}}>
+            {toReview.length>0 ? "Revoir les mots ratés pendant 2 minutes, puis refaire un quiz court." : "Consolider avec un quiz court ou un exercice de nuance."}
+          </p>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            {toReview.length>0 && <Btn label="Réviser" variant="primary" small onClick={onGoReview}/>} 
+            <Btn label="Quiz" variant="ghost" small onClick={onGoQuiz}/>
+            <Btn label="Nuance" variant="ghost" small onClick={onGoNuance}/>
+          </div>
+        </Card>
+        <p style={{textAlign:"center",color:C.ter,fontSize:13}}>Reviens demain pour la prochaine routine.</p>
       </div>
     );
   }
 
-  if(hearts<=0) return (
+  if (hearts <= 0) return (
     <div style={{textAlign:"center",padding:"48px 0"}}>
       <div style={{fontSize:56,marginBottom:16}}>💔</div>
       <h2 style={{fontSize:24,fontWeight:700,marginBottom:20,color:C.text}}>Plus de cœurs</h2>
@@ -608,21 +1230,21 @@ function DailyTab({words,state,setState,onMilestone}) {
     </div>
   );
 
-  if(!current) return (
+  if (!current) return (
     <div>
-      {motDuJour && <MotDuJour word={motDuJour} state={state}/>}
-      <div style={{color:C.sub,textAlign:"center",padding:48,fontSize:16}}>Reviens demain pour de nouveaux mots 🌙</div>
+      {motDuJour && <MotDuJour word={motDuJour} state={state}/>} 
+      <Card style={{textAlign:"center",padding:"40px 24px"}}>
+        <p style={{color:C.sub,fontSize:16}}>Aucun mot disponible pour cette session.</p>
+      </Card>
     </div>
   );
 
-  const cardBg=feedback==="correct"?`${C.green}14`:feedback==="wrong"?`${C.red}10`:C.surface;
+  const cardBg = feedback === "correct" ? `${C.green}14` : feedback === "wrong" ? `${C.red}10` : C.surface;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      {/* Mot du jour (compact, cliquable) */}
-      {step===0 && idx===0 && motDuJour && <MotDuJour word={motDuJour} state={state}/>}
+      {step===0 && idx===0 && motDuJour && <MotDuJour word={motDuJour} state={state}/>} 
 
-      {/* Barre de progression */}
       <div style={{display:"flex",gap:8,alignItems:"center"}}>
         <div style={{flex:1,display:"flex",gap:4}}>
           {STEPS.map((s,i)=>(
@@ -634,19 +1256,18 @@ function DailyTab({words,state,setState,onMilestone}) {
       </div>
       <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>{STEPS[step]} · {idx+1} / {sources.length}</div>
 
-      <div style={{background:cardBg,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",transition:"background 0.4s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
-        {step===0 && <StepDiscover word={current} shown={shown} setShown={setShown} onNext={()=>advance(true)}/>}
-        {step===1 && <StepChoice word={current} words={words} mode="termToDefinition" onAnswer={ok=>advance(ok,"recog")}/>}
-        {step===2 && <StepContext word={current} words={words} onAnswer={ok=>advance(ok,"prod")}/>}
-        {step===3 && <StepProd word={current} inputVal={inputVal} setInputVal={setInputVal} onAnswer={ok=>advance(ok,"prod")}/>}
-        {step===4 && <StepChoice word={current} words={words} mode="mixed" onAnswer={ok=>advance(ok,"recog")}/>}
+      <div className={`question-card ${feedback==="correct"?"feedback-correct":feedback==="wrong"?"feedback-wrong":""}`} style={{background:cardBg,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",transition:"background 0.4s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
+        {step===0 && <StepDiscover key={`discover-${current.id}-${idx}`} word={current} words={words} shown={shown} setShown={setShown} onNext={()=>advance(true)} />}
+        {step===1 && <StepChoice key={`association-${current.id}-${idx}`} word={current} words={words} mode="termToDefinition" onAnswer={ok=>advance(ok,"recog")} />}
+        {step===2 && <StepContext key={`context-${current.id}-${idx}`} word={current} words={words} onAnswer={ok=>advance(ok,"prod")} />}
+        {step===3 && <StepProd key={`production-${current.id}-${idx}`} word={current} inputVal={inputVal} setInputVal={setInputVal} onAnswer={ok=>advance(ok,"prod")} />}
+        {step===4 && <StepChoice key={`boss-${current.id}-${idx}`} word={current} words={words} mode="mixed" onAnswer={ok=>advance(ok,"recog")} />}
       </div>
     </div>
   );
 }
 
-// Découverte : exemple EN AVANT
-function StepDiscover({word,shown,setShown,onNext}) {
+function StepDiscover({word,words,shown,setShown,onNext}) {
   return (
     <div>
       <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
@@ -654,10 +1275,9 @@ function StepDiscover({word,shown,setShown,onNext}) {
         <Pill label={word.theme} color={THEME_COLOR[word.theme]}/>
         <Pill label={word.level} color={C.sub}/>
       </div>
-      <div style={{fontSize:38,fontWeight:800,color:C.text,letterSpacing:-1.3,marginBottom:14,lineHeight:1.05}}>{word.word}</div>
+      <WordTitle>{word.word}</WordTitle>
       {!shown ? (
         <>
-          {/* Aperçu de l'exemple AVANT la définition */}
           <ExampleBlock word={word}/>
           <Btn label="Voir la définition" variant="primary" full onClick={()=>setShown(true)}/>
         </>
@@ -666,54 +1286,70 @@ function StepDiscover({word,shown,setShown,onNext}) {
           <p style={{fontSize:18,color:C.text,fontWeight:700,marginBottom:6}}>{word.compact}</p>
           <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:12}}>{word.definition}</p>
           <ExampleBlock word={word}/>
-          <Btn label="J'ai compris ✓" variant="success" full onClick={onNext}/>
+          <ConfusionBlock word={word} words={words} compact />
+          <Btn label="J'ai compris" variant="success" full onClick={onNext}/>
         </>
       )}
     </div>
   );
 }
 
-// Association : bouton Continuer après erreur
 function StepChoice({word,words,mode,onAnswer}) {
-  const pool    = useMemo(()=>shuffle(words.filter(x=>x.id!==word.id)).slice(0,3),[word.id]);
-  const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
-  const showTerm= useMemo(()=>mode==="termToDefinition"||(mode==="mixed"&&Math.random()>0.5),[mode]);
-  const [selected,setSelected]=useState(null);
+  const [selected,setSelected] = useState(null);
+  const timerRef = useRef(null);
 
-  const handleClick=(o)=>{
-    if(selected) return;
+  useEffect(() => {
+    setSelected(null);
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, [word.id]);
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
+  const pool = useMemo(
+    ()=>shuffle(words.filter(x=>x.id!==word.id)).slice(0,3),
+    [word.id, words]
+  );
+  const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
+  const showTerm = useMemo(
+    ()=>mode==="termToDefinition" || (mode==="mixed" && Math.random()>0.5),
+    [mode, word.id]
+  );
+
+  const handleClick = (o) => {
+    if (selected) return;
     setSelected(o.id);
-    const ok=o.id===word.id;
-    if(ok) setTimeout(()=>onAnswer(true),900);
-    // Si faux : l'utilisateur clique sur Continuer
+    const ok = o.id === word.id;
+    if (ok) timerRef.current = setTimeout(()=>onAnswer(true), 650);
   };
 
-  const getBtnStyle=(o)=>{
-    if(!selected) return {bg:C.solid,border:C.border,color:C.text,weight:500};
-    if(o.id===word.id)   return {bg:`${C.green}22`,border:C.green,color:C.text,weight:700};
-    if(o.id===selected)  return {bg:`${C.red}18`,  border:C.red,  color:C.sub, weight:500};
+  const getBtnStyle = (o) => {
+    if (!selected) return {bg:C.solid,border:C.border,color:C.text,weight:500};
+    if (o.id === word.id) return {bg:`${C.green}22`,border:C.green,color:C.text,weight:700};
+    if (o.id === selected) return {bg:`${C.red}18`,border:C.red,color:C.sub,weight:500};
     return {bg:C.solid,border:C.border,color:C.ter,weight:500};
   };
 
-  const wrong = selected && selected!==word.id;
+  const wrong = selected && selected !== word.id;
 
   return (
     <div>
       <p style={{fontSize:12,color:C.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>
         {showTerm?"Quelle est la définition ?":"Quel est le mot ?"}
       </p>
-      <div style={{fontSize:showTerm?36:18,fontWeight:showTerm?800:500,color:C.text,marginBottom:18,letterSpacing:showTerm?-1.2:0,lineHeight:1.1}}>
+      <div className="word-title" style={{fontSize:showTerm?36:18,fontWeight:showTerm?800:500,color:C.text,marginBottom:18,letterSpacing:showTerm?-1.2:0,lineHeight:1.18}}>
         {showTerm?word.word:word.compact}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+      <div className="choice-grid">
         {options.map(o=>{
-          const s=getBtnStyle(o);
+          const s = getBtnStyle(o);
           return (
-            <button key={o.id} onClick={()=>handleClick(o)} disabled={!!selected&&o.id!==word.id&&!wrong} style={{
+            <button key={o.id} onClick={()=>handleClick(o)} disabled={!!selected} style={{
               padding:"13px 12px",borderRadius:14,border:`1.5px solid ${s.border}`,
               background:s.bg,textAlign:"left",cursor:selected?"default":"pointer",
               fontSize:13,fontWeight:s.weight,color:s.color,lineHeight:1.45,
-              fontFamily:"-apple-system,'SF Pro Text',sans-serif",transition:"all 0.25s ease",
+              transition:"all 0.25s ease"
             }}>
               {showTerm?o.compact:o.word}{o.id===word.id&&selected?" ✓":""}
             </button>
@@ -724,47 +1360,58 @@ function StepChoice({word,words,mode,onAnswer}) {
         <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
           <ExampleBlock word={word}/>
           <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}><strong style={{color:C.text}}>{word.word}</strong> — {word.definition}</p>
-          <Btn label="J'ai compris →" variant="primary" full onClick={()=>onAnswer(false)}/>
+          <Btn label="J'ai compris" variant="primary" full onClick={()=>onAnswer(false)}/>
         </div>
       )}
     </div>
   );
 }
 
-// Contexte : même traitement
 function StepContext({word,words,onAnswer}) {
-  const pool    = useMemo(()=>shuffle(words.filter(x=>x.id!==word.id)).slice(0,3),[word.id]);
-  const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
-  const [selected,setSelected]=useState(null);
+  const [selected,setSelected] = useState(null);
+  const timerRef = useRef(null);
 
-  const handleClick=(o)=>{
-    if(selected) return;
+  useEffect(() => {
+    setSelected(null);
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, [word.id]);
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
+  const pool = useMemo(
+    ()=>shuffle(words.filter(x=>x.id!==word.id)).slice(0,3),
+    [word.id, words]
+  );
+  const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
+
+  const handleClick = (o) => {
+    if (selected) return;
     setSelected(o.id);
-    const ok=o.id===word.id;
-    if(ok) setTimeout(()=>onAnswer(true),900);
+    const ok = o.id === word.id;
+    if (ok) timerRef.current = setTimeout(()=>onAnswer(true),650);
   };
 
-  const wrong=selected&&selected!==word.id;
+  const wrong = selected && selected !== word.id;
 
   return (
     <div>
       <p style={{fontSize:12,color:C.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Complète la phrase</p>
-      <div style={{background:`${C.blue}07`,borderLeft:`4px solid ${C.blue}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"0 0 16px"}}>
-        <p style={{fontSize:16,color:C.text,fontStyle:"italic",lineHeight:1.7,margin:0}}>{blankSentence(word)}</p>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+      <ExampleBlock word={word} showLabel={false} fontSize={16} cloze />
+      <div className="choice-grid">
         {options.map(o=>{
           let bg=C.solid,border=C.border,color=C.blue;
           if(selected) {
-            if(o.id===word.id)         {bg=`${C.green}22`;border=C.green;color=C.green;}
-            else if(o.id===selected)   {bg=`${C.red}18`; border=C.red;  color=C.red;}
+            if(o.id===word.id) {bg=`${C.green}22`;border=C.green;color=C.green;}
+            else if(o.id===selected) {bg=`${C.red}18`; border=C.red; color=C.red;}
             else color=C.ter;
           }
           return (
             <button key={o.id} onClick={()=>handleClick(o)} disabled={!!selected} style={{
               padding:"12px 14px",borderRadius:14,border:`1.5px solid ${border}`,
               background:bg,cursor:selected?"default":"pointer",fontSize:14,fontWeight:700,color,
-              fontFamily:"-apple-system,'SF Pro Text',sans-serif",transition:"all 0.25s ease",
+              transition:"all 0.25s ease"
             }}>
               {o.word}{o.id===word.id&&selected?" ✓":""}
             </button>
@@ -773,58 +1420,129 @@ function StepContext({word,words,onAnswer}) {
       </div>
       {wrong&&(
         <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
-          <p style={{fontSize:13,color:C.sub,margin:"0 0 12px"}}><strong style={{color:C.text}}>{word.word}</strong> — {word.compact}</p>
-          <Btn label="J'ai compris →" variant="primary" full onClick={()=>onAnswer(false)}/>
+          <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}><strong style={{color:C.text}}>{word.word}</strong> — {word.compact}</p>
+          <Btn label="J'ai compris" variant="primary" full onClick={()=>onAnswer(false)}/>
         </div>
       )}
     </div>
   );
 }
 
-// Production : saisie libre
 function StepProd({word,inputVal,setInputVal,onAnswer}) {
+  const [result,setResult] = useState(null);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    setResult(null);
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, [word.id]);
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+  }, []);
+
+  const submit = () => {
+    if (result) return;
+    const ok = answerMatches(inputVal, word);
+    if (ok) {
+      setResult("ok");
+      timerRef.current = setTimeout(()=>onAnswer(true), 650);
+    } else {
+      setResult("wrong");
+    }
+  };
+
   return (
     <div>
       <p style={{fontSize:12,color:C.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Retrouve le mot</p>
       <div style={{background:`${C.blue}10`,borderRadius:14,padding:"13px 16px",marginBottom:12}}>
-        <p style={{fontSize:15,color:C.text,margin:0}}>{word.compact}</p>
+        <p style={{fontSize:15,color:C.text,margin:0,lineHeight:1.5}}>{word.compact}</p>
       </div>
-      <ExampleBlock word={word} showLabel={false} fontSize={13}/>
+      <ExampleBlock word={word} showLabel={false} fontSize={13} cloze />
       <input value={inputVal} onChange={e=>setInputVal(e.target.value)}
-        onKeyDown={e=>e.key==="Enter"&&onAnswer(norm(inputVal)===norm(word.word))}
-        placeholder="Écris le mot…" autoFocus
-        style={{width:"100%",padding:"12px 16px",borderRadius:13,fontSize:16,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,fontFamily:"-apple-system",outline:"none",marginBottom:12,boxSizing:"border-box"}}/>
+        onKeyDown={e=>e.key==="Enter"&&submit()}
+        placeholder="Écris le mot…" autoFocus disabled={!!result}
+        style={{width:"100%",padding:"12px 16px",borderRadius:13,fontSize:16,border:`1.5px solid ${result==="wrong"?C.red:C.border}`,background:C.solid,color:C.text,outline:"none",marginBottom:12}}/>
+
+      {result === "wrong" && (
+        <div style={{padding:"12px 14px",borderRadius:14,background:`${C.red}08`,border:`1px solid ${C.red}25`,marginBottom:12,animation:"fadeSlideIn 0.25s ease"}}>
+          <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:0}}>Réponse attendue : <strong style={{color:C.text}}>{word.word}</strong></p>
+          <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"6px 0 0"}}>{word.definition}</p>
+        </div>
+      )}
+
+      {result === "ok" && (
+        <div style={{padding:"10px 12px",borderRadius:14,background:`${C.green}10`,border:`1px solid ${C.green}25`,marginBottom:12,color:C.green,fontSize:14,fontWeight:700}}>Correct</div>
+      )}
+
       <div style={{display:"flex",gap:10}}>
-        <Btn label="Valider" variant="primary" full onClick={()=>onAnswer(norm(inputVal)===norm(word.word))}/>
-        <Btn label="Passer" variant="ghost" onClick={()=>onAnswer(false)}/>
+        {!result ? (
+          <>
+            <Btn label="Valider" variant="primary" full onClick={submit} disabled={!inputVal.trim()}/>
+            <Btn label="Passer" variant="ghost" onClick={()=>setResult("wrong")}/>
+          </>
+        ) : result === "wrong" ? (
+          <Btn label="J'ai compris" variant="primary" full onClick={()=>onAnswer(false)}/>
+        ) : (
+          <Btn label="Suite" variant="success" full disabled />
+        )}
       </div>
     </div>
   );
 }
 
 // ─── RÉVISION TAB ─────────────────────────────────────────────────────────────
-function LearnTab({words,state,setState}) {
-  const seenWords=useMemo(()=>words.filter(w=>getP(state,w.id).seen>0),[words,state]);
-  const [pool]=useState(()=>seenWords.length===0?[]:candidates(state,seenWords,"smart",20));
-  const [idx,setIdx]=useState(0);
-  const [shown,setShown]=useState(false);
-  const w=pool[idx];
+function LearnTab({words,state,setState,onMilestone,mode="smart"}) {
+  const seenWords = useMemo(()=>words.filter(w=>readP(state,w.id).seen>0),[words,state]);
+  const sessionWords = useMemo(()=>{
+    if (mode === "fragile") return seenWords.filter(w=>wordStatus(state,w)==="Fragile");
+    if (mode === "due") return seenWords.filter(w=>isDue(state,w));
+    return seenWords;
+  }, [mode, seenWords, state]);
+  const sessionTitle = mode === "fragile" ? "Mots fragiles" : mode === "due" ? "Mots à revoir" : "Révision rapide";
+  const [pool,setPool] = useState(()=>sessionWords.length===0?[]:candidates(state,sessionWords,"smart",20));
+  const [idx,setIdx] = useState(0);
+  const [shown,setShown] = useState(false);
+  const wordsSignature = useMemo(()=>sessionWords.map(w=>w.id).join("|"),[sessionWords]);
+
+  useEffect(()=>{
+    setPool(sessionWords.length===0?[]:candidates(state,sessionWords,"smart",20));
+    setIdx(0); setShown(false);
+  }, [mode, wordsSignature]);
+
+  const w = pool[idx];
 
   if(seenWords.length===0) return (
     <Card style={{textAlign:"center",padding:"40px 24px"}}>
       <div style={{fontSize:48,marginBottom:12}}>📚</div>
       <p style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:8}}>Aucun mot vu pour l'instant</p>
-      <p style={{fontSize:14,color:C.sub,lineHeight:1.6}}>Fais d'abord la <strong>Routine</strong> du jour — les mots appris y apparaîtront ensuite ici pour révision.</p>
+      <p style={{fontSize:14,color:C.sub,lineHeight:1.6}}>Fais d'abord la Routine du jour. Les mots appris apparaîtront ensuite ici.</p>
     </Card>
   );
-  if(!w) return <div style={{textAlign:"center",padding:48,color:C.sub,fontSize:16}}>Session terminée ✅<br/><br/><small>Tous tes mots sont en bonne voie. À demain !</small></div>;
 
-  const x=getP(state,w.id);
+  if(!w) return (
+    <Card style={{textAlign:"center",padding:"40px 24px"}}>
+      <p style={{color:C.sub,fontSize:16,fontWeight:700,marginBottom:6}}>{sessionWords.length ? "Session terminée" : "Aucun mot dans cette session"}</p>
+      <p style={{color:C.sub,fontSize:14,lineHeight:1.5,marginBottom:18}}>{sessionWords.length ? "Tu peux lancer une nouvelle session avec les mêmes critères." : "Essaie la révision rapide ou la routine."}</p>
+      <Btn label="Nouvelle session" variant="primary" onClick={()=>{setPool(candidates(state,sessionWords.length?sessionWords:seenWords,"smart",20));setIdx(0);setShown(false);}} />
+    </Card>
+  );
+
+  const x = readP(state,w.id);
+  const grade = (rating) => {
+    const ns = gradeWord(state,w.id,rating,"recog");
+    setState(ns);
+    const m = checkMilestones(ns, words);
+    if (m) onMilestone(m);
+    setShown(false);
+    setIdx(i=>i+1);
+  };
+
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <span style={{fontSize:13,color:C.sub,fontWeight:500}}>{idx+1} / {pool.length}</span>
-        <div style={{display:"flex",gap:6}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+        <span style={{fontSize:13,color:C.sub,fontWeight:500}}>{sessionTitle} · {idx+1} / {pool.length}</span>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}>
           <Pill label={wordStatus(state,w)} color={STATUS_COLOR[wordStatus(state,w)]}/>
           <Pill label={`${getRate(state,w)}%`} color={C.blue}/>
         </div>
@@ -833,11 +1551,10 @@ function LearnTab({words,state,setState}) {
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
           <Pill label={w.nature} color={C.purple}/><Pill label={w.theme} color={THEME_COLOR[w.theme]}/>
         </div>
-        <div style={{fontSize:36,fontWeight:800,letterSpacing:-1.3,color:C.text,marginBottom:12,lineHeight:1.05}}>{w.word}</div>
+        <WordTitle>{w.word}</WordTitle>
         {!shown ? (
           <>
             <p style={{fontSize:14,color:C.ter,marginBottom:12}}>Retrouve mentalement la définition, puis révèle.</p>
-            {/* L'exemple en contexte — visible avant de révéler */}
             <ExampleBlock word={w} showLabel={false} fontSize={14}/>
             <Btn label="Révéler la définition" variant="primary" full onClick={()=>setShown(true)}/>
           </>
@@ -846,18 +1563,18 @@ function LearnTab({words,state,setState}) {
             <p style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:6}}>{w.compact}</p>
             <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:10}}>{w.definition}</p>
             <ExampleBlock word={w}/>
+            <ConfusionBlock word={w} words={words} compact />
             <div style={{background:"rgba(0,0,0,0.04)",borderRadius:12,padding:"10px 14px",marginBottom:14}}>
-              <div style={{fontSize:12,color:C.sub,display:"flex",gap:16,marginBottom:6}}>
+              <div style={{fontSize:12,color:C.sub,display:"flex",gap:16,marginBottom:6,flexWrap:"wrap"}}>
                 <span>Recog. {x.recog}/6</span><span>Prod. {x.prod}/6</span><span>{getRate(state,w)}%</span>
               </div>
               <Bar value={(x.mastery/6)*100} color={C.blue}/>
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
               {[["Oublié","again",C.red],["Difficile","hard",C.orange],["Bien","good",C.blue],["Facile","easy",C.green]].map(([l,r,c])=>(
-                <button key={r} onClick={()=>{ const ns=gradeWord(state,w.id,r,"recog"); setState(ns); setShown(false); setIdx(i=>i+1); }} style={{
-                  flex:1,padding:"9px 4px",borderRadius:12,border:`1.5px solid ${c}30`,
-                  background:`${c}12`,color:c,fontWeight:700,fontSize:13,cursor:"pointer",
-                  fontFamily:"-apple-system,'SF Pro Text',sans-serif",
+                <button key={r} onClick={()=>grade(r)} style={{
+                  flex:1,minWidth:86,padding:"9px 4px",borderRadius:12,border:`1.5px solid ${c}30`,
+                  background:`${c}12`,color:c,fontWeight:700,fontSize:13,cursor:"pointer"
                 }}>{l}</button>
               ))}
             </div>
@@ -869,56 +1586,177 @@ function LearnTab({words,state,setState}) {
 }
 
 // ─── QUIZ TAB ─────────────────────────────────────────────────────────────────
-const QUIZ_SIZES=[5,10,15,20];
+const QUIZ_SIZES = [5,10,15,20];
 
-function QuizTab({words,state,setState}) {
-  const [maxQ,setMaxQ]=useState(10);
-  const [count,setCount]=useState(0);
-  const [score,setScore]=useState(0);
-  const [done,setDone]=useState(false);
-  const [started,setStarted]=useState(false);
+function buildNuanceQuestion(word, words) {
+  const close = getConfusionItems(word, words, 5).map(item => {
+    const existing = words.find(w => norm(w.word) === norm(item.word));
+    if (existing) return existing;
+    return {
+      id:`virtual-${norm(item.word)}`,
+      word:item.word,
+      compact:item.difference || item.compact || item.definition || "Terme à comparer",
+      definition:item.definition || item.compact || item.difference || "",
+      theme:word.theme,
+      nature:word.nature
+    };
+  });
+  const fillers = words.filter(w => w.id !== word.id && !close.some(c => norm(c.word) === norm(w.word)) && w.theme === word.theme).slice(0, 6);
+  const options = uniqueById([word, ...close, ...shuffle(fillers)]).slice(0, 4);
+  while (options.length < Math.min(4, words.length)) {
+    const candidate = shuffle(words.filter(w => w.id !== word.id && !options.some(o => o.id === w.id)))[0];
+    if (!candidate) break;
+    options.push(candidate);
+  }
+  return { prompt: blankSentence(word), answer: word, options: shuffle(options) };
+}
 
-  // Ref pour toujours avoir le dernier state dans les callbacks
-  const stateRef=useRef(state);
+function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
+  const [count,setCount] = useState(0);
+  const [score,setScore] = useState(0);
+  const [done,setDone] = useState(false);
+  const [current,setCurrent] = useState(null);
+  const [selected,setSelected] = useState(null);
+  const askedRef = useRef(new Set());
+
+  const getNext = useCallback(() => {
+    const base = candidates(state, words, "smart", words.length, askedRef.current);
+    return base.find(w => getConfusionItems(w, words, 3).length > 0) || base[0] || words[0];
+  }, [state, words]);
+
+  useEffect(()=>{ setCurrent(getNext()); setSelected(null); }, [getNext]);
+
+  const q = useMemo(()=>current ? buildNuanceQuestion(current, words) : null, [current, words]);
+  const maxQ = 8;
+
+  const continueNext = () => {
+    const next = count + 1;
+    if (next >= maxQ) { setDone(true); return; }
+    setCount(next);
+    setSelected(null);
+    setCurrent(getNext());
+  };
+
+  const answer = (o) => {
+    if (selected || !current) return;
+    setSelected(o.id);
+    askedRef.current.add(current.id);
+    const ok = o.id === current.id;
+    const ns = gradeWord(state, current.id, ok ? "good" : "again", "nuance");
+    setState(ns);
+    const m = checkMilestones(ns, words);
+    if (m) onMilestone(m);
+    if (ok) setScore(s=>s+1);
+  };
+
+  if (!current || !q) return <Card style={{textAlign:"center",padding:"40px 24px",color:C.sub}}>Aucun mot disponible pour le mode nuance.</Card>;
+
+  if (done) return (
+    <Card style={{textAlign:"center",padding:"36px 24px"}}>
+      <div style={{fontSize:52,marginBottom:12}}>{score>=6?"🎯":"🧭"}</div>
+      <h2 style={{fontSize:24,fontWeight:850,color:C.text,marginBottom:8}}>Nuance : {score} / {maxQ}</h2>
+      <p style={{fontSize:14,color:C.sub,lineHeight:1.55,margin:"0 0 20px"}}>Ce mode entraîne surtout le choix du mot juste parmi des termes proches.</p>
+      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+        <Btn label="Rejouer" variant="primary" onClick={()=>{askedRef.current=new Set();setCount(0);setScore(0);setDone(false);setSelected(null);setCurrent(getNext());}}/>
+        <Btn label="Quiz classique" variant="ghost" onClick={onBackToQuick}/>
+      </div>
+    </Card>
+  );
+
+  const wrong = selected && selected !== current.id;
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12,animation:"fadeSlideIn 0.25s ease"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div style={{flex:1}}><Bar value={(count/maxQ)*100} color={C.indigo}/></div>
+        <span style={{fontSize:13,color:C.sub,fontWeight:600,minWidth:50,textAlign:"right"}}>{count+1} / {maxQ}</span>
+        <span style={{fontSize:13,color:C.green,fontWeight:700}}>✓ {score}</span>
+      </div>
+      <Card>
+        <p style={{fontSize:12,color:C.indigo,fontWeight:800,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>Mode nuance</p>
+        <div style={{background:`${C.indigo}08`,borderLeft:`4px solid ${C.indigo}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"0 0 16px"}}>
+          <p style={{fontSize:16,color:C.text,fontStyle:"italic",lineHeight:1.7,margin:0}}>{q.prompt}</p>
+        </div>
+        <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"0 0 12px"}}>Quel mot est le plus précis dans ce contexte ?</p>
+        <div className="choice-grid">
+          {q.options.map(o=>{
+            let bg=C.solid,border=C.border,color=C.text,weight=650;
+            if(selected) {
+              if(o.id===current.id) {bg=`${C.green}22`;border=C.green;color=C.green;weight=800;}
+              else if(o.id===selected) {bg=`${C.red}18`;border=C.red;color=C.red;}
+              else color=C.ter;
+            }
+            return <button key={o.id} disabled={!!selected} onClick={()=>answer(o)} style={{padding:"13px 12px",borderRadius:14,border:`1.5px solid ${border}`,background:bg,textAlign:"left",cursor:selected?"default":"pointer",fontSize:14,fontWeight:weight,color,lineHeight:1.35,transition:"all 0.2s"}}>{o.word}</button>;
+          })}
+        </div>
+        {selected && (
+          <div style={{marginTop:14,animation:"fadeSlideIn 0.25s ease"}}>
+            <p style={{fontSize:13,color:wrong?C.red:C.green,fontWeight:800,margin:"0 0 8px"}}>{wrong ? "À corriger" : "Correct"}</p>
+            <p style={{fontSize:14,color:C.text,lineHeight:1.55,margin:"0 0 8px"}}><strong>{current.word}</strong> — {current.compact}</p>
+            <ConfusionBlock word={current} words={words}/>
+            <Btn label="Continuer" variant="primary" full onClick={continueNext}/>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function QuizTab({words,state,setState,onMilestone,mode="quick",onModeChange}) {
+  if (mode === "nuance") {
+    return <NuanceQuiz words={words} state={state} setState={setState} onMilestone={onMilestone} onBackToQuick={()=>onModeChange&&onModeChange("quick")} />;
+  }
+  const [maxQ,setMaxQ] = useState(10);
+  const [count,setCount] = useState(0);
+  const [score,setScore] = useState(0);
+  const [done,setDone] = useState(false);
+  const [started,setStarted] = useState(false);
+  const [w,setW] = useState(null);
+  const [selected,setSelected] = useState(null);
+  const stateRef = useRef(state);
+  const askedRef = useRef(new Set());
+  const timerRef = useRef(null);
+
   useEffect(()=>{ stateRef.current=state; },[state]);
+  useEffect(()=>()=>{ if(timerRef.current) clearTimeout(timerRef.current); },[]);
 
-  const [w,setW]=useState(null);
-  const [selected,setSelected]=useState(null);
-  const quiz=useMemo(()=>w?{w,options:shuffle([w,...shuffle(words.filter(x=>x.id!==w.id)).slice(0,3)])}:null,[w]);
+  const quiz = useMemo(()=>w?{w,options:shuffle([w,...shuffle(words.filter(x=>x.id!==w.id)).slice(0,3)])}:null,[w,words]);
 
-  const getNext=useCallback(()=>candidates(stateRef.current,words,"smart",1)[0],[words]);
+  const getNext = useCallback(() => {
+    const next = candidates(stateRef.current, words, "smart", 1, askedRef.current)[0];
+    if (next) return next;
+    askedRef.current = new Set();
+    return candidates(stateRef.current, words, "smart", 1)[0];
+  }, [words]);
 
-  const startQuiz=()=>{
+  const startQuiz = () => {
+    askedRef.current = new Set();
     setCount(0); setScore(0); setDone(false); setSelected(null);
     setW(getNext());
     setStarted(true);
   };
 
-  const handleAnswer=(o)=>{
-    if(selected) return;
-    setSelected(o.id);
-    const ok=o.id===w.id;
-    const ns=gradeWord(stateRef.current,w.id,ok?"good":"again","recog");
-    setState(ns);
-    if(ok) setScore(s=>s+1);
-    const next=count+1;
-    if(ok) {
-      // Bonne réponse : avance automatiquement après 900ms
-      setTimeout(()=>{
-        setCount(next);
-        if(next>=maxQ) { setDone(true); setStarted(false); }
-        else { setSelected(null); setW(candidates(stateRef.current,words,"smart",1)[0]); }
-      },900);
-    }
-    // Mauvaise réponse : l'utilisateur clique sur "J'ai compris →"
+  const moveNext = (nextCount) => {
+    setCount(nextCount);
+    if(nextCount>=maxQ) { setDone(true); setStarted(false); }
+    else { setSelected(null); setW(getNext()); }
   };
 
-  const handleContinue=()=>{
-    const next=count+1;
-    setCount(next);
-    if(next>=maxQ) { setDone(true); setStarted(false); }
-    else { setSelected(null); setW(candidates(stateRef.current,words,"smart",1)[0]); }
+  const handleAnswer = (o) => {
+    if(selected || !w) return;
+    setSelected(o.id);
+    askedRef.current.add(w.id);
+    const ok = o.id === w.id;
+    const ns = gradeWord(stateRef.current,w.id,ok?"good":"again","recog");
+    stateRef.current = ns;
+    setState(ns);
+    const m = checkMilestones(ns, words);
+    if (m) onMilestone(m);
+    if(ok) setScore(s=>s+1);
+    const next = count + 1;
+    if(ok) timerRef.current = setTimeout(()=>moveNext(next), 650);
   };
+
+  const handleContinue = () => moveNext(count+1);
 
   if(!started&&!done) return (
     <Card style={{textAlign:"center",padding:"36px 24px"}}>
@@ -931,8 +1769,7 @@ function QuizTab({words,state,setState}) {
             padding:"10px 22px",borderRadius:14,fontWeight:700,fontSize:15,
             border:`2px solid ${maxQ===n?C.blue:C.border}`,
             background:maxQ===n?`${C.blue}14`:C.solid,
-            color:maxQ===n?C.blue:C.sub,cursor:"pointer",
-            fontFamily:"-apple-system,'SF Pro Text',sans-serif",transition:"all 0.15s",
+            color:maxQ===n?C.blue:C.sub,cursor:"pointer",transition:"all 0.15s"
           }}>{n}</button>
         ))}
       </div>
@@ -945,9 +1782,9 @@ function QuizTab({words,state,setState}) {
       <div style={{fontSize:56,marginBottom:12}}>{score>=maxQ*0.8?"🏆":score>=maxQ*0.5?"👍":"💪"}</div>
       <h2 style={{fontSize:24,fontWeight:800,color:C.text,marginBottom:8}}>{score} / {maxQ} correct{score>1?"s":""}</h2>
       <p style={{fontSize:15,color:C.sub,marginBottom:24}}>
-        {score===maxQ?"Parfait !":score>=maxQ*0.8?"Excellent !":score>=maxQ*0.5?"Bien joué !":"Continue, ça vient !"}
+        {score===maxQ?"Parfait.":score>=maxQ*0.8?"Très bon résultat.":score>=maxQ*0.5?"Résultat correct.":"À consolider."}
       </p>
-      <div style={{display:"flex",gap:10,justifyContent:"center"}}>
+      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
         <Btn label="Rejouer" variant="primary" onClick={startQuiz}/>
         <Btn label="Changer le nombre" variant="ghost" onClick={()=>{setDone(false);setStarted(false);}}/>
       </div>
@@ -956,7 +1793,7 @@ function QuizTab({words,state,setState}) {
 
   if(!w||!quiz) return <div style={{color:C.sub,textAlign:"center",padding:48}}>Chargement…</div>;
 
-  const wrong=selected&&selected!==w.id;
+  const wrong = selected && selected !== w.id;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -969,21 +1806,20 @@ function QuizTab({words,state,setState}) {
         <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
           <Pill label={w.nature} color={C.purple}/><Pill label={w.theme} color={THEME_COLOR[w.theme]}/>
         </div>
-        <div style={{fontSize:38,fontWeight:800,letterSpacing:-1.3,color:C.text,marginBottom:18,lineHeight:1.05}}>{w.word}</div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        <WordTitle>{w.word}</WordTitle>
+        <div className="choice-grid">
           {quiz.options.map(o=>{
             let bg=C.solid,border=C.border,color=C.text,weight=500;
             if(selected) {
-              if(o.id===w.id)         {bg=`${C.green}22`;border=C.green;weight=700;}
-              else if(o.id===selected){bg=`${C.red}18`; border=C.red;  color=C.sub;}
+              if(o.id===w.id) {bg=`${C.green}22`;border=C.green;weight=700;}
+              else if(o.id===selected){bg=`${C.red}18`; border=C.red; color=C.sub;}
               else color=C.ter;
             }
             return (
               <button key={o.id} onClick={()=>handleAnswer(o)} disabled={!!selected} style={{
                 padding:"13px 12px",borderRadius:14,border:`1.5px solid ${border}`,
                 background:bg,textAlign:"left",cursor:selected?"default":"pointer",
-                fontSize:13,fontWeight:weight,color,lineHeight:1.45,
-                fontFamily:"-apple-system,'SF Pro Text',sans-serif",transition:"all 0.25s",
+                fontSize:13,fontWeight:weight,color,lineHeight:1.45,transition:"all 0.25s"
               }}>
                 {o.compact}{o.id===w.id&&selected?" ✓":""}
               </button>
@@ -994,7 +1830,7 @@ function QuizTab({words,state,setState}) {
           <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
             <ExampleBlock word={w}/>
             <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}>{w.definition}</p>
-            <Btn label="J'ai compris →" variant="primary" full onClick={handleContinue}/>
+            <Btn label="J'ai compris" variant="primary" full onClick={handleContinue}/>
           </div>
         )}
       </Card>
@@ -1002,30 +1838,303 @@ function QuizTab({words,state,setState}) {
   );
 }
 
+// ─── FIGURES DE STYLE TAB ────────────────────────────────────────────────────
+function FigureExampleBlock({figure, masked=false}) {
+  const text = masked && figure.cloze ? figure.cloze : figure.example;
+  return (
+    <div style={{background:`${C.indigo}07`,borderLeft:`4px solid ${C.indigo}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"12px 0"}}>
+      <p style={{fontSize:11,fontWeight:800,color:C.indigo,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 6px"}}>{masked ? "Exemple masqué" : "Exemple"}</p>
+      <p style={{fontSize:15,color:C.text,fontStyle:"italic",lineHeight:1.7,margin:0}}>{text}</p>
+      {figure.exampleType && <p style={{fontSize:11,color:C.ter,margin:"7px 0 0"}}>{figure.exampleType}</p>}
+    </div>
+  );
+}
+
+function FigureDetail({figure, figures, state, onBack}) {
+  const st = wordStatus(state, figure);
+  return (
+    <Card>
+      <button onClick={onBack} style={{background:"none",border:"none",color:C.blue,fontSize:14,cursor:"pointer",padding:0,marginBottom:10,fontWeight:600}}>← Retour</button>
+      <div className="word-title" style={{fontSize:30,fontWeight:850,color:C.text,letterSpacing:-0.9,marginBottom:10}}>{figure.word}</div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+        <Pill label={figure.theme} color={THEME_COLOR[figure.theme] || C.indigo}/>
+        <Pill label={figure.nature} color={C.purple}/>
+        <Pill label={st} color={STATUS_COLOR[st]}/>
+      </div>
+      <p style={{fontSize:17,fontWeight:800,color:C.text,margin:"0 0 6px"}}>{figure.compact}</p>
+      <p style={{fontSize:14,color:C.sub,lineHeight:1.65,margin:"0 0 10px"}}>{figure.definition}</p>
+      <FigureExampleBlock figure={figure}/>
+      {figure.cloze && <FigureExampleBlock figure={figure} masked/>}
+      <ConfusionBlock word={figure} words={figures}/>
+      {figure.memoryTip && <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"10px 0 0"}}><strong style={{color:C.text}}>Astuce :</strong> {figure.memoryTip}</p>}
+      {figure.etymology && <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"8px 0 0"}}><strong style={{color:C.text}}>Étymologie :</strong> {figure.etymology}</p>}
+    </Card>
+  );
+}
+
+function buildFigureQuestion(figure, figures, mode) {
+  const pool = shuffle(figures.filter(f => f.id !== figure.id)).slice(0, 3);
+  const options = shuffle([figure, ...pool]);
+  if (mode === "definition") {
+    return {
+      label: "Définition → figure",
+      prompt: figure.compact || figure.definition,
+      helper: "Quelle figure correspond à cette définition ?",
+      options,
+      renderOption: f => f.word
+    };
+  }
+  return {
+    label: "Exemple → figure",
+    prompt: figure.example,
+    cloze: figure.cloze,
+    helper: "Quelle figure est illustrée par cet exemple complet ?",
+    options,
+    renderOption: f => f.word
+  };
+}
+
+function FigurePractice({figures,state,setState,onMilestone,mode="identify",onBack}) {
+  const [maxQ,setMaxQ] = useState(10);
+  const [started,setStarted] = useState(false);
+  const [count,setCount] = useState(0);
+  const [score,setScore] = useState(0);
+  const [done,setDone] = useState(false);
+  const [current,setCurrent] = useState(null);
+  const [selected,setSelected] = useState(null);
+  const askedRef = useRef(new Set());
+  const stateRef = useRef(state);
+  const timerRef = useRef(null);
+
+  useEffect(()=>{ stateRef.current = state; },[state]);
+  useEffect(()=>()=>{ if(timerRef.current) clearTimeout(timerRef.current); },[]);
+
+  const getNext = useCallback(() => {
+    const next = candidates(stateRef.current, figures, "smart", 1, askedRef.current)[0];
+    if (next) return next;
+    askedRef.current = new Set();
+    return candidates(stateRef.current, figures, "smart", 1)[0];
+  }, [figures]);
+
+  const start = () => {
+    askedRef.current = new Set();
+    setCount(0); setScore(0); setDone(false); setSelected(null);
+    setCurrent(getNext());
+    setStarted(true);
+  };
+
+  const moveNext = (nextCount) => {
+    setCount(nextCount);
+    if (nextCount >= maxQ) { setDone(true); setStarted(false); }
+    else { setSelected(null); setCurrent(getNext()); }
+  };
+
+  const answer = (o) => {
+    if (selected || !current) return;
+    setSelected(o.id);
+    askedRef.current.add(current.id);
+    const ok = o.id === current.id;
+    const ns = gradeWord(stateRef.current, current.id, ok ? "good" : "again", mode === "definition" ? "recog" : "prod");
+    stateRef.current = ns;
+    setState(ns);
+    const m = checkMilestones(ns, figures);
+    if (m) onMilestone(m);
+    if (ok) setScore(s => s + 1);
+    const next = count + 1;
+    if (ok) timerRef.current = setTimeout(()=>moveNext(next), 650);
+  };
+
+  const q = useMemo(()=>current ? buildFigureQuestion(current, figures, mode) : null, [current, figures, mode]);
+
+  if (!started && !done) return (
+    <Card style={{textAlign:"center",padding:"36px 24px"}}>
+      <div style={{fontSize:48,marginBottom:14}}>✒️</div>
+      <h2 style={{fontSize:23,fontWeight:850,color:C.text,marginBottom:8}}>{mode === "definition" ? "Figures : définitions" : "Figures : exemples"}</h2>
+      <p style={{fontSize:14,color:C.sub,margin:"0 auto 22px",lineHeight:1.6,maxWidth:460}}>
+        {mode === "definition" ? "Associe chaque définition courte à la bonne figure de style." : "Observe l'exemple complet et identifie le procédé utilisé. Les exemples masqués restent réservés aux fiches de révision."}
+      </p>
+      <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:24,flexWrap:"wrap"}}>
+        {[5,10,15,20].map(n=>(
+          <button key={n} onClick={()=>setMaxQ(n)} style={{padding:"10px 20px",borderRadius:14,fontWeight:750,fontSize:15,border:`2px solid ${maxQ===n?C.indigo:C.border}`,background:maxQ===n?`${C.indigo}14`:C.solid,color:maxQ===n?C.indigo:C.sub,cursor:"pointer"}}>{n}</button>
+        ))}
+      </div>
+      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+        <Btn label={`Démarrer — ${maxQ} questions`} variant="primary" onClick={start}/>
+        <Btn label="Retour" variant="ghost" onClick={onBack}/>
+      </div>
+    </Card>
+  );
+
+  if (done) return (
+    <Card style={{textAlign:"center",padding:"36px 24px"}}>
+      <div style={{fontSize:54,marginBottom:12}}>{score>=maxQ*0.8?"🏆":score>=maxQ*0.5?"👍":"💪"}</div>
+      <h2 style={{fontSize:24,fontWeight:850,color:C.text,marginBottom:8}}>{score} / {maxQ}</h2>
+      <p style={{fontSize:15,color:C.sub,marginBottom:22}}>Les figures mal identifiées reviendront plus vite.</p>
+      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+        <Btn label="Rejouer" variant="primary" onClick={start}/>
+        <Btn label="Retour aux figures" variant="ghost" onClick={onBack}/>
+      </div>
+    </Card>
+  );
+
+  if (!current || !q) return <div style={{color:C.sub,textAlign:"center",padding:48}}>Chargement…</div>;
+  const wrong = selected && selected !== current.id;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:12}}>
+        <div style={{flex:1}}><Bar value={(count/maxQ)*100} color={C.indigo}/></div>
+        <span style={{fontSize:13,color:C.sub,fontWeight:650,minWidth:54,textAlign:"right"}}>{count+1} / {maxQ}</span>
+        <span style={{fontSize:13,color:C.green,fontWeight:800}}>✓ {score}</span>
+      </div>
+      <Card className={`question-card ${selected ? (wrong ? "feedback-wrong" : "feedback-correct") : ""}`}>
+        <p style={{fontSize:12,color:C.indigo,fontWeight:850,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>{q.label}</p>
+        <div style={{background:`${C.indigo}08`,borderLeft:`4px solid ${C.indigo}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"0 0 16px"}}>
+          <p style={{fontSize:16,color:C.text,fontStyle:mode==="definition"?"normal":"italic",fontWeight:mode==="definition"?750:500,lineHeight:1.7,margin:0}}>{q.prompt}</p>
+        </div>
+        <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"0 0 12px"}}>{q.helper}</p>
+        <div className="choice-grid">
+          {q.options.map(o=>{
+            let bg=C.solid,border=C.border,color=C.text,weight=650;
+            if(selected) {
+              if(o.id===current.id) {bg=`${C.green}22`;border=C.green;color=C.green;weight=850;}
+              else if(o.id===selected) {bg=`${C.red}18`;border=C.red;color=C.red;}
+              else color=C.ter;
+            }
+            return <button key={o.id} disabled={!!selected} onClick={()=>answer(o)} style={{padding:"13px 12px",borderRadius:14,border:`1.5px solid ${border}`,background:bg,textAlign:"left",cursor:selected?"default":"pointer",fontSize:14,fontWeight:weight,color,lineHeight:1.35,transition:"all 0.2s"}}>{q.renderOption(o)}{o.id===current.id&&selected?" ✓":""}</button>;
+          })}
+        </div>
+        {selected && (
+          <div style={{marginTop:14,animation:"fadeSlideIn 0.25s ease"}}>
+            <p style={{fontSize:13,color:wrong?C.red:C.green,fontWeight:850,margin:"0 0 8px"}}>{wrong ? "À corriger" : "Correct"}</p>
+            <p style={{fontSize:15,color:C.text,lineHeight:1.55,margin:"0 0 8px"}}><strong>{current.word}</strong> — {current.compact}</p>
+            <p style={{fontSize:13,color:C.sub,lineHeight:1.55,margin:"0 0 10px"}}>{current.definition}</p>
+            <FigureExampleBlock figure={current}/>
+            <Btn label="Continuer" variant="primary" full onClick={()=>moveNext(count+1)}/>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function FiguresTab({figures,state,setState,onMilestone,onReloadFigures,figuresStatus}) {
+  const [mode,setMode] = useState("home");
+  const [selected,setSelected] = useState(null);
+  const [query,setQuery] = useState("");
+  const [filter,setFilter] = useState("Tous");
+
+  const total = figures.length;
+  const seen = figures.filter(f=>readP(state,f.id).seen>0).length;
+  const mastered = figures.filter(f=>wordStatus(state,f)==="Maîtrisé").length;
+  const due = figures.filter(f=>isDue(state,f)&&readP(state,f.id).seen>0).length;
+  const families = useMemo(()=>["Tous",...Array.from(new Set(figures.map(f=>f.theme))).sort()],[figures]);
+  const visible = useMemo(()=>{
+    const q = norm(query);
+    return figures.filter(f=>{
+      const hay = norm([f.word,f.compact,f.definition,f.example,f.theme].join(" "));
+      return (!q || hay.includes(q)) && (filter === "Tous" || f.theme === filter);
+    }).sort((a,b)=>a.word.localeCompare(b.word,"fr"));
+  },[figures,query,filter]);
+  const sel = selected ? figures.find(f=>f.id===selected) : null;
+
+  if (mode === "identify") return <FigurePractice figures={figures} state={state} setState={setState} onMilestone={onMilestone} mode="identify" onBack={()=>setMode("home")}/>;
+  if (mode === "definition") return <FigurePractice figures={figures} state={state} setState={setState} onMilestone={onMilestone} mode="definition" onBack={()=>setMode("home")}/>;
+  if (sel) return <FigureDetail figure={sel} figures={figures} state={state} onBack={()=>setSelected(null)}/>;
+
+  if (!figures.length) return (
+    <Card style={{textAlign:"center",padding:"42px 24px"}}>
+      <div style={{fontSize:46,marginBottom:12}}>✒️</div>
+      <h2 style={{fontSize:22,fontWeight:850,color:C.text,marginBottom:8}}>Aucune figure chargée</h2>
+      <p style={{fontSize:14,color:C.sub,lineHeight:1.6,margin:"0 0 18px"}}>Le corpus des figures de style n'est pas encore disponible.</p>
+      <Btn label="Recharger depuis GitHub" variant="primary" onClick={onReloadFigures}/>
+    </Card>
+  );
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.25s ease"}}>
+      <Card style={{background:`linear-gradient(135deg, ${C.indigo}12 0%, ${C.purple}09 100%)`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+          <div>
+            <p style={{fontSize:11,fontWeight:850,color:C.indigo,textTransform:"uppercase",letterSpacing:1,margin:"0 0 6px"}}>Figures de style</p>
+            <h2 style={{fontSize:25,fontWeight:850,color:C.text,letterSpacing:-0.8,margin:"0 0 6px"}}>Reconnaître les procédés</h2>
+            <p style={{fontSize:14,color:C.sub,lineHeight:1.55,margin:0}}>Travaille les exemples, les définitions courtes et les familles de figures.</p>
+          </div>
+          <Pill label={`${seen}/${total} vues`} color={C.indigo}/>
+        </div>
+        <div className="stats-grid" style={{marginTop:16}}>
+          <div><p style={{fontSize:22,fontWeight:850,color:C.text,margin:0}}>{total}</p><p style={{fontSize:11,color:C.sub,margin:0}}>figures</p></div>
+          <div><p style={{fontSize:22,fontWeight:850,color:C.green,margin:0}}>{mastered}</p><p style={{fontSize:11,color:C.sub,margin:0}}>maîtrisées</p></div>
+          <div><p style={{fontSize:22,fontWeight:850,color:C.red,margin:0}}>{due}</p><p style={{fontSize:11,color:C.sub,margin:0}}>à revoir</p></div>
+        </div>
+      </Card>
+
+      <Card>
+        <h3 style={{fontSize:16,fontWeight:850,color:C.text,margin:"0 0 10px"}}>Sessions figures</h3>
+        <div className="choice-grid">
+          <SessionButton title="Identifier par l'exemple" subtitle="Trouver la figure illustrée dans une phrase complète." icon="🔎" color={C.indigo} onClick={()=>setMode("identify")}/>
+          <SessionButton title="Associer la définition" subtitle="Retrouver le procédé à partir du sens." icon="📘" color={C.blue} onClick={()=>setMode("definition")}/>
+        </div>
+      </Card>
+
+      <Card>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+          <div>
+            <h3 style={{fontSize:16,fontWeight:850,color:C.text,margin:"0 0 3px"}}>Explorer les figures</h3>
+            <p style={{fontSize:13,color:C.sub,margin:0}}>Ouvre une fiche pour voir l'exemple complet. L'exemple masqué sert seulement de support de rappel, pas d'identification.</p>
+          </div>
+          {onReloadFigures && <Btn label={figuresStatus==="loading"?"Chargement…":"Recharger"} variant="ghost" small onClick={onReloadFigures} disabled={figuresStatus==="loading"}/>}
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"stretch",marginBottom:10}}>
+          <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Rechercher une figure…" style={{flex:1,minWidth:0,padding:"10px 14px",borderRadius:12,fontSize:14,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none"}}/>
+          <select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"10px 12px",borderRadius:12,fontSize:13,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none",maxWidth:190}}>
+            {families.map(t=><option key={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="scroll-list">
+          {visible.map(f=>{
+            const st = wordStatus(state,f);
+            return (
+              <div key={f.id} onClick={()=>setSelected(f.id)} style={{padding:"12px 14px",borderRadius:14,cursor:"pointer",background:C.surface,border:`1.5px solid ${C.border}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:3}}>
+                  <span className="word-title" style={{fontWeight:800,fontSize:15,color:C.text,minWidth:0}}>{f.word}</span>
+                  <Pill label={st} color={STATUS_COLOR[st]}/>
+                </div>
+                <div style={{fontSize:13,color:C.sub,lineHeight:1.45}}>{f.compact}</div>
+                <div style={{fontSize:12,color:C.ter,marginTop:3}}>{f.theme}</div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // ─── LIBRARY TAB ──────────────────────────────────────────────────────────────
 function LibraryTab({words,state}) {
-  const [query,setQuery]=useState("");
-  const [filter,setFilter]=useState("Tous");
-  const [selected,setSelected]=useState(null);
+  const [query,setQuery] = useState("");
+  const [filter,setFilter] = useState("Tous");
+  const [selected,setSelected] = useState(null);
 
-  const themes=useMemo(()=>["Tous","Nouveau","À revoir","Maîtrisé","Fragile",...Array.from(new Set(words.map(w=>w.theme))).sort()],[words]);
-  const visible=useMemo(()=>{
-    const q=norm(query);
+  const themes = useMemo(()=>["Tous","Nouveau","À revoir","Maîtrisé","Fragile",...Array.from(new Set(words.map(w=>w.theme))).sort()],[words]);
+  const visible = useMemo(()=>{
+    const q = norm(query);
     return words.filter(w=>{
-      const hay=norm([w.word,w.compact,w.definition,w.theme,w.nature].join(" "));
+      const hay = norm([w.word,w.compact,w.definition,w.theme,w.nature].join(" "));
       return (!q||hay.includes(q))&&(filter==="Tous"||w.theme===filter||wordStatus(state,w)===filter);
     }).sort((a,b)=>a.word.localeCompare(b.word,"fr"));
   },[query,filter,state,words]);
 
-  const sel=selected?words.find(w=>w.id===selected):null;
+  const sel = selected?words.find(w=>w.id===selected):null;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      <div style={{display:"flex",gap:8}}>
-        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="🔍  Rechercher…"
-          style={{flex:1,padding:"10px 14px",borderRadius:12,fontSize:14,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,fontFamily:"-apple-system",outline:"none",boxSizing:"border-box"}}/>
+      <div style={{display:"flex",gap:8,alignItems:"stretch"}}>
+        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Rechercher…"
+          style={{flex:1,minWidth:0,padding:"10px 14px",borderRadius:12,fontSize:14,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none"}}/>
         <select value={filter} onChange={e=>setFilter(e.target.value)}
-          style={{padding:"10px 12px",borderRadius:12,fontSize:13,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,fontFamily:"-apple-system",outline:"none"}}>
+          style={{padding:"10px 12px",borderRadius:12,fontSize:13,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none",maxWidth:180}}>
           {themes.map(t=><option key={t}>{t}</option>)}
         </select>
       </div>
@@ -1033,8 +2142,8 @@ function LibraryTab({words,state}) {
 
       {sel ? (
         <Card>
-          <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",color:C.blue,fontSize:14,cursor:"pointer",padding:0,marginBottom:10,fontWeight:500,fontFamily:"-apple-system"}}>← Retour</button>
-          <div style={{fontSize:28,fontWeight:800,color:C.text,letterSpacing:-0.8,marginBottom:10}}>{sel.word}</div>
+          <button onClick={()=>setSelected(null)} style={{background:"none",border:"none",color:C.blue,fontSize:14,cursor:"pointer",padding:0,marginBottom:10,fontWeight:500}}>← Retour</button>
+          <div className="word-title" style={{fontSize:28,fontWeight:800,color:C.text,letterSpacing:-0.8,marginBottom:10}}>{sel.word}</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
             <Pill label={sel.nature} color={C.purple}/>
             <Pill label={sel.theme} color={THEME_COLOR[sel.theme]}/>
@@ -1043,15 +2152,18 @@ function LibraryTab({words,state}) {
           <p style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>{sel.compact}</p>
           <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:10}}>{sel.definition}</p>
           <ExampleBlock word={sel}/>
+          <ConfusionBlock word={sel} words={words} />
+          {sel.memoryTip && <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"10px 0 0"}}><strong style={{color:C.text}}>Astuce :</strong> {sel.memoryTip}</p>}
+          {sel.etymology && <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"8px 0 0"}}><strong style={{color:C.text}}>Étymologie :</strong> {sel.etymology}</p>}
         </Card>
       ) : (
-        <div style={{display:"flex",flexDirection:"column",gap:6,maxHeight:560,overflowY:"auto"}}>
+        <div className="scroll-list">
           {visible.map(w=>{
-            const st=wordStatus(state,w);
+            const st = wordStatus(state,w);
             return (
               <div key={w.id} onClick={()=>setSelected(w.id)} style={{padding:"12px 14px",borderRadius:14,cursor:"pointer",background:C.surface,border:`1.5px solid ${C.border}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
-                  <span style={{fontWeight:700,fontSize:15,color:C.text}}>{w.word}</span>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,marginBottom:3}}>
+                  <span className="word-title" style={{fontWeight:700,fontSize:15,color:C.text,minWidth:0}}>{w.word}</span>
                   <Pill label={st} color={STATUS_COLOR[st]}/>
                 </div>
                 <div style={{fontSize:13,color:C.sub,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{w.compact}</div>
@@ -1065,15 +2177,18 @@ function LibraryTab({words,state}) {
 }
 
 // ─── STATS TAB ────────────────────────────────────────────────────────────────
-function StatsTab({words,state,onOpenImport,onReset,onExport,onSync}) {
-  const total    = words.length;
+function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,onReloadRemote,canReloadRemote,onReloadFigures,canReloadFigures}) {
+  const total = words.length;
   const mastered = words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
-  const dueN     = words.filter(w=>isDue(state,w)).length;
-  const fragile  = words.filter(w=>wordStatus(state,w)==="Fragile").length;
-  const seen     = words.filter(w=>getP(state,w.id).seen>0).length;
+  const dueN = words.filter(w=>isDue(state,w)).length;
+  const fragile = words.filter(w=>wordStatus(state,w)==="Fragile").length;
+  const seen = words.filter(w=>readP(state,w.id).seen>0).length;
+  const figureTotal = figures.length;
+  const figureSeen = figures.filter(w=>readP(state,w.id).seen>0).length;
+  const figureMastered = figures.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
 
-  const themeStats=useMemo(()=>{
-    const map={};
+  const themeStats = useMemo(()=>{
+    const map = {};
     words.forEach(w=>{
       if(!map[w.theme]) map[w.theme]={total:0,mastered:0};
       map[w.theme].total++;
@@ -1082,24 +2197,25 @@ function StatsTab({words,state,onOpenImport,onReset,onExport,onSync}) {
     return Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
   },[words,state]);
 
-  const StatCard=({icon,label,value,color,sub})=>(
+  const StatCard = ({icon,label,value,color,sub}) => (
     <div style={{background:C.surface,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,padding:"14px 16px",boxShadow:"0 1px 8px rgba(0,0,0,0.05)"}}>
       <div style={{fontSize:20,marginBottom:4}}>{icon}</div>
       <div style={{fontSize:24,fontWeight:800,color:color||C.text,fontVariantNumeric:"tabular-nums"}}>{value}</div>
       <div style={{fontSize:12,color:C.sub,marginTop:2,fontWeight:500}}>{label}</div>
-      {sub&&<div style={{fontSize:11,color:C.ter,marginTop:2}}>{sub}</div>}
+      {sub&&<div style={{fontSize:11,color:C.ter,marginTop:2,lineHeight:1.4}}>{sub}</div>}
     </div>
   );
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+      <div className="stats-grid">
         <StatCard icon="📖" label="Total" value={total} color={C.blue}/>
-        <StatCard icon="✅" label="Maîtrisés" value={mastered} color={C.green} sub="mastery≥5, taux≥75%"/>
+        <StatCard icon="✅" label="Maîtrisés" value={mastered} color={C.green} sub="mastery≥5, prod≥2"/>
         <StatCard icon="🔄" label="À revoir" value={dueN} color={C.red}/>
         <StatCard icon="⚠️" label="Fragiles" value={fragile} color={C.orange} sub="≥2 erreurs, taux<70%"/>
         <StatCard icon="👁" label="Vus" value={seen} color={C.purple}/>
         <StatCard icon="🔥" label="Série" value={`${state.meta.streak||0}j`} color={C.orange}/>
+        <StatCard icon="✒️" label="Figures" value={figureTotal} color={C.indigo} sub={`${figureSeen} vues · ${figureMastered} maîtrisées`}/>
       </div>
 
       <Card>
@@ -1109,11 +2225,17 @@ function StatsTab({words,state,onOpenImport,onReset,onExport,onSync}) {
       </Card>
 
       <Card>
+        <h3 style={{fontSize:16,fontWeight:700,color:C.text,marginTop:0,marginBottom:10}}>Régularité récente</h3>
+        <ActivityHeatmap days={28}/>
+        <p style={{fontSize:12,color:C.ter,margin:"10px 0 0",lineHeight:1.45}}>28 derniers jours d'activité.</p>
+      </Card>
+
+      <Card>
         <h3 style={{fontSize:16,fontWeight:700,color:C.text,marginTop:0,marginBottom:14}}>Par thème</h3>
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           {themeStats.map(([theme,{total:t,mastered:m}])=>(
             <div key={theme}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:4,gap:10}}>
                 <span style={{fontSize:13,fontWeight:600,color:C.text}}>{theme}</span>
                 <span style={{fontSize:12,color:C.sub}}>{m}/{t}</span>
               </div>
@@ -1129,81 +2251,168 @@ function StatsTab({words,state,onOpenImport,onReset,onExport,onSync}) {
           <strong>{total} mots</strong> chargés · progression sauvegardée automatiquement.
         </p>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          <Btn label="📥 Mettre à jour le vocabulaire" variant="primary" full onClick={onOpenImport}/>
+          <Btn label="Mettre à jour le vocabulaire" variant="primary" full onClick={onOpenImport}/>
+          {canReloadRemote && <Btn label="Recharger vocabulaire depuis GitHub" variant="ghost" full onClick={onReloadRemote}/>}
+          {canReloadFigures && <Btn label="Recharger figures depuis GitHub" variant="ghost" full onClick={onReloadFigures}/>} 
           <div style={{display:"flex",gap:8}}>
-            <Btn label="⬆️ Exporter progression" variant="ghost" full onClick={onExport}/>
-            <Btn label="⬇️ Importer progression" variant="ghost" full onClick={onSync}/>
+            <Btn label="Exporter progression" variant="ghost" full onClick={onExport}/>
+            <Btn label="Importer progression" variant="ghost" full onClick={onSync}/>
           </div>
-          <Btn label="🔄 Réinitialiser la progression" variant="ghost" full onClick={onReset}/>
+          <Btn label="Réinitialiser la progression" variant="ghost" full onClick={onReset}/>
         </div>
         <p style={{fontSize:12,color:C.ter,marginTop:10,lineHeight:1.5}}>
-          💡 Multi-appareils : exporte ta progression ici, transfère via AirDrop/iCloud, importe sur l'autre appareil.
+          Multi-appareils : exporte ta progression, transfère le fichier, puis importe-le sur l'autre appareil.
         </p>
       </Card>
     </div>
   );
 }
 
-// ─── ROOT ──────────────────────────────────────────────────────────────────────
+// ─── ROOT ─────────────────────────────────────────────────────────────────────
 function App() {
-  const [tab,setTab]=useState("daily");
-  const [state,setState]=useState(loadProgress);
-  const [rawWords,setRawWords]=useState(()=>loadCustomWords()||SEED_WORDS);
-  const [showImport,setShowImport]=useState(false);
-  const [fetchStatus,setFetchStatus]=useState(null); // null | "loading" | "done" | "error"
+  const initialStoredWords = useMemo(()=>loadCustomWords(),[]);
+  const initialStoredFigures = useMemo(()=>loadCustomFigures(),[]);
+  const [tab,setTab] = useState("home");
+  const [learnMode,setLearnMode] = useState("smart");
+  const [quizMode,setQuizMode] = useState("quick");
+  const [state,setState] = useState(loadProgress);
+  const [rawWords,setRawWords] = useState(()=>initialStoredWords || (VOCAB_URL ? [] : SEED_WORDS));
+  const [rawFigures,setRawFigures] = useState(()=>initialStoredFigures || (FIGURES_URL ? [] : SEED_FIGURES));
+  const [hasStoredWords,setHasStoredWords] = useState(()=>!!initialStoredWords);
+  const [hasStoredFigures,setHasStoredFigures] = useState(()=>!!initialStoredFigures);
+  const [showImport,setShowImport] = useState(false);
+  const [showReset,setShowReset] = useState(false);
+  const [showSync,setShowSync] = useState(false);
+  const [milestone,setMilestone] = useState(null);
+  const [fetchStatus,setFetchStatus] = useState(()=>initialStoredWords || !VOCAB_URL ? null : "loading");
+  const [figuresStatus,setFiguresStatus] = useState(()=>initialStoredFigures || !FIGURES_URL ? null : "loading");
 
-  // Auto-chargement depuis VOCAB_URL si pas de mots en localStorage
-  useEffect(()=>{
+  const words = useMemo(()=>buildWords(rawWords,"vocab"),[rawWords]);
+  const figures = useMemo(()=>buildWords(rawFigures,"figure"),[rawFigures]);
+  const allItems = useMemo(()=>[...words, ...figures],[words,figures]);
+  const total = words.length;
+  const mastered = words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
+  const figuresMastered = figures.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
+  const dueCount = useMemo(()=>words.filter(w=>isDue(state,w)&&readP(state,w.id).seen>0).length,[words,state]);
+
+  const loadRemoteVocabulary = useCallback((force=false) => {
     if (!VOCAB_URL) return;
-    if (loadCustomWords()) return; // déjà des mots en cache → rien à faire
+    if (!force && loadCustomWords()) return;
     setFetchStatus("loading");
-    fetch(VOCAB_URL)
+    fetch(dataUrl(VOCAB_URL, force), { cache: "no-store" })
       .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(data=>{
-        if (!Array.isArray(data) || !data[0]?.word) throw new Error("Format invalide");
+        const error = validateVocabArray(data);
+        if (error) throw new Error(error);
         saveCustomWords(data);
+        const nextWords = buildWords(data,"vocab");
+        const cleaned = cleanProgressForWords(state, [...nextWords, ...figures]);
+        saveProgress(cleaned);
+        setState(cleaned);
         setRawWords(data);
+        setHasStoredWords(true);
+        clearDailyDone();
         setFetchStatus("done");
         setTimeout(()=>setFetchStatus(null), 3000);
       })
       .catch(err=>{
         console.warn("Chargement vocabulaire échoué :", err);
+        if (!rawWords.length) setRawWords(SEED_WORDS);
         setFetchStatus("error");
       });
-  },[]);
-  const [showReset,setShowReset]=useState(false);
-  const [showSync,setShowSync]=useState(false);
-  const [milestone,setMilestone]=useState(null);
+  }, [rawWords.length, state, figures]);
 
-  const words=useMemo(()=>rawWords.map(buildWord),[rawWords]);
-  const total=words.length;
-  const mastered=words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
-  const usingCustom=!!loadCustomWords();
-  const dueCount=useMemo(()=>words.filter(w=>isDue(state,w)&&getP(state,w.id).seen>0).length,[words,state]);
+  const loadRemoteFigures = useCallback((force=false) => {
+    if (!FIGURES_URL) return;
+    if (!force && loadCustomFigures()) return;
+    setFiguresStatus("loading");
+    fetch(dataUrl(FIGURES_URL, force), { cache: "no-store" })
+      .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(data=>{
+        const error = validateVocabArray(data);
+        if (error) throw new Error(error);
+        saveCustomFigures(data);
+        const nextFigures = buildWords(data,"figure");
+        const cleaned = cleanProgressForWords(state, [...words, ...nextFigures]);
+        saveProgress(cleaned);
+        setState(cleaned);
+        setRawFigures(data);
+        setHasStoredFigures(true);
+        setFiguresStatus("done");
+        setTimeout(()=>setFiguresStatus(null), 3000);
+      })
+      .catch(err=>{
+        console.warn("Chargement figures échoué :", err);
+        if (!rawFigures.length) setRawFigures(SEED_FIGURES);
+        setFiguresStatus("error");
+      });
+  }, [rawFigures.length, state, words]);
 
-  const handleReset=()=>{
-    const fresh={progress:{},meta:{xp:0,streak:0,lastDay:null}};
-    saveProgress(fresh); setState(fresh); setShowReset(false);
+  useEffect(()=>{
+    if (!initialStoredWords && VOCAB_URL) loadRemoteVocabulary(false);
+    if (!initialStoredFigures && FIGURES_URL) loadRemoteFigures(false);
+  }, []);
+
+  const handleImportWords = (data) => {
+    const nextWords = buildWords(data,"vocab");
+    const cleaned = cleanProgressForWords(state, [...nextWords, ...figures]);
+    saveProgress(cleaned);
+    setState(cleaned);
+    setRawWords(data);
+    setHasStoredWords(true);
+    clearDailyDone();
   };
-  const handleImportProgress=(data)=>{
-    const ns={progress:data.progress||{},meta:data.meta||{xp:0,streak:0,lastDay:null}};
-    saveProgress(ns); setState(ns); setShowSync(false);
+
+  const handleReset = () => {
+    const fresh = {progress:{},meta:{...DEFAULT_META}};
+    saveProgress(fresh);
+    try { localStorage.removeItem(STORE_MILESTONE); } catch {}
+    clearDailyDone();
+    setState(fresh);
+    setShowReset(false);
   };
-  const handleExport=()=>{
-    const data={progress:state.progress,meta:state.meta,exportedAt:new Date().toISOString()};
-    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url; a.download=`vocab_progression_${new Date().toISOString().slice(0,10)}.json`; a.click();
+
+  const handleImportProgress = (data) => {
+    const currentHash = hashString(allItems.map(w=>w.id).join("|"));
+    if (data.vocabHash && data.vocabHash !== currentHash) {
+      const ok = window.confirm("Cette progression semble liée à une autre version des corpus. Importer quand même les éléments compatibles ?");
+      if (!ok) return;
+    }
+    const ns = normalizeLoadedProgress(data);
+    const cleaned = cleanProgressForWords(ns, allItems);
+    saveProgress(cleaned);
+    setState(cleaned);
+    setShowSync(false);
+  };
+
+  const handleExport = () => {
+    const data = {
+      progress: state.progress,
+      meta: state.meta,
+      vocabCount: words.length,
+      figuresCount: figures.length,
+      vocabHash: hashString(allItems.map(w=>w.id).join("|")),
+      exportedAt: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `vocab_progression_${localDateKey()}.json`;
+    a.click();
     URL.revokeObjectURL(url);
   };
 
+  const startDaily = () => setTab("daily");
+  const startReview = (mode="smart") => { setLearnMode(mode); setTab("learn"); };
+  const startQuiz = (mode="quick") => { setQuizMode(mode); setTab("quiz"); };
+  const startFigures = () => setTab("figures");
+
   return (
-    <div style={{minHeight:"100vh",background:C.bg,fontFamily:"-apple-system,'SF Pro Text','Helvetica Neue',sans-serif",WebkitFontSmoothing:"antialiased"}}>
-      {milestone&&<MilestoneToast milestone={milestone} onDone={()=>setMilestone(null)}/>}
+    <div style={{minHeight:"100vh",background:C.bg}}>
+      {milestone&&<MilestoneToast milestone={milestone} onDone={()=>setMilestone(null)}/>} 
 
       <div style={{maxWidth:760,margin:"0 auto",padding:"24px 18px 80px"}}>
-        {/* Header */}
         <div style={{marginBottom:20}}>
           <p style={{fontSize:11,fontWeight:700,letterSpacing:1.4,color:C.sub,textTransform:"uppercase",margin:"0 0 4px"}}>Atelier vocabulaire</p>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",flexWrap:"wrap",gap:10}}>
@@ -1213,39 +2422,63 @@ function App() {
               <div style={{background:`${C.blue}12`, color:C.blue, borderRadius:11,padding:"5px 11px",fontSize:12,fontWeight:700}}>⚡ {state.meta.xp||0} XP</div>
             </div>
           </div>
-          <p style={{fontSize:13,color:C.sub,marginTop:4,marginBottom:0}}>
-            {total} mots {usingCustom?"(import perso ✓)":"(démo)"} · {mastered} maîtrisés
+          <p style={{fontSize:13,color:C.sub,marginTop:4,marginBottom:0,lineHeight:1.5}}>
+            {total} mots {hasStoredWords?"(chargés ✓)":"(démo)"} · {mastered} maîtrisés · {figures.length} figures {hasStoredFigures?"(chargées ✓)":""} · {figuresMastered} maîtrisées
           </p>
           {fetchStatus==="loading" && (
             <div style={{marginTop:8,padding:"8px 14px",borderRadius:10,background:`${C.blue}10`,color:C.blue,fontSize:13,fontWeight:600,display:"inline-flex",alignItems:"center",gap:8}}>
               <span style={{animation:"shimmer 1.2s ease infinite",display:"inline-block"}}>⏳</span> Chargement du vocabulaire…
             </div>
           )}
+          {figuresStatus==="loading" && (
+            <div style={{marginTop:8,marginLeft:fetchStatus==="loading"?8:0,padding:"8px 14px",borderRadius:10,background:`${C.indigo}10`,color:C.indigo,fontSize:13,fontWeight:600,display:"inline-flex",alignItems:"center",gap:8}}>
+              <span style={{animation:"shimmer 1.2s ease infinite",display:"inline-block"}}>✒️</span> Chargement des figures…
+            </div>
+          )}
           {fetchStatus==="done" && (
             <div style={{marginTop:8,padding:"8px 14px",borderRadius:10,background:`${C.green}12`,color:C.green,fontSize:13,fontWeight:600}}>
-              ✅ {rawWords.length} mots chargés et mis en cache !
+              {rawWords.length} mots chargés et mis en cache.
+            </div>
+          )}
+          {figuresStatus==="done" && (
+            <div style={{marginTop:8,padding:"8px 14px",borderRadius:10,background:`${C.green}12`,color:C.green,fontSize:13,fontWeight:600}}>
+              {rawFigures.length} figures chargées et mises en cache.
             </div>
           )}
           {fetchStatus==="error" && (
-            <div style={{marginTop:8,padding:"8px 14px",borderRadius:10,background:`${C.red}10`,color:C.red,fontSize:13,fontWeight:600}}>
-              ⚠️ Impossible de charger le vocabulaire distant. <button onClick={()=>setShowImport(true)} style={{background:"none",border:"none",color:C.red,textDecoration:"underline",cursor:"pointer",fontSize:13,fontWeight:600}}>Importer manuellement</button>
+            <div style={{marginTop:8,padding:"8px 14px",borderRadius:10,background:`${C.red}10`,color:C.red,fontSize:13,fontWeight:600,lineHeight:1.5}}>
+              Impossible de charger le vocabulaire distant. {rawWords.length ? "Fallback local utilisé." : ""} <button onClick={()=>setShowImport(true)} style={{background:"none",border:"none",color:C.red,textDecoration:"underline",cursor:"pointer",fontSize:13,fontWeight:600}}>Importer manuellement</button>
             </div>
           )}
-          {!usingCustom && !fetchStatus && !VOCAB_URL &&(
-            <button onClick={()=>setShowImport(true)} style={{marginTop:10,padding:"8px 14px",borderRadius:10,background:`${C.blue}12`,color:C.blue,border:`1px solid ${C.blue}30`,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"-apple-system"}}>📥 Importer mes 700+ mots</button>
+          {figuresStatus==="error" && (
+            <div style={{marginTop:8,padding:"8px 14px",borderRadius:10,background:`${C.red}10`,color:C.red,fontSize:13,fontWeight:600,lineHeight:1.5}}>
+              Impossible de charger les figures distantes. {rawFigures.length ? "Fallback local utilisé." : ""}
+            </div>
           )}
         </div>
 
-        <TabBar active={tab} onSelect={setTab} dueCount={dueCount}/>
+        {fetchStatus === "loading" && total === 0 ? (
+          <Card style={{textAlign:"center",padding:"48px 24px"}}>
+            <div style={{fontSize:42,marginBottom:12,animation:"shimmer 1.2s ease infinite"}}>⏳</div>
+            <p style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:6}}>Chargement du vocabulaire</p>
+            <p style={{fontSize:14,color:C.sub,lineHeight:1.6}}>L'app attend les données avant de démarrer la routine pour éviter de créer une progression sur les mots de démo.</p>
+          </Card>
+        ) : (
+          <>
+            <TabBar active={tab} onSelect={setTab} dueCount={dueCount}/>
 
-        {tab==="daily"   && <DailyTab   words={words} state={state} setState={setState} onMilestone={setMilestone}/>}
-        {tab==="learn"   && <LearnTab   words={words} state={state} setState={setState}/>}
-        {tab==="quiz"    && <QuizTab    words={words} state={state} setState={setState}/>}
-        {tab==="library" && <LibraryTab words={words} state={state}/>}
-        {tab==="stats"   && <StatsTab   words={words} state={state} onOpenImport={()=>setShowImport(true)} onReset={()=>setShowReset(true)} onExport={handleExport} onSync={()=>setShowSync(true)}/>}
+            {tab==="home"    && <Dashboard words={words} figures={figures} state={state} onStartDaily={startDaily} onStartReview={()=>startReview("smart")} onStartFragile={()=>startReview("fragile")} onStartDue={()=>startReview("due")} onStartQuiz={()=>startQuiz("quick")} onStartNuance={()=>startQuiz("nuance")} onStartFigures={startFigures}/>} 
+            {tab==="daily"   && <DailyTab   words={words} state={state} setState={setState} onMilestone={setMilestone} onGoReview={()=>startReview("fragile")} onGoQuiz={()=>startQuiz("quick")} onGoNuance={()=>startQuiz("nuance")}/>} 
+            {tab==="learn"   && <LearnTab   key={`learn-${learnMode}`} words={words} state={state} setState={setState} onMilestone={setMilestone} mode={learnMode}/>} 
+            {tab==="quiz"    && <QuizTab    key={`quiz-${quizMode}`} words={words} state={state} setState={setState} onMilestone={setMilestone} mode={quizMode} onModeChange={setQuizMode}/>} 
+            {tab==="figures" && <FiguresTab figures={figures} state={state} setState={setState} onMilestone={setMilestone} onReloadFigures={()=>loadRemoteFigures(true)} figuresStatus={figuresStatus}/>}
+            {tab==="library" && <LibraryTab words={words} state={state}/>} 
+            {tab==="stats"   && <StatsTab   words={words} figures={figures} state={state} onOpenImport={()=>setShowImport(true)} onReset={()=>setShowReset(true)} onExport={handleExport} onSync={()=>setShowSync(true)} onReloadRemote={()=>loadRemoteVocabulary(true)} canReloadRemote={!!VOCAB_URL} onReloadFigures={()=>loadRemoteFigures(true)} canReloadFigures={!!FIGURES_URL}/>} 
+          </>
+        )}
       </div>
 
-      <ImportModal open={showImport} onClose={()=>setShowImport(false)} currentCount={total} onImport={w=>setRawWords(w)}/>
+      <ImportModal open={showImport} onClose={()=>setShowImport(false)} currentCount={total} onImport={handleImportWords}/>
       <SyncModal   open={showSync}   onClose={()=>setShowSync(false)}   onImportProgress={handleImportProgress}/>
       <ResetModal  open={showReset}  onClose={()=>setShowReset(false)}  onConfirm={handleReset}/>
     </div>
