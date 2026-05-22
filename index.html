@@ -147,6 +147,8 @@ function hashString(str) {
 }
 
 function stableWordId(w) {
+  const provided = String(w.id || w.slug || "").trim();
+  if (provided) return norm(provided).replace(/ /g, "-") || provided;
   const label = norm(w.word || "mot").replace(/ /g, "-") || "mot";
   // ID volontairement fondé sur le mot et la nature, pas sur la définition :
   // une correction éditoriale du JSON ne doit pas effacer la progression.
@@ -331,8 +333,9 @@ function buildWord(w, kind = "vocab") {
   const compact = w.definition_compacte || w.definition_courte || w.compact || w.definition || "";
   const hasGoodExample = raw.trim().length > 20 && !isGeneric(raw);
   const baseId = stableWordId(w);
+  const finalId = isFigure && !String(baseId).startsWith("figure-") ? `figure-${baseId}` : baseId;
   return {
-    id: isFigure ? `figure-${baseId}` : baseId,
+    id: finalId,
     kind: isFigure ? "figure" : "vocab",
     word: String(w.word || "").trim(),
     definition: String(w.definition || ""),
@@ -375,6 +378,30 @@ function uniqueById(arr) {
   return [...new Map(arr.map(w => [w.id, w])).values()];
 }
 
+function dedupeWordKey(w) {
+  return `${w.kind || "vocab"}:${norm(w.word || "")}`;
+}
+
+function mergeWordsPriority(groups) {
+  const items = [];
+  const seenIds = new Set();
+  const seenWords = new Set();
+  const skipped = [];
+  groups.forEach(group => {
+    (group.items || []).forEach(item => {
+      const key = dedupeWordKey(item);
+      if (!key.split(":")[1] || seenIds.has(item.id) || seenWords.has(key)) {
+        skipped.push({ ...item, sourceId: group.sourceId || item.sourceId || "", sourceLabel: group.sourceLabel || item.sourceLabel || "" });
+        return;
+      }
+      seenIds.add(item.id);
+      seenWords.add(key);
+      items.push({ ...item, sourceId: group.sourceId || item.sourceId || "", sourceLabel: group.sourceLabel || item.sourceLabel || "" });
+    });
+  });
+  return { items, skipped };
+}
+
 function escapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -410,137 +437,320 @@ function answerMatches(input, word) {
   return acceptedAnswers(word).includes(n);
 }
 
-// ─── STORAGE ──────────────────────────────────────────────────────────────────
-const STORE_PROGRESS  = "atelier_vocab_progress_v5";
-const STORE_WORDS     = "atelier_vocab_words_v6";
-const STORE_FIGURES   = "atelier_vocab_figures_v1";
-const STORE_MILESTONE = "atelier_vocab_milestone_v5";
-const STORE_DAILY     = "atelier_vocab_daily_done_v1";
-const STORE_ACTIVITY  = "atelier_vocab_activity_v1";
+// ─── STORAGE & PROFILE ────────────────────────────────────────────────────────
+// Les clés sans suffixe de version sont volontaires : elles permettent de publier
+// de nouvelles versions de l'app sans rendre invisible la progression existante.
+const STORE_PROFILE   = "atelier_vocab_profile";
+const STORE_PROGRESS  = "atelier_vocab_progress";
+const STORE_WORDS     = "atelier_vocab_words";
+const STORE_FIGURES   = "atelier_vocab_figures";
+const STORE_SOURCES   = "atelier_vocab_sources";
+const STORE_SOURCE_CACHE = "atelier_vocab_source_cache";
+const STORE_MILESTONE = "atelier_vocab_milestone";
+const STORE_DAILY     = "atelier_vocab_daily_done";
+const STORE_ACTIVITY  = "atelier_vocab_activity";
+const PROFILE_SCHEMA_VERSION = 1;
+
+const LEGACY_PROGRESS_KEYS = [
+  "atelier_vocab_progress_v4",
+  "atelier_vocab_progress_v5",
+  "atelier_vocab_progress_v6",
+  "atelier_vocab_progress"
+];
+const LEGACY_WORD_KEYS = ["atelier_vocab_words_v4", "atelier_vocab_words_v5", "atelier_vocab_words_v6", "atelier_vocab_words"];
+const LEGACY_FIGURE_KEYS = ["atelier_vocab_figures_v1", "atelier_vocab_figures"];
+const LEGACY_MILESTONE_KEYS = ["atelier_vocab_milestone_v4", "atelier_vocab_milestone_v5", "atelier_vocab_milestone"];
+const LEGACY_ACTIVITY_KEYS = ["atelier_vocab_activity_v1", "atelier_vocab_activity"];
+const LEGACY_DAILY_KEYS = ["atelier_vocab_daily_done_v1", "atelier_vocab_daily_done"];
 
 const EMPTY_PROGRESS = Object.freeze({ seen:0, correct:0, wrong:0, mastery:0, recog:0, prod:0, streak:0, next:null });
 const DEFAULT_META = Object.freeze({ xp:0, streak:0, lastDay:null });
 
+function safeParseJSON(value, fallback = null) {
+  try { return value ? JSON.parse(value) : fallback; }
+  catch { return fallback; }
+}
+
 function normalizeLoadedProgress(data) {
   if (!data || typeof data !== "object") return { progress:{}, meta:{...DEFAULT_META} };
+  const source = data.profileData && typeof data.profileData === "object" ? data.profileData : data;
   return {
-    progress: data.progress && typeof data.progress === "object" ? data.progress : {},
-    meta: { ...DEFAULT_META, ...(data.meta && typeof data.meta === "object" ? data.meta : {}) }
+    progress: source.progress && typeof source.progress === "object" ? source.progress : {},
+    meta: { ...DEFAULT_META, ...(source.meta && typeof source.meta === "object" ? source.meta : {}) }
   };
 }
 
+function defaultProfile() {
+  return {
+    type: "atelier-vocab-profile",
+    schemaVersion: PROFILE_SCHEMA_VERSION,
+    profile: {
+      id: `profile-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+      name: "Profil local",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    progress: {},
+    meta: { ...DEFAULT_META },
+    sources: [],
+    activity: {},
+    milestones: [],
+    dailyDone: null,
+    sourceCache: {}
+  };
+}
+
+function loadProfile() {
+  const stored = safeParseJSON(localStorage.getItem(STORE_PROFILE));
+  if (stored && typeof stored === "object") {
+    return {
+      ...defaultProfile(),
+      ...stored,
+      profile: { ...defaultProfile().profile, ...(stored.profile || {}) },
+      meta: { ...DEFAULT_META, ...(stored.meta || {}) },
+      progress: stored.progress && typeof stored.progress === "object" ? stored.progress : {},
+      sources: Array.isArray(stored.sources) ? stored.sources : [],
+      activity: stored.activity && typeof stored.activity === "object" ? stored.activity : {},
+      milestones: Array.isArray(stored.milestones) ? stored.milestones : [],
+      sourceCache: stored.sourceCache && typeof stored.sourceCache === "object" ? stored.sourceCache : {}
+    };
+  }
+  return defaultProfile();
+}
+
+function saveProfile(profile) {
+  try {
+    const next = {
+      ...defaultProfile(),
+      ...profile,
+      schemaVersion: PROFILE_SCHEMA_VERSION,
+      profile: { ...(profile.profile || defaultProfile().profile), updatedAt: new Date().toISOString() }
+    };
+    localStorage.setItem(STORE_PROFILE, JSON.stringify(next));
+    return true;
+  } catch { return false; }
+}
+
+function updateProfilePatch(patch) {
+  const current = loadProfile();
+  return saveProfile({ ...current, ...patch });
+}
+
+function findFirstStoredJSON(keys, validator = null) {
+  for (const key of keys) {
+    const parsed = safeParseJSON(localStorage.getItem(key));
+    if (parsed && (!validator || validator(parsed))) return parsed;
+  }
+  return null;
+}
+
 function loadProgress() {
-  try { return normalizeLoadedProgress(JSON.parse(localStorage.getItem(STORE_PROGRESS))); }
-  catch { return { progress:{}, meta:{...DEFAULT_META} }; }
+  const hasStoredProfile = !!localStorage.getItem(STORE_PROFILE);
+  const profile = loadProfile();
+  if (hasStoredProfile) {
+    return normalizeLoadedProgress(profile);
+  }
+  const legacy = findFirstStoredJSON(LEGACY_PROGRESS_KEYS, x => x && typeof x === "object");
+  const normalized = normalizeLoadedProgress(legacy);
+  if (legacy) {
+    updateProfilePatch({ progress: normalized.progress, meta: normalized.meta });
+    try { localStorage.setItem(STORE_PROGRESS, JSON.stringify(normalized)); } catch {}
+  }
+  return normalized;
 }
 
 function saveProgress(s) {
-  try { localStorage.setItem(STORE_PROGRESS, JSON.stringify(s)); return true; }
-  catch { return false; }
+  const normalized = normalizeLoadedProgress(s);
+  try { localStorage.setItem(STORE_PROGRESS, JSON.stringify(normalized)); } catch {}
+  return updateProfilePatch({ progress: normalized.progress, meta: normalized.meta });
+}
+
+function compactItemForStorage(w) {
+  const shortDef = w.definition_courte || w.definition_compacte || w.compact || "";
+  return {
+    id: w.id || "",
+    sourceId: w.sourceId || "",
+    word: w.word,
+    nature: w.nature || "",
+    definition: w.definition || "",
+    definition_courte: shortDef,
+    definition_compacte: shortDef,
+    example: w.example || "",
+    example_type: w.example_type || "",
+    example_cloze: w.example_cloze || w.cloze || w.phrase_trouee || "",
+    example_cloze_type: w.example_cloze_type || "",
+    cloze: w.cloze || w.example_cloze || w.phrase_trouee || "",
+    confusions: w.confusions || w.mots_proches || w.motsProches || [],
+    memory_tip: w.memory_tip || w.mnemonic || w.astuce || "",
+    etymology: w.etymology || w.etymologie || "",
+    register: w.register || w.registre || "",
+    theme: w.theme || ""
+  };
 }
 
 function loadCustomWords() {
-  try {
-    const r = localStorage.getItem(STORE_WORDS);
-    if (!r) return null;
-    const p = JSON.parse(r);
-    return Array.isArray(p) ? p : null;
-  } catch { return null; }
+  const current = safeParseJSON(localStorage.getItem(STORE_WORDS));
+  if (Array.isArray(current)) return current;
+  const legacy = findFirstStoredJSON(LEGACY_WORD_KEYS, Array.isArray);
+  if (Array.isArray(legacy)) {
+    try { localStorage.setItem(STORE_WORDS, JSON.stringify(legacy)); } catch {}
+    return legacy;
+  }
+  return null;
 }
 
 function saveCustomWords(arr) {
   try {
-    const compact = arr.map(w => {
-      const shortDef = w.definition_courte || w.definition_compacte || w.compact || "";
-      return {
-        word: w.word,
-        nature: w.nature || "",
-        definition: w.definition || "",
-        definition_courte: shortDef,
-        definition_compacte: shortDef,
-        example: w.example || "",
-        example_type: w.example_type || "",
-        example_cloze: w.example_cloze || w.cloze || w.phrase_trouee || "",
-        example_cloze_type: w.example_cloze_type || "",
-        cloze: w.cloze || w.example_cloze || w.phrase_trouee || "",
-        confusions: w.confusions || w.mots_proches || w.motsProches || [],
-        memory_tip: w.memory_tip || w.mnemonic || w.astuce || "",
-        etymology: w.etymology || w.etymologie || "",
-        register: w.register || w.registre || ""
-      };
-    });
+    const compact = arr.map(compactItemForStorage);
     localStorage.setItem(STORE_WORDS, JSON.stringify(compact));
     return true;
   } catch { return false; }
 }
 
 function loadCustomFigures() {
-  try {
-    const r = localStorage.getItem(STORE_FIGURES);
-    if (!r) return null;
-    const p = JSON.parse(r);
-    return Array.isArray(p) ? p : null;
-  } catch { return null; }
+  const current = safeParseJSON(localStorage.getItem(STORE_FIGURES));
+  if (Array.isArray(current)) return current;
+  const legacy = findFirstStoredJSON(LEGACY_FIGURE_KEYS, Array.isArray);
+  if (Array.isArray(legacy)) {
+    try { localStorage.setItem(STORE_FIGURES, JSON.stringify(legacy)); } catch {}
+    return legacy;
+  }
+  return null;
 }
 
 function saveCustomFigures(arr) {
   try {
-    const compact = arr.map(w => ({
-      word: w.word,
-      nature: w.nature || "",
-      definition: w.definition || "",
-      definition_courte: w.definition_courte || w.definition_compacte || w.compact || "",
-      example: w.example || "",
-      example_type: w.example_type || "",
-      example_cloze: w.example_cloze || w.cloze || w.phrase_trouee || "",
-      example_cloze_type: w.example_cloze_type || "",
-      confusions: w.confusions || w.mots_proches || w.motsProches || [],
-      memory_tip: w.memory_tip || w.mnemonic || w.astuce || "",
-      etymology: w.etymology || w.etymologie || "",
-      register: w.register || w.registre || ""
-    }));
+    const compact = arr.map(compactItemForStorage);
     localStorage.setItem(STORE_FIGURES, JSON.stringify(compact));
     return true;
   } catch { return false; }
 }
 
+function normalizeRawGistUrl(url) {
+  let u = String(url || "").trim();
+  if (!u) return "";
+  u = u.replace(/\.js(\?.*)?$/, "");
+  const gistMatch = u.match(/^https:\/\/gist\.github\.com\/([^\/]+)\/([a-f0-9]+)(?:\/.*)?$/i);
+  if (gistMatch) return `https://gist.githubusercontent.com/${gistMatch[1]}/${gistMatch[2]}/raw/`;
+  return u;
+}
+
+function sourceIdFromUrl(url) {
+  return `source-${hashString(normalizeRawGistUrl(url))}`;
+}
+
+function normalizeVocabSource(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const url = normalizeRawGistUrl(raw.url || raw.rawUrl || raw.href || "");
+  if (!url) return null;
+  const id = raw.id || sourceIdFromUrl(url);
+  return {
+    id,
+    type: "vocab",
+    label: String(raw.label || raw.name || "Source vocabulaire").trim() || "Source vocabulaire",
+    url,
+    enabled: raw.enabled !== false,
+    createdAt: raw.createdAt || new Date().toISOString(),
+    lastLoadedAt: raw.lastLoadedAt || null,
+    lastError: raw.lastError || null
+  };
+}
+
+function loadExtraSources() {
+  const profile = loadProfile();
+  const fromProfile = Array.isArray(profile.sources) ? profile.sources.map(normalizeVocabSource).filter(Boolean) : [];
+  const fromStore = safeParseJSON(localStorage.getItem(STORE_SOURCES), []);
+  const rawSources = fromProfile.length ? fromProfile : (Array.isArray(fromStore) ? fromStore.map(normalizeVocabSource).filter(Boolean) : []);
+  const seen = new Set();
+  const out = [];
+  rawSources.forEach(src => {
+    const key = normalizeRawGistUrl(src.url);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(src);
+  });
+  if (out.length && !fromProfile.length) updateProfilePatch({ sources: out });
+  return out;
+}
+
+function saveExtraSources(sources) {
+  const normalized = (sources || []).map(normalizeVocabSource).filter(Boolean);
+  try { localStorage.setItem(STORE_SOURCES, JSON.stringify(normalized)); } catch {}
+  updateProfilePatch({ sources: normalized });
+  return normalized;
+}
+
+function loadSourceCache() {
+  const profile = loadProfile();
+  if (profile.sourceCache && Object.keys(profile.sourceCache).length) return profile.sourceCache;
+  const cache = safeParseJSON(localStorage.getItem(STORE_SOURCE_CACHE), {});
+  return cache && typeof cache === "object" ? cache : {};
+}
+
+function saveSourceCache(cache) {
+  try { localStorage.setItem(STORE_SOURCE_CACHE, JSON.stringify(cache || {})); } catch {}
+  updateProfilePatch({ sourceCache: cache || {} });
+}
+
 function loadSeenMilestones() {
-  try { return JSON.parse(localStorage.getItem(STORE_MILESTONE)) || []; }
-  catch { return []; }
+  const profile = loadProfile();
+  if (Array.isArray(profile.milestones) && profile.milestones.length) return profile.milestones;
+  const legacy = findFirstStoredJSON(LEGACY_MILESTONE_KEYS, Array.isArray) || [];
+  if (legacy.length) updateProfilePatch({ milestones: legacy });
+  return legacy;
 }
 
 function saveSeenMilestone(key) {
   try {
     const s = loadSeenMilestones();
     if (!s.includes(key)) {
-      s.push(key);
-      localStorage.setItem(STORE_MILESTONE, JSON.stringify(s));
+      const next = [...s, key];
+      localStorage.setItem(STORE_MILESTONE, JSON.stringify(next));
+      updateProfilePatch({ milestones: next });
     }
   } catch {}
 }
 
 function loadDailyDone() {
-  try { return localStorage.getItem(STORE_DAILY) === localDateKey(); }
-  catch { return false; }
+  try {
+    const profile = loadProfile();
+    if (profile.dailyDone) return profile.dailyDone === localDateKey();
+    for (const key of LEGACY_DAILY_KEYS) {
+      const value = localStorage.getItem(key);
+      if (value) return value === localDateKey();
+    }
+    return false;
+  } catch { return false; }
 }
 
 function saveDailyDone() {
-  try { localStorage.setItem(STORE_DAILY, localDateKey()); } catch {}
+  try {
+    const key = localDateKey();
+    localStorage.setItem(STORE_DAILY, key);
+    updateProfilePatch({ dailyDone: key });
+  } catch {}
 }
 
 function clearDailyDone() {
-  try { localStorage.removeItem(STORE_DAILY); } catch {}
+  try {
+    localStorage.removeItem(STORE_DAILY);
+    updateProfilePatch({ dailyDone: null });
+  } catch {}
 }
 
 function loadActivity() {
-  try {
-    const data = JSON.parse(localStorage.getItem(STORE_ACTIVITY));
-    return data && typeof data === "object" ? data : {};
-  } catch { return {}; }
+  const profile = loadProfile();
+  if (profile.activity && Object.keys(profile.activity).length) return profile.activity;
+  const legacy = findFirstStoredJSON(LEGACY_ACTIVITY_KEYS, x => x && typeof x === "object") || {};
+  if (Object.keys(legacy).length) updateProfilePatch({ activity: legacy });
+  return legacy;
 }
 
 function saveActivity(data) {
-  try { localStorage.setItem(STORE_ACTIVITY, JSON.stringify(data)); } catch {}
+  try {
+    localStorage.setItem(STORE_ACTIVITY, JSON.stringify(data));
+    updateProfilePatch({ activity: data });
+  } catch {}
 }
 
 function recordActivity(rating, mode) {
@@ -955,7 +1165,7 @@ function SyncModal({open,onClose,onImportProgress}) {
       const parsed = JSON.parse(text);
       if (!parsed.progress || !parsed.meta) { setFeedback({type:"error",msg:"Fichier invalide."}); return; }
       onImportProgress(parsed);
-      setFeedback({type:"ok",msg:"Progression importée."});
+      setFeedback({type:"ok",msg:"Profil importé."});
       setTimeout(()=>{ onClose(); setText(""); setFeedback(null); }, 500);
     } catch(e) { setFeedback({type:"error",msg:`JSON invalide : ${e.message}`}); }
   };
@@ -963,19 +1173,95 @@ function SyncModal({open,onClose,onImportProgress}) {
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={requestClose}>
       <div style={{background:C.solid,borderRadius:20,padding:24,maxWidth:500,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
-        <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:8}}>Synchroniser sur un autre appareil</h2>
+        <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:8}}>Synchroniser le profil</h2>
         <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:16}}>
-          Sur cet appareil : Stats → Exporter progression. Sur l'autre appareil : importer le fichier ci-dessous.
+          Sur cet appareil : Stats → Exporter profil. Sur l'autre appareil : importer le fichier ci-dessous. Le profil contient la progression, les sources ajoutées et l'activité récente.
         </p>
         <label style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,border:`1.5px dashed ${C.blue}60`,cursor:"pointer",marginBottom:12,background:`${C.blue}06`,color:C.blue,fontWeight:600,fontSize:14}}>
-          Charger le fichier de progression
+          Charger le fichier de profil
           <input type="file" accept=".json,application/json" onChange={handleFile} style={{display:"none"}}/>
         </label>
         {text&&<p style={{fontSize:12,color:C.green,marginBottom:8}}>Fichier chargé</p>}
         {feedback&&<p style={{fontSize:14,fontWeight:600,color:feedback.type==="ok"?C.green:C.red,marginBottom:8}}>{feedback.msg}</p>}
         <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:8}}>
           <Btn label="Annuler" variant="ghost" onClick={requestClose}/>
-          <Btn label="Importer la progression" variant="primary" onClick={handleImport} disabled={!text.trim()}/>
+          <Btn label="Importer le profil" variant="primary" onClick={handleImport} disabled={!text.trim()}/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SourcesModal({open,onClose,sources,onAddSource,onRemoveSource,onToggleSource,onReloadSources,status,duplicateCount}) {
+  const [url,setUrl] = useState("");
+  const [label,setLabel] = useState("");
+  const [feedback,setFeedback] = useState(null);
+  if (!open) return null;
+
+  const reset = () => { setUrl(""); setLabel(""); setFeedback(null); };
+  const requestClose = () => { reset(); onClose(); };
+
+  const handleAdd = () => {
+    const cleanUrl = normalizeRawGistUrl(url);
+    if (!cleanUrl || !/^https?:\/\//i.test(cleanUrl)) {
+      setFeedback({type:"error", msg:"Entre une URL raw valide commençant par https://."});
+      return;
+    }
+    if ((sources || []).some(s => normalizeRawGistUrl(s.url) === cleanUrl)) {
+      setFeedback({type:"error", msg:"Cette source est déjà ajoutée."});
+      return;
+    }
+    const src = normalizeVocabSource({ url: cleanUrl, label: label || "Vocabulaire additionnel", enabled: true });
+    onAddSource(src);
+    setFeedback({type:"ok", msg:"Source ajoutée. Elle va être chargée automatiquement."});
+    setUrl(""); setLabel("");
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100,padding:16}} onClick={requestClose}>
+      <div style={{background:C.solid,borderRadius:20,padding:24,maxWidth:640,width:"100%",maxHeight:"86vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
+        <h2 style={{fontSize:21,fontWeight:850,color:C.text,margin:"0 0 8px"}}>Sources de vocabulaire</h2>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.55,margin:"0 0 16px"}}>
+          Ajoute une URL raw de Gist ou de fichier JSON. Les sources sont fusionnées dans l'ordre : corpus principal d'abord, puis sources additionnelles. En cas de doublon, la première entrée est conservée et la suivante est ignorée.
+        </p>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginBottom:14}}>
+          <input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Nom de la source, ex. Philosophie" style={{padding:"11px 13px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:14,outline:"none",background:C.solid,color:C.text}} />
+          <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="URL raw du Gist, ex. https://gist.githubusercontent.com/.../raw/" style={{padding:"11px 13px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:14,outline:"none",background:C.solid,color:C.text}} />
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <Btn label="Ajouter la source" variant="primary" onClick={handleAdd} disabled={!url.trim()} />
+            <Btn label={status==="loading"?"Chargement…":"Recharger les sources"} variant="ghost" onClick={onReloadSources} disabled={status==="loading" || !(sources||[]).length} />
+          </div>
+          {feedback && <p style={{fontSize:13,fontWeight:700,color:feedback.type==="ok"?C.green:C.red,margin:0}}>{feedback.msg}</p>}
+        </div>
+
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {(sources || []).length === 0 ? (
+            <div style={{padding:"14px 16px",borderRadius:14,background:"rgba(0,0,0,0.035)",color:C.sub,fontSize:13,lineHeight:1.5}}>Aucune source additionnelle pour l'instant. Le vocabulaire principal reste chargé depuis l'URL configurée dans l'app.</div>
+          ) : sources.map(src => (
+            <div key={src.id} style={{padding:"12px 14px",borderRadius:14,border:`1px solid ${C.border}`,background:C.surface}}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start"}}>
+                <div style={{minWidth:0}}>
+                  <p style={{fontSize:14,fontWeight:800,color:C.text,margin:"0 0 3px"}}>{src.label}</p>
+                  <p style={{fontSize:12,color:C.sub,margin:0,lineHeight:1.45,overflowWrap:"anywhere"}}>{src.url}</p>
+                  <p style={{fontSize:11,color:src.lastError?C.red:C.ter,margin:"5px 0 0",lineHeight:1.4}}>
+                    {src.lastError ? `Erreur : ${src.lastError}` : src.lastLoadedAt ? `Dernier chargement : ${new Date(src.lastLoadedAt).toLocaleString("fr-FR")}` : "Pas encore chargée"}
+                  </p>
+                </div>
+                <div style={{display:"flex",gap:6,flexShrink:0,flexWrap:"wrap",justifyContent:"flex-end"}}>
+                  <Btn label={src.enabled?"Désactiver":"Activer"} variant="ghost" small onClick={()=>onToggleSource(src.id)} />
+                  <Btn label="Supprimer" variant="ghost" small onClick={()=>onRemoveSource(src.id)} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {duplicateCount > 0 && (
+          <p style={{fontSize:12,color:C.orange,lineHeight:1.45,margin:"12px 0 0"}}>{duplicateCount} doublon{duplicateCount>1?"s":""} ignoré{duplicateCount>1?"s":""} : seule la première entrée est comptabilisée.</p>
+        )}
+        <div style={{display:"flex",justifyContent:"flex-end",marginTop:16}}>
+          <Btn label="Fermer" variant="primary" onClick={requestClose}/>
         </div>
       </div>
     </div>
@@ -2010,7 +2296,7 @@ function FigurePractice({figures,state,setState,onMilestone,mode="identify",onBa
             <p style={{fontSize:15,color:C.text,lineHeight:1.55,margin:"0 0 8px"}}><strong>{current.word}</strong> — {current.compact}</p>
             <p style={{fontSize:13,color:C.sub,lineHeight:1.55,margin:"0 0 10px"}}>{current.definition}</p>
             <FigureExampleBlock figure={current}/>
-            <Btn label="Continuer" variant="primary" full onClick={()=>moveNext(count+1)}/>
+            {wrong && <Btn label="Continuer" variant="primary" full onClick={()=>moveNext(count+1)}/>}
           </div>
         )}
       </Card>
@@ -2177,7 +2463,7 @@ function LibraryTab({words,state}) {
 }
 
 // ─── STATS TAB ────────────────────────────────────────────────────────────────
-function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,onReloadRemote,canReloadRemote,onReloadFigures,canReloadFigures}) {
+function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,onReloadRemote,canReloadRemote,onReloadFigures,canReloadFigures,onOpenSources,extraSources=[],duplicateCount=0,sourcesStatus}) {
   const total = words.length;
   const mastered = words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
   const dueN = words.filter(w=>isDue(state,w)).length;
@@ -2246,22 +2532,30 @@ function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,o
       </Card>
 
       <Card>
+        <h3 style={{fontSize:16,fontWeight:700,color:C.text,marginTop:0,marginBottom:8}}>Sources de vocabulaire</h3>
+        <p style={{fontSize:13,color:C.sub,marginTop:0,marginBottom:12,lineHeight:1.5}}>
+          Corpus principal + <strong>{extraSources.length}</strong> source{extraSources.length>1?"s":""} additionnelle{extraSources.length>1?"s":""}. {duplicateCount>0 ? `${duplicateCount} doublon${duplicateCount>1?"s":""} ignoré${duplicateCount>1?"s":""}.` : "Aucun doublon ignoré."}
+        </p>
+        <Btn label={sourcesStatus==="loading"?"Chargement des sources…":"Gérer les sources JSON"} variant="primary" full onClick={onOpenSources}/>
+      </Card>
+
+      <Card>
         <h3 style={{fontSize:16,fontWeight:700,color:C.text,marginTop:0,marginBottom:8}}>Mes données</h3>
         <p style={{fontSize:13,color:C.sub,marginTop:0,marginBottom:12,lineHeight:1.5}}>
-          <strong>{total} mots</strong> chargés · progression sauvegardée automatiquement.
+          <strong>{total} mots</strong> chargés · progression sauvegardée dans un profil local stable.
         </p>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           <Btn label="Mettre à jour le vocabulaire" variant="primary" full onClick={onOpenImport}/>
-          {canReloadRemote && <Btn label="Recharger vocabulaire depuis GitHub" variant="ghost" full onClick={onReloadRemote}/>}
+          {canReloadRemote && <Btn label="Recharger vocabulaire depuis GitHub" variant="ghost" full onClick={onReloadRemote}/>} 
           {canReloadFigures && <Btn label="Recharger figures depuis GitHub" variant="ghost" full onClick={onReloadFigures}/>} 
           <div style={{display:"flex",gap:8}}>
-            <Btn label="Exporter progression" variant="ghost" full onClick={onExport}/>
-            <Btn label="Importer progression" variant="ghost" full onClick={onSync}/>
+            <Btn label="Exporter profil" variant="ghost" full onClick={onExport}/>
+            <Btn label="Importer profil" variant="ghost" full onClick={onSync}/>
           </div>
           <Btn label="Réinitialiser la progression" variant="ghost" full onClick={onReset}/>
         </div>
         <p style={{fontSize:12,color:C.ter,marginTop:10,lineHeight:1.5}}>
-          Multi-appareils : exporte ta progression, transfère le fichier, puis importe-le sur l'autre appareil.
+          Le profil conserve progression, sources ajoutées et activité. Une mise à jour de l'app ne doit pas l'effacer.
         </p>
       </Card>
     </div>
@@ -2272,6 +2566,8 @@ function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,o
 function App() {
   const initialStoredWords = useMemo(()=>loadCustomWords(),[]);
   const initialStoredFigures = useMemo(()=>loadCustomFigures(),[]);
+  const initialExtraSources = useMemo(()=>loadExtraSources(),[]);
+  const initialSourceCache = useMemo(()=>loadSourceCache(),[]);
   const [tab,setTab] = useState("home");
   const [learnMode,setLearnMode] = useState("smart");
   const [quizMode,setQuizMode] = useState("quick");
@@ -2281,13 +2577,28 @@ function App() {
   const [hasStoredWords,setHasStoredWords] = useState(()=>!!initialStoredWords);
   const [hasStoredFigures,setHasStoredFigures] = useState(()=>!!initialStoredFigures);
   const [showImport,setShowImport] = useState(false);
+  const [showSources,setShowSources] = useState(false);
   const [showReset,setShowReset] = useState(false);
   const [showSync,setShowSync] = useState(false);
   const [milestone,setMilestone] = useState(null);
+  const [extraSources,setExtraSources] = useState(initialExtraSources);
+  const [extraWordsBySource,setExtraWordsBySource] = useState(initialSourceCache);
+  const [sourcesStatus,setSourcesStatus] = useState(null);
   const [fetchStatus,setFetchStatus] = useState(()=>initialStoredWords || !VOCAB_URL ? null : "loading");
   const [figuresStatus,setFiguresStatus] = useState(()=>initialStoredFigures || !FIGURES_URL ? null : "loading");
 
-  const words = useMemo(()=>buildWords(rawWords,"vocab"),[rawWords]);
+  const mainWords = useMemo(()=>buildWords(rawWords,"vocab"),[rawWords]);
+  const extraWordGroups = useMemo(()=>extraSources.filter(s=>s.enabled !== false).map(src => ({
+    sourceId: src.id,
+    sourceLabel: src.label,
+    items: buildWords(extraWordsBySource[src.id] || [], "vocab")
+  })), [extraSources, extraWordsBySource]);
+  const mergedVocabulary = useMemo(()=>mergeWordsPriority([
+    { sourceId:"vocab-general", sourceLabel:"Vocabulaire principal", items: mainWords },
+    ...extraWordGroups
+  ]), [mainWords, extraWordGroups]);
+  const words = mergedVocabulary.items;
+  const duplicateWords = mergedVocabulary.skipped;
   const figures = useMemo(()=>buildWords(rawFigures,"figure"),[rawFigures]);
   const allItems = useMemo(()=>[...words, ...figures],[words,figures]);
   const total = words.length;
@@ -2297,7 +2608,6 @@ function App() {
 
   const loadRemoteVocabulary = useCallback((force=false) => {
     if (!VOCAB_URL) return;
-    if (!force && loadCustomWords()) return;
     setFetchStatus("loading");
     fetch(dataUrl(VOCAB_URL, force), { cache: "no-store" })
       .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
@@ -2305,13 +2615,9 @@ function App() {
         const error = validateVocabArray(data);
         if (error) throw new Error(error);
         saveCustomWords(data);
-        const nextWords = buildWords(data,"vocab");
-        const cleaned = cleanProgressForWords(state, [...nextWords, ...figures]);
-        saveProgress(cleaned);
-        setState(cleaned);
+        saveProgress(state);
         setRawWords(data);
         setHasStoredWords(true);
-        clearDailyDone();
         setFetchStatus("done");
         setTimeout(()=>setFetchStatus(null), 3000);
       })
@@ -2324,7 +2630,6 @@ function App() {
 
   const loadRemoteFigures = useCallback((force=false) => {
     if (!FIGURES_URL) return;
-    if (!force && loadCustomFigures()) return;
     setFiguresStatus("loading");
     fetch(dataUrl(FIGURES_URL, force), { cache: "no-store" })
       .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
@@ -2332,10 +2637,7 @@ function App() {
         const error = validateVocabArray(data);
         if (error) throw new Error(error);
         saveCustomFigures(data);
-        const nextFigures = buildWords(data,"figure");
-        const cleaned = cleanProgressForWords(state, [...words, ...nextFigures]);
-        saveProgress(cleaned);
-        setState(cleaned);
+        saveProgress(state);
         setRawFigures(data);
         setHasStoredFigures(true);
         setFiguresStatus("done");
@@ -2348,16 +2650,97 @@ function App() {
       });
   }, [rawFigures.length, state, words]);
 
+
+  const persistExtraSources = (nextSources) => {
+    const saved = saveExtraSources(nextSources);
+    setExtraSources(saved);
+    return saved;
+  };
+
+  const fetchExtraSource = useCallback((src, force=false) => {
+    const source = normalizeVocabSource(src);
+    if (!source || source.enabled === false) return Promise.resolve(null);
+    return fetch(dataUrl(source.url, force), { cache:"no-store" })
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(data => {
+        const error = validateVocabArray(data);
+        if (error) throw new Error(error);
+        return { source:{ ...source, lastLoadedAt:new Date().toISOString(), lastError:null }, data };
+      })
+      .catch(err => {
+        console.warn("Chargement source vocabulaire échoué :", source.url, err);
+        return { source:{ ...source, lastError:err.message || "Erreur de chargement" }, data:null };
+      });
+  }, []);
+
+  const loadExtraVocabularySources = useCallback((force=false) => {
+    const active = extraSources.filter(s => s.enabled !== false);
+    if (!active.length) return;
+    setSourcesStatus("loading");
+    Promise.all(active.map(src => fetchExtraSource(src, force))).then(results => {
+      const nextSources = [...extraSources];
+      const nextCache = { ...loadSourceCache(), ...extraWordsBySource };
+      results.filter(Boolean).forEach(result => {
+        const idx = nextSources.findIndex(s => s.id === result.source.id);
+        if (idx >= 0) nextSources[idx] = result.source;
+        if (Array.isArray(result.data)) nextCache[result.source.id] = result.data;
+      });
+      saveSourceCache(nextCache);
+      persistExtraSources(nextSources);
+      setExtraWordsBySource(nextCache);
+      setSourcesStatus("done");
+      setTimeout(()=>setSourcesStatus(null), 2500);
+    }).catch(() => {
+      setSourcesStatus("error");
+    });
+  }, [extraSources, extraWordsBySource, fetchExtraSource]);
+
   useEffect(()=>{
-    if (!initialStoredWords && VOCAB_URL) loadRemoteVocabulary(false);
-    if (!initialStoredFigures && FIGURES_URL) loadRemoteFigures(false);
+    if (extraSources.some(s => s.enabled !== false)) loadExtraVocabularySources(false);
+  }, []);
+
+  const handleAddSource = (source) => {
+    const src = normalizeVocabSource(source);
+    if (!src) return;
+    const nextSources = persistExtraSources([...extraSources, src]);
+    setSourcesStatus("loading");
+    fetchExtraSource(src, true).then(result => {
+      const nextCache = { ...loadSourceCache(), ...extraWordsBySource };
+      const updatedSources = [...nextSources];
+      if (result) {
+        const idx = updatedSources.findIndex(s => s.id === result.source.id);
+        if (idx >= 0) updatedSources[idx] = result.source;
+        if (Array.isArray(result.data)) nextCache[result.source.id] = result.data;
+      }
+      saveSourceCache(nextCache);
+      persistExtraSources(updatedSources);
+      setExtraWordsBySource(nextCache);
+      setSourcesStatus("done");
+      setTimeout(()=>setSourcesStatus(null), 2500);
+    });
+  };
+
+  const handleRemoveSource = (id) => {
+    const nextSources = extraSources.filter(s => s.id !== id);
+    const nextCache = { ...extraWordsBySource };
+    delete nextCache[id];
+    persistExtraSources(nextSources);
+    saveSourceCache(nextCache);
+    setExtraWordsBySource(nextCache);
+  };
+
+  const handleToggleSource = (id) => {
+    const nextSources = extraSources.map(s => s.id === id ? { ...s, enabled: s.enabled === false } : s);
+    persistExtraSources(nextSources);
+  };
+
+  useEffect(()=>{
+    if (VOCAB_URL) loadRemoteVocabulary(false);
+    if (FIGURES_URL) loadRemoteFigures(false);
   }, []);
 
   const handleImportWords = (data) => {
-    const nextWords = buildWords(data,"vocab");
-    const cleaned = cleanProgressForWords(state, [...nextWords, ...figures]);
-    saveProgress(cleaned);
-    setState(cleaned);
+    saveProgress(state);
     setRawWords(data);
     setHasStoredWords(true);
     clearDailyDone();
@@ -2367,38 +2750,63 @@ function App() {
     const fresh = {progress:{},meta:{...DEFAULT_META}};
     saveProgress(fresh);
     try { localStorage.removeItem(STORE_MILESTONE); } catch {}
+    updateProfilePatch({ progress:{}, meta:{...DEFAULT_META}, milestones:[], dailyDone:null });
     clearDailyDone();
     setState(fresh);
     setShowReset(false);
   };
 
   const handleImportProgress = (data) => {
+    const profileData = data.profileData || data;
     const currentHash = hashString(allItems.map(w=>w.id).join("|"));
     if (data.vocabHash && data.vocabHash !== currentHash) {
-      const ok = window.confirm("Cette progression semble liée à une autre version des corpus. Importer quand même les éléments compatibles ?");
+      const ok = window.confirm("Cette sauvegarde semble liée à une autre version des corpus. Importer quand même la progression et les sources ?");
       if (!ok) return;
     }
-    const ns = normalizeLoadedProgress(data);
-    const cleaned = cleanProgressForWords(ns, allItems);
-    saveProgress(cleaned);
-    setState(cleaned);
+    const ns = normalizeLoadedProgress(profileData);
+    saveProgress(ns);
+    setState(ns);
+    if (Array.isArray(profileData.sources)) {
+      const savedSources = saveExtraSources(profileData.sources);
+      setExtraSources(savedSources);
+    }
+    if (profileData.sourceCache && typeof profileData.sourceCache === "object") {
+      saveSourceCache(profileData.sourceCache);
+      setExtraWordsBySource(profileData.sourceCache);
+    }
+    if (profileData.activity && typeof profileData.activity === "object") saveActivity(profileData.activity);
+    if (Array.isArray(profileData.milestones)) {
+      try { localStorage.setItem(STORE_MILESTONE, JSON.stringify(profileData.milestones)); } catch {}
+      updateProfilePatch({ milestones: profileData.milestones });
+    }
     setShowSync(false);
   };
 
   const handleExport = () => {
+    const profile = loadProfile();
     const data = {
-      progress: state.progress,
-      meta: state.meta,
+      type: "atelier-vocab-profile",
+      schemaVersion: PROFILE_SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
       vocabCount: words.length,
       figuresCount: figures.length,
+      duplicateIgnoredCount: duplicateWords.length,
       vocabHash: hashString(allItems.map(w=>w.id).join("|")),
-      exportedAt: new Date().toISOString()
+      profileData: {
+        ...profile,
+        progress: state.progress,
+        meta: state.meta,
+        sources: extraSources,
+        sourceCache: extraWordsBySource,
+        activity: loadActivity(),
+        milestones: loadSeenMilestones()
+      }
     };
     const blob = new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `vocab_progression_${localDateKey()}.json`;
+    a.download = `atelier_vocab_profil_${localDateKey()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -2473,12 +2881,13 @@ function App() {
             {tab==="quiz"    && <QuizTab    key={`quiz-${quizMode}`} words={words} state={state} setState={setState} onMilestone={setMilestone} mode={quizMode} onModeChange={setQuizMode}/>} 
             {tab==="figures" && <FiguresTab figures={figures} state={state} setState={setState} onMilestone={setMilestone} onReloadFigures={()=>loadRemoteFigures(true)} figuresStatus={figuresStatus}/>}
             {tab==="library" && <LibraryTab words={words} state={state}/>} 
-            {tab==="stats"   && <StatsTab   words={words} figures={figures} state={state} onOpenImport={()=>setShowImport(true)} onReset={()=>setShowReset(true)} onExport={handleExport} onSync={()=>setShowSync(true)} onReloadRemote={()=>loadRemoteVocabulary(true)} canReloadRemote={!!VOCAB_URL} onReloadFigures={()=>loadRemoteFigures(true)} canReloadFigures={!!FIGURES_URL}/>} 
+            {tab==="stats"   && <StatsTab   words={words} figures={figures} state={state} onOpenImport={()=>setShowImport(true)} onReset={()=>setShowReset(true)} onExport={handleExport} onSync={()=>setShowSync(true)} onReloadRemote={()=>loadRemoteVocabulary(true)} canReloadRemote={!!VOCAB_URL} onReloadFigures={()=>loadRemoteFigures(true)} canReloadFigures={!!FIGURES_URL} onOpenSources={()=>setShowSources(true)} extraSources={extraSources} duplicateCount={duplicateWords.length} sourcesStatus={sourcesStatus}/>} 
           </>
         )}
       </div>
 
       <ImportModal open={showImport} onClose={()=>setShowImport(false)} currentCount={total} onImport={handleImportWords}/>
+      <SourcesModal open={showSources} onClose={()=>setShowSources(false)} sources={extraSources} onAddSource={handleAddSource} onRemoveSource={handleRemoveSource} onToggleSource={handleToggleSource} onReloadSources={()=>loadExtraVocabularySources(true)} status={sourcesStatus} duplicateCount={duplicateWords.length}/>
       <SyncModal   open={showSync}   onClose={()=>setShowSync(false)}   onImportProgress={handleImportProgress}/>
       <ResetModal  open={showReset}  onClose={()=>setShowReset(false)}  onConfirm={handleReset}/>
     </div>
