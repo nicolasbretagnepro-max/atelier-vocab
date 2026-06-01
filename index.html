@@ -329,9 +329,35 @@ function buildWord(w, kind = "vocab") {
   // Le corpus est déterminé par la source de chargement, pas par la présence
   // de definition_courte : le vocabulaire général peut aussi utiliser ce champ.
   const isFigure = kind === "figure" || w.kind === "figure" || w.type === "figure";
-  const raw = String(w.example || "");
-  const compact = w.definition_compacte || w.definition_courte || w.compact || w.definition || "";
-  const hasGoodExample = raw.trim().length > 20 && !isGeneric(raw);
+const compact = w.definition_compacte || w.definition_courte || w.compact || w.definition || "";
+
+const rawExamples = [
+ {
+  example: String(w.example_1 || w.example || "").trim(),
+  cloze: String(w.example_cloze_1 || w.example_cloze || w.cloze || w.phrase_trouee || "").trim(),
+  type: String(w.example_type_1 || w.example_type || "").trim(),
+  clozeType: String(w.example_cloze_type_1 || w.example_cloze_type || "").trim()
+ },
+ {
+  example: String(w.example_2 || "").trim(),
+  cloze: String(w.example_cloze_2 || "").trim(),
+  type: String(w.example_type_2 || "").trim(),
+  clozeType: String(w.example_cloze_type_2 || "").trim()
+ }
+].filter(item => item.example && item.example.length > 20 && !isGeneric(item.example));
+
+const fallbackExample = String(w.example || "").trim();
+
+const examples = rawExamples.length
+ ? rawExamples
+ : [{
+  example: fallbackExample || makeContextSentence({ word: w.word, compact }),
+  cloze: String(w.cloze || w.example_cloze || w.phrase_trouee || "").trim(),
+  type: String(w.example_type || "").trim(),
+  clozeType: String(w.example_cloze_type || "").trim()
+ }];
+
+const hasGoodExample = rawExamples.length > 0 || (fallbackExample.length > 20 && !isGeneric(fallbackExample));
   const baseId = stableWordId(w);
   const finalId = isFigure && !String(baseId).startsWith("figure-") ? `figure-${baseId}` : baseId;
   return {
@@ -340,11 +366,18 @@ function buildWord(w, kind = "vocab") {
     word: String(w.word || "").trim(),
     definition: String(w.definition || ""),
     compact: String(compact || ""),
-    example: hasGoodExample ? raw : makeContextSentence({ word: w.word, compact }),
-    hasRealExample: hasGoodExample,
-    cloze: w.cloze || w.example_cloze || w.phrase_trouee || null,
-    exampleType: String(w.example_type || ""),
-    clozeType: String(w.example_cloze_type || ""),
+    examples,
+
+example: examples[0]?.example || makeContextSentence({ word: w.word, compact }),
+
+hasRealExample: hasGoodExample,
+
+cloze: examples[0]?.cloze || null,
+
+exampleType: examples[0]?.type || "",
+
+clozeType: examples[0]?.clozeType || "",
+    
     confusions: normalizeConfusions(w.confusions || w.mots_proches || w.motsProches || w.near || []),
     memoryTip: String(w.memory_tip || w.mnemonic || w.astuce || ""),
     etymology: String(w.etymology || w.etymologie || ""),
@@ -405,9 +438,43 @@ function mergeWordsPriority(groups) {
 function escapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+function pickRandomExample(word) {
+ const examples = Array.isArray(word.examples)
+  ? word.examples.filter(item => item && item.example)
+  : [];
 
+ if (examples.length) {
+  return examples[Math.floor(Math.random() * examples.length)];
+ }
+
+ return {
+  example: word.example || "",
+  cloze: word.cloze || word.example_cloze || word.phrase_trouee || "",
+  type: word.exampleType || word.example_type || "",
+  clozeType: word.clozeType || word.example_cloze_type || ""
+ };
+}
+
+function getExampleText(word, cloze = false) {
+ const picked = pickRandomExample(word);
+
+ if (!cloze) {
+  return picked.example || word.example || "";
+ }
+
+ if (picked.cloze) {
+  return picked.cloze;
+ }
+
+ return blankSentence({
+  ...word,
+  example: picked.example || word.example || "",
+  cloze: picked.cloze || word.cloze || ""
+ });
+}
 function blankSentence(w) {
   if (w.cloze && String(w.cloze).includes("________")) return w.cloze;
+  if (w.cloze && String(w.cloze).includes("[…]")) return w.cloze;
   const e = String(w.example || "");
   const forms = [w.word, String(w.word || "").replace(/^\(Se\)\s*/i, "se ")]
     .map(x => String(x || "").trim())
@@ -576,6 +643,15 @@ function compactItemForStorage(w) {
     definition_courte: shortDef,
     definition_compacte: shortDef,
     example: w.example || "",
+    examples: Array.isArray(w.examples) ? w.examples : [],
+
+example_1: w.example_1 || w.examples?.[0]?.example || w.example || "",
+
+example_cloze_1: w.example_cloze_1 || w.examples?.[0]?.cloze || w.example_cloze || w.cloze || "",
+
+example_2: w.example_2 || w.examples?.[1]?.example || "",
+
+example_cloze_2: w.example_cloze_2 || w.examples?.[1]?.cloze || "",
     example_type: w.example_type || "",
     example_cloze: w.example_cloze || w.cloze || w.phrase_trouee || "",
     example_cloze_type: w.example_cloze_type || "",
@@ -973,13 +1049,19 @@ const Bar = ({value, color}) => (
   </div>
 );
 
-const ExampleBlock = ({word, showLabel=true, fontSize=15, cloze=false}) => (
-  <div style={{background:`${C.blue}07`,borderLeft:`4px solid ${C.blue}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"12px 0"}}>
-    {showLabel && <p style={{fontSize:11,fontWeight:700,color:C.blue,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 6px"}}>Exemple en contexte</p>}
-    <p style={{fontSize,color:C.text,fontStyle:"italic",lineHeight:1.7,margin:0}}>{cloze ? blankSentence(word) : word.example}</p>
-  </div>
-);
+const ExampleBlock = ({word, showLabel=true, fontSize=15, cloze=false}) => {
+  const text = useMemo(() => getExampleText(word, cloze), [word.id, cloze]);
 
+  return (
+    <div style={{background:`${C.blue}07`,borderLeft:`4px solid ${C.blue}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"12px 0"}}>
+
+      {showLabel && <p style={{fontSize:11,fontWeight:700,color:C.blue,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 6px"}}>Exemple en contexte</p>}
+
+      <p style={{fontSize,color:C.text,fontStyle:"italic",lineHeight:1.7,margin:0}}>{text}</p>
+
+    </div>
+  );
+};
 function WordTitle({children, size=38}) {
   return <div className="word-title" style={{fontSize:size,fontWeight:800,color:C.text,letterSpacing:-1.3,marginBottom:14,lineHeight:1.05}}>{children}</div>;
 }
@@ -1135,7 +1217,7 @@ function ImportModal({open, onClose, onImport, currentCount}) {
           <Btn label="Importer" variant="primary" onClick={handleImport} disabled={!text.trim()}/>
         </div>
         <div style={{marginTop:16,padding:"12px 14px",background:`${C.blue}08`,borderRadius:12,fontSize:12,color:C.sub,lineHeight:1.6}}>
-          Format attendu : tableau JSON contenant au minimum un champ <code>word</code> par entrée. Champs recommandés : <code>definition_courte</code>, <code>definition</code>, <code>example</code>, <code>example_cloze</code>, <code>confusions</code>, <code>memory_tip</code>, <code>etymology</code>.
+          Format attendu : tableau JSON contenant au minimum un champ <code>word</code> par entrée. Champs recommandés : <code>definition_courte</code>, <code>definition</code>, <code>example_1</code>, <code>example_cloze_1</code>, <code>example_2</code>, <code>example_cloze_2</code>, <code>confusions</code>, <code>memory_tip</code>, <code>etymology</code>.
         </div>
       </div>
     </div>
@@ -1894,7 +1976,7 @@ function buildNuanceQuestion(word, words) {
     if (!candidate) break;
     options.push(candidate);
   }
-  return { prompt: blankSentence(word), answer: word, options: shuffle(options) };
+  return { prompt: getExampleText(word, true), answer: word, options: shuffle(options) };
 }
 
 function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
