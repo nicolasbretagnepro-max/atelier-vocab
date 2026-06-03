@@ -1,5 +1,9 @@
 // sw.js — Service Worker Atelier Vocabulaire
-const CACHE_NAME = "atelier-vocab-v1";
+// Version mise à jour pour forcer le renouvellement du cache
+// et éviter les anciennes réponses contenant les pseudo-exemples.
+
+const CACHE_NAME = "atelier-vocab-v4";
+
 const ASSETS = [
   "./",
   "./index.html",
@@ -11,7 +15,6 @@ const ASSETS = [
   "https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"
 ];
 
-// Installation : mise en cache de tous les assets
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
@@ -23,40 +26,38 @@ self.addEventListener("install", event => {
   self.skipWaiting();
 });
 
-// Activation : suppression des anciens caches
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+        keys
+          .filter(key => key !== CACHE_NAME)
+          .map(key => caches.delete(key))
       )
     )
   );
   self.clients.claim();
 });
 
-// Fetch : cache-first pour les assets, network-first pour le Gist vocabulaire
-self.addEventListener("fetch", event => {
-  const url = event.request.url;
-
-  // Pour le Gist GitHub : réseau d'abord, cache en fallback
-  if (url.includes("gist.githubusercontent.com")) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
+function networkFirst(event) {
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        if (response && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+  );
+}
 
-  // Pour tout le reste : cache d'abord, réseau en fallback
+function cacheFirst(event) {
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
+
       return fetch(event.request).then(response => {
         if (response && response.status === 200) {
           const clone = response.clone();
@@ -66,4 +67,27 @@ self.addEventListener("fetch", event => {
       });
     })
   );
+}
+
+self.addEventListener("fetch", event => {
+  const url = event.request.url;
+  const request = event.request;
+
+  // Toujours chercher la dernière version pour les navigations HTML.
+  if (request.mode === "navigate" || url.endsWith("/index.html")) {
+    networkFirst(event);
+    return;
+  }
+
+  // Données vocabulaire / figures : réseau d'abord, cache seulement en secours.
+  if (
+    url.includes("gist.githubusercontent.com") ||
+    url.includes("raw.githubusercontent.com")
+  ) {
+    networkFirst(event);
+    return;
+  }
+
+  // Assets statiques : cache d'abord.
+  cacheFirst(event);
 });
