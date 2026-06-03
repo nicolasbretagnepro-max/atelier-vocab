@@ -821,10 +821,18 @@ function clearDailyDone() {
 
 function loadActivity() {
   const profile = loadProfile();
-  if (profile.activity && Object.keys(profile.activity).length) return profile.activity;
+  const stored = safeParseJSON(localStorage.getItem(STORE_ACTIVITY), {});
   const legacy = findFirstStoredJSON(LEGACY_ACTIVITY_KEYS, x => x && typeof x === "object") || {};
-  if (Object.keys(legacy).length) updateProfilePatch({ activity: legacy });
-  return legacy;
+  const merged = {
+    ...(legacy && typeof legacy === "object" ? legacy : {}),
+    ...(stored && typeof stored === "object" ? stored : {}),
+    ...(profile.activity && typeof profile.activity === "object" ? profile.activity : {})
+  };
+  if (Object.keys(merged).length) {
+    try { localStorage.setItem(STORE_ACTIVITY, JSON.stringify(merged)); } catch {}
+    updateProfilePatch({ activity: merged });
+  }
+  return merged;
 }
 
 function saveActivity(data) {
@@ -1532,13 +1540,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     advancingRef.current = true;
     let _dailyXp = 0;
     if (ok) {
-      _dailyXp = step === 0 ? 8 : (mode === "prod" ? 15 : 10);
-      const _wp = readP(state, current.id);
-      if ((_wp.wrong||0) > 0 && step > 0) _dailyXp = Math.max(_dailyXp, 20);
-      const _st = wordStatus(state, current);
-      if (_st === "Fragile" && step > 0) _dailyXp = Math.max(_dailyXp, 15);
-      else if (_st === "À revoir" && step > 0) _dailyXp = Math.max(_dailyXp, 12);
-      else if (_st === "Maîtrisé" && step > 0) _dailyXp = 6;
+      _dailyXp = calcXP(state, current, step === 0 ? "discover" : mode);
     }
     const ns = gradeWord(state, current.id, ok ? "good" : "again", mode, ok ? _dailyXp : 0);
     setState(ns);
@@ -2182,9 +2184,8 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
   const advance = useCallback((ok, mode="prod") => {
     if (!current || advancingRef.current) return;
     advancingRef.current = true;
-    const baseXp = steps[step] === "Découverte" ? 8 : steps[step] === "Boss" ? 15 : 10;
-    const prev = readP(state, current.id);
-    const xp = ok ? Math.max(baseXp, (prev.wrong||0) > 0 ? 20 : baseXp) : 0;
+    const xpMode = steps[step] === "Découverte" ? "discover" : steps[step] === "Boss" ? "prod" : mode;
+    const xp = ok ? calcXP(state, current, xpMode) : 0;
     const ns = gradeWord(state, current.id, ok ? "good" : "again", mode, xp);
     setState(ns);
     if (ok) setXpSession(x=>x+xp); else setHearts(h=>h-1);
@@ -2695,20 +2696,15 @@ function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,o
 
 // ─── XP HELPERS ──────────────────────────────────────────────────────────────
 function calcXP(state, word, mode) {
-  let xp = mode === "discover" ? 8 : mode === "prod" ? 15 : 10;
+  let xp = mode === "discover" ? 3 : mode === "prod" ? 10 : 5;
   const wp = readP(state, word.id);
-  if ((wp.wrong||0) > 0) xp = Math.max(xp, 20);
-  else {
-    const st = wordStatus(state, word);
-    if (st === "Fragile") xp = Math.max(xp, 15);
-    else if (st === "À revoir") xp = Math.max(xp, 12);
-    else if (st === "Maîtrisé") xp = 6;
-  }
+  if ((wp.wrong || 0) > 0) xp = Math.max(xp, 10);
+  else if (wordStatus(state, word) === "Maîtrisé") xp = Math.min(xp, 3);
   return xp;
 }
 function calcStreakBonus(prev, next) {
   for (const m of [3, 5, 10]) {
-    if (prev < m && next >= m) return m === 3 ? 5 : m === 5 ? 15 : 40;
+    if (prev < m && next >= m) return m === 3 ? 2 : m === 5 ? 5 : 10;
   }
   return 0;
 }
@@ -2738,7 +2734,7 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
   const perfectSession = done && log.length > 0 && log.every(e => e.ok);
   useEffect(() => {
     if (!perfectSession || bonusAwarded) return;
-    const ns = awardXpBonus(state, 50, "perfect");
+    const ns = awardXpBonus(state, 20, "perfect");
     setState(ns);
     const m = checkMilestones(ns, words);
     if (m) onMilestone(m);
@@ -2774,14 +2770,14 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
 
   if (done || !current) {
     const nOk = log.filter(e => e.ok).length; const nWrong = log.filter(e => !e.ok).length;
-    const perfect = nWrong === 0 && nOk > 0; const totalXp = xpSession + (perfect ? 50 : 0);
+    const perfect = nWrong === 0 && nOk > 0; const totalXp = xpSession + (perfect ? 20 : 0);
     return (
       <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.3s ease"}}>
         <div style={{textAlign:"center",padding:"24px 0 12px"}}>
           <div style={{fontSize:52,marginBottom:10}}>{perfect ? "🏆" : "🎉"}</div>
           <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:6}}>{perfect ? "Session parfaite !" : "Session terminée"}</h2>
           <p style={{color:C.sub,fontSize:14}}>+{totalXp} XP · {nOk} ✓ · {nWrong} ✗</p>
-          {perfect && <p style={{color:C.orange,fontWeight:700,fontSize:13,marginTop:4}}>+50 XP bonus !</p>}
+          {perfect && <p style={{color:C.orange,fontWeight:700,fontSize:13,marginTop:4}}>+20 XP bonus !</p>}
         </div>
         <Btn label="Retour" variant="primary" full onClick={onBack}/>
       </div>
@@ -2941,7 +2937,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   const perfectSession = done && score === maxQ;
   useEffect(() => {
     if (!perfectSession || bonusAwarded) return;
-    const ns = awardXpBonus(stateRef.current, 50, "perfect");
+    const ns = awardXpBonus(stateRef.current, 20, "perfect");
     stateRef.current = ns;
     setState(ns);
     const m = checkMilestones(ns, words);
@@ -3016,7 +3012,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   );
 
   if (done) {
-    const perfect = score === maxQ; const totalXp = xpSession + (perfect ? 50 : 0);
+    const perfect = score === maxQ; const totalXp = xpSession + (perfect ? 20 : 0);
     return (
       <Card style={{textAlign:"center",padding:"36px 24px"}}>
         <div style={{fontSize:56,marginBottom:12}}>{perfect?"🏆":score>=maxQ*0.8?"👍":"💪"}</div>
@@ -3284,6 +3280,7 @@ function App() {
 
   const handleExport = () => {
     const profile = loadProfile();
+    const activity = loadActivity();
     const data = {
       type: "atelier-vocab-profile",
       schemaVersion: PROFILE_SCHEMA_VERSION,
@@ -3292,13 +3289,15 @@ function App() {
       figuresCount: figures.length,
       duplicateIgnoredCount: duplicateWords.length,
       vocabHash: hashString(allItems.map(w=>w.id).join("|")),
+      activity,
+      regularity: activity,
       profileData: {
         ...profile,
         progress: state.progress,
         meta: state.meta,
         sources: extraSources,
         sourceCache: extraWordsBySource,
-        activity: loadActivity(),
+        activity,
         milestones: loadSeenMilestones()
       }
     };
