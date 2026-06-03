@@ -839,6 +839,21 @@ function recordActivity(rating, mode, customXp) {
   saveActivity(data);
 }
 
+function awardXpBonus(state, amount, mode = "bonus") {
+  if (!amount) return state;
+  const ns = { ...state, meta:{ ...DEFAULT_META, ...(state.meta || {}) } };
+  ns.meta.xp = (ns.meta.xp || 0) + amount;
+  const key = localDateKey();
+  const data = loadActivity();
+  const day = data[key] || { answers:0, correct:0, xp:0, modes:{} };
+  day.xp = (day.xp || 0) + amount;
+  day.modes[mode] = (day.modes[mode] || 0) + 1;
+  data[key] = day;
+  saveActivity(data);
+  saveProgress(ns);
+  return ns;
+}
+
 function recentActivityDays(days = 21) {
   const data = loadActivity();
   const out = [];
@@ -1870,100 +1885,6 @@ function StepProd({word,inputVal,setInputVal,onAnswer}) {
   );
 }
 
-// ─── RÉVISION TAB ─────────────────────────────────────────────────────────────
-function LearnTab({words,state,setState,onMilestone,mode="smart"}) {
-  const seenWords = useMemo(()=>words.filter(w=>readP(state,w.id).seen>0),[words,state]);
-  const sessionWords = useMemo(()=>{
-    if (mode === "fragile") return seenWords.filter(w=>wordStatus(state,w)==="Fragile");
-    if (mode === "due") return seenWords.filter(w=>isDue(state,w));
-    return seenWords;
-  }, [mode, seenWords, state]);
-  const sessionTitle = mode === "fragile" ? "Mots fragiles" : mode === "due" ? "Mots à revoir" : "Révision rapide";
-  const [pool,setPool] = useState(()=>sessionWords.length===0?[]:candidates(state,sessionWords,"smart",20));
-  const [idx,setIdx] = useState(0);
-  const [shown,setShown] = useState(false);
-  const wordsSignature = useMemo(()=>sessionWords.map(w=>w.id).join("|"),[sessionWords]);
-
-  useEffect(()=>{
-    setPool(sessionWords.length===0?[]:candidates(state,sessionWords,"smart",20));
-    setIdx(0); setShown(false);
-  }, [mode, wordsSignature]);
-
-  const w = pool[idx];
-
-  if(seenWords.length===0) return (
-    <Card style={{textAlign:"center",padding:"40px 24px"}}>
-      <div style={{fontSize:48,marginBottom:12}}>📚</div>
-      <p style={{fontSize:16,fontWeight:700,color:C.text,marginBottom:8}}>Aucun mot vu pour l'instant</p>
-      <p style={{fontSize:14,color:C.sub,lineHeight:1.6}}>Fais d'abord la Routine du jour. Les mots appris apparaîtront ensuite ici.</p>
-    </Card>
-  );
-
-  if(!w) return (
-    <Card style={{textAlign:"center",padding:"40px 24px"}}>
-      <p style={{color:C.sub,fontSize:16,fontWeight:700,marginBottom:6}}>{sessionWords.length ? "Session terminée" : "Aucun mot dans cette session"}</p>
-      <p style={{color:C.sub,fontSize:14,lineHeight:1.5,marginBottom:18}}>{sessionWords.length ? "Tu peux lancer une nouvelle session avec les mêmes critères." : "Essaie la révision rapide ou la routine."}</p>
-      <Btn label="Nouvelle session" variant="primary" onClick={()=>{setPool(candidates(state,sessionWords.length?sessionWords:seenWords,"smart",20));setIdx(0);setShown(false);}} />
-    </Card>
-  );
-
-  const x = readP(state,w.id);
-  const grade = (rating) => {
-    const ns = gradeWord(state,w.id,rating,"recog");
-    setState(ns);
-    const m = checkMilestones(ns, words);
-    if (m) onMilestone(m);
-    setShown(false);
-    setIdx(i=>i+1);
-  };
-
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-        <span style={{fontSize:13,color:C.sub,fontWeight:500}}>{sessionTitle} · {idx+1} / {pool.length}</span>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}>
-          <Pill label={wordStatus(state,w)} color={STATUS_COLOR[wordStatus(state,w)]}/>
-          <Pill label={`${getRate(state,w)}%`} color={C.blue}/>
-        </div>
-      </div>
-      <Card>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
-          <Pill label={w.nature} color={C.purple}/><Pill label={w.theme} color={THEME_COLOR[w.theme]}/>
-        </div>
-        <WordTitle>{w.word}</WordTitle>
-        {!shown ? (
-          <>
-            <p style={{fontSize:14,color:C.ter,marginBottom:12}}>Retrouve mentalement la définition, puis révèle.</p>
-            <ExampleBlock word={w} showLabel={false} fontSize={14}/>
-            <Btn label="Révéler la définition" variant="primary" full onClick={()=>setShown(true)}/>
-          </>
-        ) : (
-          <>
-            <p style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:6}}>{w.compact}</p>
-            <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:10}}>{w.definition}</p>
-            <ExampleBlock word={w}/>
-            <ConfusionBlock word={w} words={words} compact />
-            <div style={{background:"rgba(0,0,0,0.04)",borderRadius:12,padding:"10px 14px",marginBottom:14}}>
-              <div style={{fontSize:12,color:C.sub,display:"flex",gap:16,marginBottom:6,flexWrap:"wrap"}}>
-                <span>Recog. {x.recog}/6</span><span>Prod. {x.prod}/6</span><span>{getRate(state,w)}%</span>
-              </div>
-              <Bar value={(x.mastery/6)*100} color={C.blue}/>
-            </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {[["Oublié","again",C.red],["Difficile","hard",C.orange],["Bien","good",C.blue],["Facile","easy",C.green]].map(([l,r,c])=>(
-                <button key={r} onClick={()=>grade(r)} style={{
-                  flex:1,minWidth:86,padding:"9px 4px",borderRadius:12,border:`1.5px solid ${c}30`,
-                  background:`${c}12`,color:c,fontWeight:700,fontSize:13,cursor:"pointer"
-                }}>{l}</button>
-              ))}
-            </div>
-          </>
-        )}
-      </Card>
-    </div>
-  );
-}
-
 // ─── QUIZ TAB ─────────────────────────────────────────────────────────────────
 const QUIZ_SIZES = [5,10,15,20];
 
@@ -2080,143 +2001,6 @@ function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
   );
 }
 
-function QuizTab({words,state,setState,onMilestone,mode="quick",onModeChange}) {
-  if (mode === "nuance") {
-    return <NuanceQuiz words={words} state={state} setState={setState} onMilestone={onMilestone} onBackToQuick={()=>onModeChange&&onModeChange("quick")} />;
-  }
-  const [maxQ,setMaxQ] = useState(10);
-  const [count,setCount] = useState(0);
-  const [score,setScore] = useState(0);
-  const [done,setDone] = useState(false);
-  const [started,setStarted] = useState(false);
-  const [w,setW] = useState(null);
-  const [selected,setSelected] = useState(null);
-  const stateRef = useRef(state);
-  const askedRef = useRef(new Set());
-  const timerRef = useRef(null);
-
-  useEffect(()=>{ stateRef.current=state; },[state]);
-  useEffect(()=>()=>{ if(timerRef.current) clearTimeout(timerRef.current); },[]);
-
-  const quiz = useMemo(()=>w?{w,options:shuffle([w,...shuffle(words.filter(x=>x.id!==w.id)).slice(0,3)])}:null,[w,words]);
-
-  const getNext = useCallback(() => {
-    const next = candidates(stateRef.current, words, "smart", 1, askedRef.current)[0];
-    if (next) return next;
-    askedRef.current = new Set();
-    return candidates(stateRef.current, words, "smart", 1)[0];
-  }, [words]);
-
-  const startQuiz = () => {
-    askedRef.current = new Set();
-    setCount(0); setScore(0); setDone(false); setSelected(null);
-    setW(getNext());
-    setStarted(true);
-  };
-
-  const moveNext = (nextCount) => {
-    setCount(nextCount);
-    if(nextCount>=maxQ) { setDone(true); setStarted(false); }
-    else { setSelected(null); setW(getNext()); }
-  };
-
-  const handleAnswer = (o) => {
-    if(selected || !w) return;
-    setSelected(o.id);
-    askedRef.current.add(w.id);
-    const ok = o.id === w.id;
-    const ns = gradeWord(stateRef.current,w.id,ok?"good":"again","recog");
-    stateRef.current = ns;
-    setState(ns);
-    const m = checkMilestones(ns, words);
-    if (m) onMilestone(m);
-    if(ok) setScore(s=>s+1);
-    const next = count + 1;
-    if(ok) timerRef.current = setTimeout(()=>moveNext(next), 650);
-  };
-
-  const handleContinue = () => moveNext(count+1);
-
-  if(!started&&!done) return (
-    <Card style={{textAlign:"center",padding:"36px 24px"}}>
-      <div style={{fontSize:48,marginBottom:14}}>⚡️</div>
-      <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:8}}>Quiz rapide</h2>
-      <p style={{fontSize:14,color:C.sub,marginBottom:24,lineHeight:1.6}}>Combien de questions ?</p>
-      <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:28,flexWrap:"wrap"}}>
-        {QUIZ_SIZES.map(n=>(
-          <button key={n} onClick={()=>setMaxQ(n)} style={{
-            padding:"10px 22px",borderRadius:14,fontWeight:700,fontSize:15,
-            border:`2px solid ${maxQ===n?C.blue:C.border}`,
-            background:maxQ===n?`${C.blue}14`:C.solid,
-            color:maxQ===n?C.blue:C.sub,cursor:"pointer",transition:"all 0.15s"
-          }}>{n}</button>
-        ))}
-      </div>
-      <Btn label={`Démarrer — ${maxQ} questions`} variant="primary" onClick={startQuiz}/>
-    </Card>
-  );
-
-  if(done) return (
-    <Card style={{textAlign:"center",padding:"36px 24px"}}>
-      <div style={{fontSize:56,marginBottom:12}}>{score>=maxQ*0.8?"🏆":score>=maxQ*0.5?"👍":"💪"}</div>
-      <h2 style={{fontSize:24,fontWeight:800,color:C.text,marginBottom:8}}>{score} / {maxQ} correct{score>1?"s":""}</h2>
-      <p style={{fontSize:15,color:C.sub,marginBottom:24}}>
-        {score===maxQ?"Parfait.":score>=maxQ*0.8?"Très bon résultat.":score>=maxQ*0.5?"Résultat correct.":"À consolider."}
-      </p>
-      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-        <Btn label="Rejouer" variant="primary" onClick={startQuiz}/>
-        <Btn label="Changer le nombre" variant="ghost" onClick={()=>{setDone(false);setStarted(false);}}/>
-      </div>
-    </Card>
-  );
-
-  if(!w||!quiz) return <div style={{color:C.sub,textAlign:"center",padding:48}}>Chargement…</div>;
-
-  const wrong = selected && selected !== w.id;
-
-  return (
-    <div style={{display:"flex",flexDirection:"column",gap:12}}>
-      <div style={{display:"flex",alignItems:"center",gap:12}}>
-        <div style={{flex:1}}><Bar value={(count/maxQ)*100} color={C.blue}/></div>
-        <span style={{fontSize:13,color:C.sub,fontWeight:600,minWidth:50,textAlign:"right"}}>{count+1} / {maxQ}</span>
-        <span style={{fontSize:13,color:C.green,fontWeight:700}}>✓ {score}</span>
-      </div>
-      <Card>
-        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
-          <Pill label={w.nature} color={C.purple}/><Pill label={w.theme} color={THEME_COLOR[w.theme]}/>
-        </div>
-        <WordTitle>{w.word}</WordTitle>
-        <div className="choice-grid">
-          {quiz.options.map(o=>{
-            let bg=C.solid,border=C.border,color=C.text,weight=500;
-            if(selected) {
-              if(o.id===w.id) {bg=`${C.green}22`;border=C.green;weight=700;}
-              else if(o.id===selected){bg=`${C.red}18`; border=C.red; color=C.sub;}
-              else color=C.ter;
-            }
-            return (
-              <button key={o.id} onClick={()=>handleAnswer(o)} disabled={!!selected} style={{
-                padding:"13px 12px",borderRadius:14,border:`1.5px solid ${border}`,
-                background:bg,textAlign:"left",cursor:selected?"default":"pointer",
-                fontSize:13,fontWeight:weight,color,lineHeight:1.45,transition:"all 0.25s"
-              }}>
-                {o.compact}{o.id===w.id&&selected?" ✓":""}
-              </button>
-            );
-          })}
-        </div>
-        {wrong&&(
-          <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
-            <ExampleBlock word={w}/>
-            <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}>{w.definition}</p>
-            <Btn label="J'ai compris" variant="primary" full onClick={handleContinue}/>
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
-
 // ─── FIGURES DE STYLE TAB ────────────────────────────────────────────────────
 function FigureExampleBlock({figure, masked=false}) {
   const text = masked && figure.cloze ? figure.cloze : figure.example;
@@ -2271,6 +2055,180 @@ function buildFigureQuestion(figure, figures, mode) {
     options,
     renderOption: f => f.word
   };
+}
+
+function buildFigureRoutine(state, figures, variant = "full") {
+  const discoverCount = variant === "short" ? 2 : 3;
+  const reviewCount = variant === "short" ? 5 : 6;
+  const discover = candidates(state, figures, "new", discoverCount);
+  const discoverIds = new Set(discover.map(f => f.id));
+  let review = candidates(state, figures, "smart", reviewCount, discoverIds);
+  if (review.length < reviewCount) review = uniqueById([...review, ...shuffle(figures).slice(0, reviewCount)]);
+  return { discover, review, boss: candidates(state, figures, "smart", reviewCount) };
+}
+
+function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"}) {
+  const steps = variant === "short" ? ["Découverte", "Exemples"] : ["Découverte", "Exemples", "Définitions", "Boss"];
+  const figuresSignature = useMemo(()=>figures.map(f=>f.id).join("|"),[figures]);
+  const [session,setSession] = useState(()=>buildFigureRoutine(state,figures,variant));
+  const [step,setStep] = useState(0);
+  const [idx,setIdx] = useState(0);
+  const [hearts,setHearts] = useState(3);
+  const [xpSession,setXpSession] = useState(0);
+  const [shown,setShown] = useState(false);
+  const [selected,setSelected] = useState(null);
+  const [done,setDone] = useState(false);
+  const [log,setLog] = useState([]);
+  const timerRef = useRef(null);
+  const advancingRef = useRef(false);
+
+  useEffect(() => {
+    setSession(buildFigureRoutine(state,figures,variant));
+    setStep(0); setIdx(0); setHearts(3); setXpSession(0); setShown(false); setSelected(null); setDone(false); setLog([]);
+    advancingRef.current = false;
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [figuresSignature, variant]);
+
+  const sources = useMemo(() => {
+    if (steps[step] === "Découverte") return session.discover;
+    if (steps[step] === "Boss") return session.boss;
+    return session.review;
+  }, [step, steps, session]);
+  const current = sources[idx];
+  const questionMode = steps[step] === "Définitions" ? "definition" : "identify";
+  const q = useMemo(()=>current ? buildFigureQuestion(current, figures, questionMode) : null, [current, figures, questionMode]);
+
+  const restart = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setSession(buildFigureRoutine(state,figures,variant));
+    setStep(0); setIdx(0); setHearts(3); setXpSession(0); setShown(false); setSelected(null); setDone(false); setLog([]);
+    advancingRef.current = false;
+  }, [state, figures, variant]);
+
+  const advance = useCallback((ok, mode="prod") => {
+    if (!current || advancingRef.current) return;
+    advancingRef.current = true;
+    const baseXp = steps[step] === "Découverte" ? 8 : steps[step] === "Boss" ? 15 : 10;
+    const prev = readP(state, current.id);
+    const xp = ok ? Math.max(baseXp, (prev.wrong||0) > 0 ? 20 : baseXp) : 0;
+    const ns = gradeWord(state, current.id, ok ? "good" : "again", mode, xp);
+    setState(ns);
+    if (ok) setXpSession(x=>x+xp); else setHearts(h=>h-1);
+    setLog(l=>[...l,{figure:current,ok,step:steps[step]}]);
+    const m = checkMilestones(ns, figures);
+    if (m) onMilestone(m);
+    timerRef.current = setTimeout(() => {
+      setSelected(null); setShown(false); advancingRef.current = false;
+      if (idx + 1 >= sources.length) {
+        if (step + 1 >= steps.length) setDone(true);
+        else { setStep(s=>s+1); setIdx(0); }
+      } else setIdx(i=>i+1);
+    }, ok ? 650 : 0);
+  }, [current, state, setState, step, steps, idx, sources.length, figures, onMilestone]);
+
+  const answer = (o) => {
+    if (selected || !current) return;
+    setSelected(o.id);
+    const ok = o.id === current.id;
+    if (ok) advance(true, questionMode === "definition" ? "recog" : "prod");
+  };
+
+  if (done) {
+    const nOk = log.filter(e=>e.ok).length;
+    const nWrong = log.filter(e=>!e.ok).length;
+    const wrong = log.filter(e=>!e.ok).map(e=>e.figure);
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.3s ease"}}>
+        <div style={{textAlign:"center",padding:"28px 0 12px"}}>
+          <div style={{fontSize:58,marginBottom:10}}>🎭</div>
+          <h2 style={{fontSize:25,fontWeight:850,color:C.text,marginBottom:6}}>{variant==="short" ? "Routine courte terminée" : "Routine figures terminée"}</h2>
+          <p style={{color:C.sub,fontSize:15}}>+{xpSession} XP · {nOk} ✓ · {nWrong} ✗</p>
+        </div>
+        {wrong.length > 0 && (
+          <Card style={{padding:"14px 18px"}}>
+            <p style={{fontSize:12,fontWeight:800,color:C.orange,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>À retravailler ({wrong.length})</p>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {wrong.map(f=><div key={f.id} style={{padding:"10px 12px",borderRadius:12,background:`${C.orange}08`,border:`1px solid ${C.orange}30`}}><p style={{fontWeight:800,color:C.text,fontSize:14,margin:"0 0 2px"}}>{f.word}</p><p style={{color:C.sub,fontSize:13,margin:0}}>{f.compact}</p></div>)}
+            </div>
+          </Card>
+        )}
+        <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+          <Btn label="Rejouer" variant="primary" onClick={restart}/>
+          <Btn label="Retour aux figures" variant="ghost" onClick={onBack}/>
+        </div>
+      </div>
+    );
+  }
+
+  if (hearts <= 0) return (
+    <div style={{textAlign:"center",padding:"44px 0"}}>
+      <div style={{fontSize:54,marginBottom:12}}>💔</div>
+      <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:8}}>Session terminée</h2>
+      <p style={{fontSize:14,color:C.sub,lineHeight:1.6,margin:"0 0 20px"}}>Les figures manquées reviendront en priorité.</p>
+      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+        <Btn label="Rejouer" variant="primary" onClick={restart}/>
+        <Btn label="Retour" variant="ghost" onClick={onBack}/>
+      </div>
+    </div>
+  );
+
+  if (!current) return <Card style={{textAlign:"center",padding:"40px 24px",color:C.sub}}>Aucune figure disponible pour cette routine.</Card>;
+
+  const isDiscover = steps[step] === "Découverte";
+  const wrong = selected && selected !== current.id;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <div style={{flex:1,display:"flex",gap:4}}>
+          {steps.map((s,i)=><div key={s} style={{flex:1,height:5,borderRadius:99,background:i<step?C.green:i===step?C.indigo:"rgba(0,0,0,0.1)",transition:"background 0.3s"}}/>)}
+        </div>
+        <span style={{fontSize:14,color:C.red,fontWeight:800,minWidth:52,textAlign:"right"}}>{"♥".repeat(Math.max(0,hearts))}{"♡".repeat(Math.max(0,3-hearts))}</span>
+        <span style={{fontSize:14,color:C.orange,fontWeight:800}}>+{xpSession}</span>
+      </div>
+      <div style={{fontSize:12,color:C.sub,fontWeight:750,letterSpacing:0.8,textTransform:"uppercase"}}>{steps[step]} · {idx+1} / {sources.length}</div>
+      <Card className={`question-card ${selected ? (wrong ? "feedback-wrong" : "feedback-correct") : ""}`}>
+        {isDiscover ? (
+          <>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}><Pill label={current.theme} color={THEME_COLOR[current.theme] || C.indigo}/><Pill label={wordStatus(state,current)} color={STATUS_COLOR[wordStatus(state,current)]}/></div>
+            <WordTitle>{current.word}</WordTitle>
+            {!shown ? (
+              <><FigureExampleBlock figure={current}/><Btn label="Voir la définition" variant="primary" full onClick={()=>setShown(true)}/></>
+            ) : (
+              <><p style={{fontSize:17,fontWeight:800,color:C.text,margin:"0 0 6px"}}>{current.compact}</p><p style={{fontSize:14,color:C.sub,lineHeight:1.65,margin:"0 0 10px"}}>{current.definition}</p>{current.cloze && <FigureExampleBlock figure={current} masked/>}<Btn label="J'ai compris" variant="success" full onClick={()=>advance(true,"recog")}/></>
+            )}
+          </>
+        ) : (
+          <>
+            <p style={{fontSize:12,color:C.indigo,fontWeight:850,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>{q.label}</p>
+            <div style={{background:`${C.indigo}08`,borderLeft:`4px solid ${C.indigo}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"0 0 16px"}}>
+              <p style={{fontSize:16,color:C.text,fontStyle:questionMode==="definition"?"normal":"italic",fontWeight:questionMode==="definition"?750:500,lineHeight:1.7,margin:0}}>{q.prompt}</p>
+            </div>
+            <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"0 0 12px"}}>{q.helper}</p>
+            <div className="choice-grid">
+              {q.options.map(o=>{
+                let bg=C.solid,border=C.border,color=C.text,weight=650;
+                if(selected) {
+                  if(o.id===current.id) {bg=`${C.green}22`;border=C.green;color=C.green;weight=850;}
+                  else if(o.id===selected) {bg=`${C.red}18`;border=C.red;color=C.red;}
+                  else color=C.ter;
+                }
+                return <button key={o.id} disabled={!!selected} onClick={()=>answer(o)} style={{padding:"13px 12px",borderRadius:14,border:`1.5px solid ${border}`,background:bg,textAlign:"left",cursor:selected?"default":"pointer",fontSize:14,fontWeight:weight,color,lineHeight:1.35,transition:"all 0.2s"}}>{q.renderOption(o)}{o.id===current.id&&selected?" ✓":""}</button>;
+              })}
+            </div>
+            {selected && (
+              <div style={{marginTop:14,animation:"fadeSlideIn 0.25s ease"}}>
+                <p style={{fontSize:13,color:wrong?C.red:C.green,fontWeight:850,margin:"0 0 8px"}}>{wrong ? "À corriger" : "Correct"}</p>
+                <p style={{fontSize:15,color:C.text,lineHeight:1.55,margin:"0 0 8px"}}><strong>{current.word}</strong> — {current.compact}</p>
+                <FigureExampleBlock figure={current}/>
+                {wrong && <Btn label="J'ai compris" variant="primary" full onClick={()=>advance(false, questionMode === "definition" ? "recog" : "prod")}/>}
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+    </div>
+  );
 }
 
 function FigurePractice({figures,state,setState,onMilestone,mode="identify",onBack}) {
@@ -2417,6 +2375,8 @@ function FiguresTab({figures,state,setState,onMilestone,onReloadFigures,figuresS
   },[figures,query,filter]);
   const sel = selected ? figures.find(f=>f.id===selected) : null;
 
+  if (mode === "routine-full") return <FigureRoutine figures={figures} state={state} setState={setState} onMilestone={onMilestone} variant="full" onBack={()=>setMode("home")}/>;
+  if (mode === "routine-short") return <FigureRoutine figures={figures} state={state} setState={setState} onMilestone={onMilestone} variant="short" onBack={()=>setMode("home")}/>;
   if (mode === "identify") return <FigurePractice figures={figures} state={state} setState={setState} onMilestone={onMilestone} mode="identify" onBack={()=>setMode("home")}/>;
   if (mode === "definition") return <FigurePractice figures={figures} state={state} setState={setState} onMilestone={onMilestone} mode="definition" onBack={()=>setMode("home")}/>;
   if (sel) return <FigureDetail figure={sel} figures={figures} state={state} onBack={()=>setSelected(null)}/>;
@@ -2451,6 +2411,8 @@ function FiguresTab({figures,state,setState,onMilestone,onReloadFigures,figuresS
       <Card>
         <h3 style={{fontSize:16,fontWeight:850,color:C.text,margin:"0 0 10px"}}>Sessions figures</h3>
         <div className="choice-grid">
+          <SessionButton title="Routine figures" subtitle="Découverte, exemples, définitions et boss." icon="🎭" color={C.indigo} onClick={()=>setMode("routine-full")}/>
+          <SessionButton title="Routine courte" subtitle="Facultatif : 2 découvertes puis 5 exemples." icon="⏱️" color={C.green} onClick={()=>setMode("routine-short")}/>
           <SessionButton title="Identifier par l'exemple" subtitle="Trouver la figure illustrée dans une phrase complète." icon="🔎" color={C.indigo} onClick={()=>setMode("identify")}/>
           <SessionButton title="Associer la définition" subtitle="Retrouver le procédé à partir du sens." icon="📘" color={C.blue} onClick={()=>setMode("definition")}/>
         </div>
@@ -2690,10 +2652,24 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
   const [xpSession, setXpSession] = useState(0);
   const [log, setLog] = useState([]);
   const [done, setDone] = useState(false);
+  const [bonusAwarded, setBonusAwarded] = useState(false);
   const timerRef = useRef(null);
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const current = pool[idx];
   const total = pool.length;
+  const restartSession = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setIdx(0); setHearts(3); setStreak(0); setXpSession(0); setLog([]); setDone(false); setBonusAwarded(false);
+  }, []);
+  const perfectSession = done && log.length > 0 && log.every(e => e.ok);
+  useEffect(() => {
+    if (!perfectSession || bonusAwarded) return;
+    const ns = awardXpBonus(state, 50, "perfect");
+    setState(ns);
+    const m = checkMilestones(ns, words);
+    if (m) onMilestone(m);
+    setBonusAwarded(true);
+  }, [perfectSession, bonusAwarded, state, setState, words, onMilestone]);
   const advance = useCallback((ok) => {
     if (!current) return;
     const newStreak = ok ? streak + 1 : 0;
@@ -2716,7 +2692,7 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
       <h2 style={{fontSize:22,fontWeight:700,marginBottom:10,color:C.text}}>Session terminée</h2>
       <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:24}}>Tes erreurs ont été ajoutées à tes révisions.</p>
       <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-        <Btn label="Rejouer" variant="primary" onClick={onBack}/>
+        <Btn label="Rejouer" variant="primary" onClick={restartSession}/>
         <Btn label="Retour" variant="ghost" onClick={onBack}/>
       </div>
     </div>
@@ -2879,6 +2855,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   const [count, setCount] = useState(0);
   const [score, setScore] = useState(0);
   const [done, setDone] = useState(false);
+  const [bonusAwarded, setBonusAwarded] = useState(false);
   const [w, setW] = useState(null);
   const [selected, setSelected] = useState(null);
   const stateRef = useRef(state);
@@ -2887,6 +2864,16 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
 
   useEffect(() => { stateRef.current = state; }, [state]);
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  const perfectSession = done && score === maxQ;
+  useEffect(() => {
+    if (!perfectSession || bonusAwarded) return;
+    const ns = awardXpBonus(stateRef.current, 50, "perfect");
+    stateRef.current = ns;
+    setState(ns);
+    const m = checkMilestones(ns, words);
+    if (m) onMilestone(m);
+    setBonusAwarded(true);
+  }, [perfectSession, bonusAwarded, setState, words, onMilestone]);
 
   const quiz = useMemo(() => w ? {w, options: shuffle([w,...shuffle(words.filter(x=>x.id!==w.id)).slice(0,3)])} : null, [w, words]);
 
@@ -2900,7 +2887,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   const startQuiz = () => {
     askedRef.current = new Set();
     setCount(0); setScore(0); setDone(false); setSelected(null);
-    setHearts(3); setStreak(0); setXpSession(0);
+    setHearts(3); setStreak(0); setXpSession(0); setBonusAwarded(false);
     setW(getNext()); setStarted(true);
   };
 
