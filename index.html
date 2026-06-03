@@ -7,177 +7,486 @@
   <meta name="theme-color" content="#007AFF" />
   <style>
     * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      min-height: 100%;
-      background: #F2F2F7;
-      color: #1C1C1E;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-    }
-    .loader {
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 28px;
-      text-align: center;
-    }
-    .box {
-      max-width: 520px;
-      background: #fff;
-      border-radius: 22px;
-      padding: 28px;
-      box-shadow: 0 14px 40px rgba(0,0,0,0.08);
-    }
-    .title {
-      font-size: 22px;
-      font-weight: 750;
-      margin-bottom: 10px;
-    }
-    .text {
-      font-size: 15px;
-      line-height: 1.45;
-      color: #5b5b66;
-    }
-    .error {
-      color: #B00020;
-      margin-top: 14px;
-      white-space: pre-wrap;
-      text-align: left;
-      font-size: 13px;
-    }
+    html, body { margin: 0; min-height: 100%; background: #F2F2F7; color: #1C1C1E; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif; }
+    .loader { min-height: 100vh; display: grid; place-items: center; padding: 28px; text-align: center; }
+    .box { max-width: 520px; background: #fff; border-radius: 22px; padding: 28px; box-shadow: 0 14px 40px rgba(0,0,0,0.08); }
+    .title { font-size: 22px; font-weight: 750; margin-bottom: 10px; }
+    .text { font-size: 15px; line-height: 1.45; color: #5b5b66; }
+    .error { color: #B00020; margin-top: 14px; white-space: pre-wrap; text-align: left; font-size: 13px; }
   </style>
 </head>
 <body>
   <div class="loader">
     <div class="box">
       <div class="title">Atelier Vocabulaire</div>
-      <div class="text">Chargement de l’application…</div>
+      <div class="text">Chargement de l'application…</div>
       <div id="error" class="error" hidden></div>
     </div>
   </div>
 
   <script>
-    /*
-      index.html complet prêt à remplacer dans GitHub.
-
-      Objectif de cette version :
-      - conserver l'application actuelle ;
-      - corriger la logique des exemples en contexte ;
-      - empêcher l'affichage de phrases générées du type :
-        "On parle d'« Mot » quand on désigne : définition courte".
-
-      Cette page charge la version actuelle de l'application depuis le commit stable
-      3716b74, applique la correction au HTML, puis lance l'application corrigée.
-    */
-
-    const APP_SOURCE_URL =
-      "https://raw.githubusercontent.com/nicolasbretagnepro-max/atelier-vocab/3716b74/index.html";
+    const APP_SOURCE_URL = "https://raw.githubusercontent.com/nicolasbretagnepro-max/atelier-vocab/3716b74/index.html";
 
     function patchAppHtml(html) {
-      let patched = String(html || "");
+      let p = String(html || "");
 
-      patched = patched.replace(
-        /function isGeneric\(e\)\s*\{[\s\S]*?return !e \|\| \/Dans son article\|Le chroniqueur emploie\|Dans l'analyse\|peut servir à décrire\|Le texte emploie\|Dans le passage\|Le passage emploie\|Dans l'article\|Dans le récit\|Le journaliste emploie\/i\.test\(e\);\s*\}/,
-        `function isGeneric(e) {
-  return !e || /Dans son article|Le chroniqueur emploie|Dans l'analyse|peut servir à décrire|Le texte emploie|Dans le passage|Le passage emploie|Dans l'article|Dans le récit|Le journaliste emploie|On parle d[’']?«?/i.test(e);
-}`
+      // ── P1 : isGeneric – ajoute le pattern "On parle d'«" ─────────────────
+      p = p.replace(
+        'return !e || /Dans son article|Le chroniqueur emploie|Dans l\'analyse|peut servir à décrire|Le texte emploie|Dans le passage|Le passage emploie|Dans l\'article|Dans le récit|Le journaliste emploie/i.test(e);',
+        'return !e || /Dans son article|Le chroniqueur emploie|Dans l\'analyse|peut servir à décrire|Le texte emploie|Dans le passage|Le passage emploie|Dans l\'article|Dans le récit|Le journaliste emploie|On parle d[\'\\u2019]?«?/i.test(e);'
       );
 
-      patched = patched.replace(
-        /function makeContextSentence\(w\)\s*\{[\s\S]*?return `On parle d'« \$\{w\.word\} » quand on désigne : \$\{w\.compact \|\| w\.definition \|\| "ce mot"\}\.`;[\s\S]*?\}/,
-        `function makeContextSentence(w) {
-  // Ancien fallback volontairement neutralisé.
-  // Une définition courte ne doit jamais être déguisée en exemple.
-  return "";
+      // ── P2 : makeContextSentence neutralisé ───────────────────────────────
+      p = p.replace(
+        /function makeContextSentence\(w\) \{[\s\S]*?\}/,
+        'function makeContextSentence(w) { return ""; }'
+      );
+
+      // ── P3 : recordActivity – paramètre customXp ──────────────────────────
+      p = p.replace(
+        'function recordActivity(rating, mode) {',
+        'function recordActivity(rating, mode, customXp) {'
+      );
+      p = p.replace(
+        'day.xp += rating === "again" ? 0 : 10;',
+        'day.xp += (typeof customXp === "number") ? customXp : (rating === "again" ? 0 : 10);'
+      );
+
+      // ── P4 : gradeWord – paramètre customXp ───────────────────────────────
+      p = p.replace(
+        'function gradeWord(state, id, rating, mode = "recog") {',
+        'function gradeWord(state, id, rating, mode = "recog", customXp) {'
+      );
+      p = p.replace(
+        'meta.xp = (meta.xp || 0) + (rating === "again" ? 0 : 10);',
+        'const _xpD = (typeof customXp === "number") ? customXp : (rating === "again" ? 0 : 10); meta.xp = (meta.xp || 0) + _xpD;'
+      );
+      p = p.replace(
+        'recordActivity(rating, mode);',
+        'recordActivity(rating, mode, customXp);'
+      );
+
+      // ── P5 : DailyTab – XP différencié par étape (gradeWord + affichage) ──
+      // Remplace le bloc gradeWord + setState + if/else en une seule fois
+      // pour passer customXp à gradeWord ET mettre à jour l'affichage.
+      p = p.replace(
+        /const ns = gradeWord\(state, current\.id, ok \? "good" : "again", mode\);\s+setState\(ns\);\s+if \(ok\) setXpToday\(x=>x\+10\); else setHearts\(h=>h-1\);/,
+        `let _dailyXp = 0;
+    if (ok) {
+      _dailyXp = step === 0 ? 8 : (mode === "prod" ? 15 : 10);
+      const _wp = readP(state, current.id);
+      if ((_wp.wrong||0) > 0 && step > 0) _dailyXp = Math.max(_dailyXp, 20);
+      const _st = wordStatus(state, current);
+      if (_st === "Fragile" && step > 0) _dailyXp = Math.max(_dailyXp, 15);
+      else if (_st === "À revoir" && step > 0) _dailyXp = Math.max(_dailyXp, 12);
+      else if (_st === "Maîtrisé" && step > 0) _dailyXp = 6;
+    }
+    const ns = gradeWord(state, current.id, ok ? "good" : "again", mode, ok ? _dailyXp : 0);
+    setState(ns);
+    if (ok) setXpToday(x => x + _dailyXp); else setHearts(h => h - 1);`
+      );
+
+      // ── P6 : DailyTab – fin de session quand hearts = 0 ───────────────────
+      p = p.replace(
+        '<h2 style={{fontSize:24,fontWeight:700,marginBottom:20,color:C.text}}>Plus de cœurs</h2>',
+        '<h2 style={{fontSize:22,fontWeight:700,marginBottom:10,color:C.text}}>Session terminée</h2><p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>Tes erreurs ont été ajoutées à tes révisions.</p>'
+      );
+      p = p.replace(
+        '<Btn label="Reprendre avec 3 cœurs" variant="primary" onClick={()=>setHearts(3)}/>',
+        `<div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+        <Btn label="Rejouer" variant="primary" onClick={()=>{setHearts(3);setStep(0);setIdx(0);setLog([]);setFeedback(null);setInputVal("");setShown(false);advancingRef.current=false;setSession(buildDailySession(state,words));}}/>
+        <Btn label="Réviser mes erreurs" variant="ghost" onClick={onGoReview}/>
+      </div>`
+      );
+
+      // ── P7 : Injection des nouveaux composants avant function App() ───────
+      const NEW_CODE = `
+// ─── XP HELPERS ──────────────────────────────────────────────────────────────
+function calcXP(state, word, mode) {
+  let xp = mode === "discover" ? 8 : mode === "prod" ? 15 : 10;
+  const wp = readP(state, word.id);
+  if ((wp.wrong||0) > 0) xp = Math.max(xp, 20);
+  else {
+    const st = wordStatus(state, word);
+    if (st === "Fragile") xp = Math.max(xp, 15);
+    else if (st === "À revoir") xp = Math.max(xp, 12);
+    else if (st === "Maîtrisé") xp = 6;
+  }
+  return xp;
+}
+function calcStreakBonus(prev, next) {
+  for (const m of [3, 5, 10]) {
+    if (prev < m && next >= m) return m === 3 ? 5 : m === 5 ? 15 : 40;
+  }
+  return 0;
 }
 
-function hasMeaningfulExample(example) {
-  const text = String(example || "").trim();
-  return text.length > 20 && !isGeneric(text);
+// ─── QUIZ SESSION (cœurs + XP) ────────────────────────────────────────────────
+function QuizSession({words, state, setState, onMilestone, onBack, title, color, filterFn}) {
+  const pool = useMemo(() => {
+    let base = filterFn ? words.filter(filterFn) : words;
+    if (base.length < 4) base = [...base, ...shuffle(words.filter(w => !base.find(b => b.id === w.id))).slice(0, 4 - base.length)];
+    return shuffle(base).slice(0, 20);
+  }, []);
+  const [idx, setIdx] = useState(0);
+  const [hearts, setHearts] = useState(3);
+  const [streak, setStreak] = useState(0);
+  const [xpSession, setXpSession] = useState(0);
+  const [log, setLog] = useState([]);
+  const [done, setDone] = useState(false);
+  const timerRef = useRef(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+  const current = pool[idx];
+  const total = pool.length;
+  const advance = useCallback((ok) => {
+    if (!current) return;
+    const newStreak = ok ? streak + 1 : 0;
+    let xp = 0;
+    if (ok) { xp = calcXP(state, current, "recog"); xp += calcStreakBonus(streak, newStreak); }
+    const newHearts = ok ? hearts : hearts - 1;
+    const ns = gradeWord(state, current.id, ok ? "good" : "again", "recog", xp);
+    setState(ns); setStreak(newStreak);
+    if (!ok) setHearts(newHearts);
+    setXpSession(x => x + xp);
+    const newLog = [...log, {word: current, ok}]; setLog(newLog);
+    const m = checkMilestones(ns, words); if (m) onMilestone(m);
+    if (!ok && newHearts <= 0) return;
+    timerRef.current = setTimeout(() => { if (idx + 1 >= total) setDone(true); else setIdx(i => i + 1); }, ok ? 600 : 0);
+  }, [current, state, setState, streak, hearts, idx, total, words, onMilestone, log]);
+
+  if (hearts <= 0 && !done) return (
+    <div style={{textAlign:"center",padding:"40px 0"}}>
+      <div style={{fontSize:52,marginBottom:12}}>💔</div>
+      <h2 style={{fontSize:22,fontWeight:700,marginBottom:10,color:C.text}}>Session terminée</h2>
+      <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:24}}>Tes erreurs ont été ajoutées à tes révisions.</p>
+      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+        <Btn label="Rejouer" variant="primary" onClick={onBack}/>
+        <Btn label="Retour" variant="ghost" onClick={onBack}/>
+      </div>
+    </div>
+  );
+
+  if (done || !current) {
+    const nOk = log.filter(e => e.ok).length; const nWrong = log.filter(e => !e.ok).length;
+    const perfect = nWrong === 0 && nOk > 0; const totalXp = xpSession + (perfect ? 50 : 0);
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.3s ease"}}>
+        <div style={{textAlign:"center",padding:"24px 0 12px"}}>
+          <div style={{fontSize:52,marginBottom:10}}>{perfect ? "🏆" : "🎉"}</div>
+          <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:6}}>{perfect ? "Session parfaite !" : "Session terminée"}</h2>
+          <p style={{color:C.sub,fontSize:14}}>+{totalXp} XP · {nOk} ✓ · {nWrong} ✗</p>
+          {perfect && <p style={{color:C.orange,fontWeight:700,fontSize:13,marginTop:4}}>+50 XP bonus !</p>}
+        </div>
+        <Btn label="Retour" variant="primary" full onClick={onBack}/>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <div style={{flex:1,background:"rgba(0,0,0,0.08)",borderRadius:99,height:5,overflow:"hidden"}}>
+          <div style={{height:"100%",borderRadius:99,background:color||C.blue,width:(Math.round(idx/Math.max(total,1)*100))+"%",transition:"width 0.3s"}}/>
+        </div>
+        <span style={{fontSize:14,color:C.red,fontWeight:700}}>{"♥".repeat(Math.max(0,hearts))}{"♡".repeat(Math.max(0,3-hearts))}</span>
+        <span style={{fontSize:14,color:C.orange,fontWeight:700}}>+{xpSession}</span>
+      </div>
+      <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>{title} · {idx+1}/{total}</div>
+      <StepChoice key={"qs-"+current.id+"-"+idx} word={current} words={words} mode="termToDefinition" onAnswer={(ok)=>advance(ok)}/>
+    </div>
+  );
 }
 
-function buildExamplePairs(w) {
-  const pairs = [
-    {
-      example: String(w.example_1 || "").trim(),
-      cloze: String(w.example_cloze_1 || "").trim(),
-      type: String(w.example_type_1 || "").trim(),
-      clozeType: String(w.example_cloze_type_1 || "").trim()
-    },
-    {
-      example: String(w.example_2 || "").trim(),
-      cloze: String(w.example_cloze_2 || "").trim(),
-      type: String(w.example_type_2 || "").trim(),
-      clozeType: String(w.example_cloze_type_2 || "").trim()
-    },
-    {
-      // Compatibilité avec les anciens corpus.
-      // Ce fallback reste un vrai exemple, pas une définition transformée.
-      example: String(w.example || "").trim(),
-      cloze: String(w.example_cloze || w.cloze || w.phrase_trouee || "").trim(),
-      type: String(w.example_type || "").trim(),
-      clozeType: String(w.example_cloze_type || "").trim()
+// ─── FLASHCARD SESSION ────────────────────────────────────────────────────────
+function FlashcardSession({words, state, setState, onMilestone, onBack}) {
+  const BATCH = 20;
+  const [batchOffset, setBatchOffset] = useState(0);
+  // Shuffle une seule fois au montage → lots non redondants
+  const shuffledAll = useMemo(() => {
+    const seen = words.filter(w => readP(state, w.id).seen > 0);
+    return shuffle(seen.length ? seen : words);
+  }, []);
+  const pool = useMemo(() => shuffledAll.slice(batchOffset, batchOffset + BATCH), [batchOffset]);
+  const [idx, setIdx] = useState(0);
+  const [shown, setShown] = useState(false);
+  const [batchDone, setBatchDone] = useState(false);
+
+  if (!pool.length) return (
+    <Card style={{textAlign:"center",padding:"40px 24px"}}>
+      <p style={{color:C.sub,marginBottom:16}}>Aucun mot vu. Lance d'abord la routine !</p>
+      <Btn label="Retour" variant="primary" onClick={onBack}/>
+    </Card>
+  );
+
+  const current = pool[idx];
+
+  if (batchDone) {
+    const hasMore = batchOffset + BATCH < shuffledAll.length;
+    return (
+      <div style={{textAlign:"center",padding:"32px 0",display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
+        <div style={{fontSize:48}}>✅</div>
+        <h2 style={{fontSize:20,fontWeight:800,color:C.text}}>Lot de {pool.length} mots revu !</h2>
+        {hasMore ? <Btn label="Continuer avec 20 autres mots" variant="primary" onClick={()=>{setBatchOffset(b=>b+BATCH);setIdx(0);setShown(false);setBatchDone(false);}}/> : <Btn label="Tout revu !" variant="default" disabled/>}
+        <Btn label="Retour" variant="ghost" onClick={onBack}/>
+      </div>
+    );
+  }
+  if (!current) return null;
+  const cx = readP(state, current.id);
+
+  const grade = (rating) => {
+    const xp = rating === "again" ? 0 : rating === "easy" ? 8 : rating === "good" ? 10 : 15;
+    const ns = gradeWord(state, current.id, rating, "recog", xp);
+    setState(ns); const m = checkMilestones(ns, words); if (m) onMilestone(m);
+    setShown(false);
+    if (idx + 1 >= pool.length) setBatchDone(true); else setIdx(i => i + 1);
+  };
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <span style={{fontSize:12,color:C.sub,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8}}>Carte {idx+1}/{pool.length}</span>
+        <div style={{display:"flex",gap:3}}>{pool.map((_,i)=><div key={i} style={{width:16,height:5,borderRadius:99,background:i<idx?C.green:i===idx?C.blue:"rgba(0,0,0,0.1)"}}/>)}</div>
+      </div>
+      <Card>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}><Pill label={current.nature} color={C.purple}/><Pill label={current.theme} color={THEME_COLOR[current.theme]}/></div>
+        <WordTitle>{current.word}</WordTitle>
+        {!shown ? (
+          <><p style={{fontSize:14,color:C.ter,marginBottom:12}}>Retrouve mentalement la définition, puis révèle.</p><ExampleBlock word={current} showLabel={false} fontSize={14}/><Btn label="Révéler la définition" variant="primary" full onClick={()=>setShown(true)}/></>
+        ) : (
+          <>
+            <p style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:6}}>{current.compact}</p>
+            <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:10}}>{current.definition}</p>
+            <ExampleBlock word={current}/><ConfusionBlock word={current} words={words} compact/>
+            <div style={{background:"rgba(0,0,0,0.04)",borderRadius:12,padding:"10px 14px",marginBottom:14}}>
+              <div style={{fontSize:12,color:C.sub,display:"flex",gap:16,marginBottom:6,flexWrap:"wrap"}}><span>Recog. {cx.recog}/6</span><span>Prod. {cx.prod}/6</span><span>{getRate(state,current)}%</span></div>
+              <Bar value={(cx.mastery/6)*100} color={C.blue}/>
+            </div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+              {[["Oublié","again",C.red],["Difficile","hard",C.orange],["Bien","good",C.blue],["Facile","easy",C.green]].map(([l,r,c])=>(
+                <button key={r} onClick={()=>grade(r)} style={{flex:1,minWidth:86,padding:"9px 4px",borderRadius:12,border:"1.5px solid "+c+"30",background:c+"12",color:c,fontWeight:700,fontSize:13,cursor:"pointer"}}>{l}</button>
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ─── LEARN TAB NEW ────────────────────────────────────────────────────────────
+function LearnTabNew({words, state, setState, onMilestone, initialMode=null}) {
+  const [mode, setMode] = useState(initialMode);
+  const seenWords = useMemo(() => words.filter(w => readP(state, w.id).seen > 0), [state, words]);
+  const errorWords = useMemo(() => words.filter(w => (readP(state, w.id).wrong||0) > 0), [state, words]);
+
+  if (mode === "cards") return <FlashcardSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)}/>;
+  if (mode === "quiz-review") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="Quiz de révision" color={C.purple} filterFn={w=>readP(state,w.id).seen>0}/>;
+  if (mode === "quiz-errors") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="Quiz erreurs" color={C.red} filterFn={w=>(readP(state,w.id).wrong||0)>0}/>;
+
+  const card = (col, disabled, onClick, icon, title, desc, badge) => (
+    <button onClick={disabled ? undefined : onClick} style={{textAlign:"left",background:C.solid,border:"1.5px solid "+col+"30",borderRadius:18,padding:"18px 20px",cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.55:1,boxShadow:"0 1px 10px rgba(0,0,0,0.04)",width:"100%"}}>
+      <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+        <span style={{fontSize:26,background:col+"12",color:col,borderRadius:12,width:44,height:44,display:"inline-flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{icon}</span>
+        <div style={{minWidth:0}}>
+          <p style={{fontSize:16,fontWeight:800,color:C.text,margin:"0 0 4px"}}>{title}</p>
+          <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"0 0 6px"}}>{desc}</p>
+          <span style={{fontSize:12,color:col,fontWeight:600}}>{badge}</span>
+        </div>
+      </div>
+    </button>
+  );
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.25s ease"}}>
+      <div style={{marginBottom:4}}>
+        <h2 style={{fontSize:22,fontWeight:800,color:C.text,margin:"0 0 4px",letterSpacing:-0.5}}>Révision</h2>
+        <p style={{fontSize:13,color:C.sub,margin:0}}>{seenWords.length} mots déjà vus · {errorWords.length} avec des erreurs</p>
+      </div>
+      {card(C.purple, false, ()=>setMode("cards"), "📚", "Définitions", "Revois les mots par lot de 20. Retourne la carte pour voir la définition.", seenWords.length+" mots vus disponibles")}
+      {card(C.blue, seenWords.length<4, ()=>setMode("quiz-review"), "⚡", "Quiz de révision", "QCM sur les mots vus au moins une fois. 3 cœurs par session.", seenWords.length>=4 ? seenWords.length+" mots disponibles" : "Il faut au moins 4 mots vus")}
+      {card(C.red, errorWords.length<4, ()=>setMode("quiz-errors"), "🎯", "Quiz erreurs", "QCM sur les mots déjà ratés. 3 cœurs. +20 XP par correction.", errorWords.length>=4 ? errorWords.length+" mots avec erreurs" : errorWords.length+" mots avec erreurs (4 min.)")}
+    </div>
+  );
+}
+
+// ─── QUIZ TAB NEW (cœurs + XP sur quick) ─────────────────────────────────────
+function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeChange}) {
+  if (mode === "nuance") return <NuanceQuiz words={words} state={state} setState={setState} onMilestone={onMilestone} onBackToQuick={()=>onModeChange&&onModeChange("quick")}/>;
+
+  const SIZES = [5,10,15,20];
+  const [maxQ, setMaxQ] = useState(10);
+  const [started, setStarted] = useState(false);
+  const [hearts, setHearts] = useState(3);
+  const [streak, setStreak] = useState(0);
+  const [xpSession, setXpSession] = useState(0);
+  const [count, setCount] = useState(0);
+  const [score, setScore] = useState(0);
+  const [done, setDone] = useState(false);
+  const [w, setW] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const stateRef = useRef(state);
+  const askedRef = useRef(new Set());
+  const timerRef = useRef(null);
+
+  useEffect(() => { stateRef.current = state; }, [state]);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const quiz = useMemo(() => w ? {w, options: shuffle([w,...shuffle(words.filter(x=>x.id!==w.id)).slice(0,3)])} : null, [w, words]);
+
+  const getNext = useCallback(() => {
+    const next = candidates(stateRef.current, words, "smart", 1, askedRef.current)[0];
+    if (next) return next;
+    askedRef.current = new Set();
+    return candidates(stateRef.current, words, "smart", 1)[0];
+  }, [words]);
+
+  const startQuiz = () => {
+    askedRef.current = new Set();
+    setCount(0); setScore(0); setDone(false); setSelected(null);
+    setHearts(3); setStreak(0); setXpSession(0);
+    setW(getNext()); setStarted(true);
+  };
+
+  const moveNext = (nextCount) => {
+    setCount(nextCount);
+    if (nextCount >= maxQ) { setDone(true); setStarted(false); }
+    else { setSelected(null); setW(getNext()); }
+  };
+
+  const handleAnswer = (o) => {
+    if (selected || !w) return;
+    setSelected(o.id);
+    askedRef.current.add(w.id);
+    const ok = o.id === w.id;
+    const newStreak = ok ? streak + 1 : 0;
+    let xp = 0;
+    if (ok) { xp = calcXP(stateRef.current, w, "recog"); xp += calcStreakBonus(streak, newStreak); }
+    const newHearts = ok ? hearts : hearts - 1;
+    const ns = gradeWord(stateRef.current, w.id, ok ? "good" : "again", "recog", xp);
+    stateRef.current = ns; setState(ns); setStreak(newStreak);
+    if (!ok) setHearts(newHearts);
+    setXpSession(x => x + xp);
+    const m = checkMilestones(ns, words); if (m) onMilestone(m);
+    if (ok) setScore(s => s+1);
+    const next = count + 1;
+    if (!ok && newHearts <= 0) return; // hearts=0 screen
+    if (ok) timerRef.current = setTimeout(() => moveNext(next), 650);
+  };
+
+  if (hearts <= 0 && started && !done) return (
+    <div style={{textAlign:"center",padding:"40px 0"}}>
+      <div style={{fontSize:52,marginBottom:12}}>💔</div>
+      <h2 style={{fontSize:22,fontWeight:700,marginBottom:10,color:C.text}}>Session terminée</h2>
+      <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:24}}>Tes erreurs ont été ajoutées à tes révisions.</p>
+      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+        <Btn label="Rejouer" variant="primary" onClick={startQuiz}/>
+        <Btn label="Changer le nombre" variant="ghost" onClick={()=>{setStarted(false);setDone(false);}}/>
+      </div>
+    </div>
+  );
+
+  if (!started && !done) return (
+    <Card style={{textAlign:"center",padding:"36px 24px"}}>
+      <div style={{fontSize:48,marginBottom:14}}>⚡️</div>
+      <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:8}}>Quiz rapide</h2>
+      <p style={{fontSize:14,color:C.sub,marginBottom:24,lineHeight:1.6}}>3 cœurs par session. Bonne réponse = +XP.</p>
+      <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:28,flexWrap:"wrap"}}>
+        {SIZES.map(n=><button key={n} onClick={()=>setMaxQ(n)} style={{padding:"10px 22px",borderRadius:14,fontWeight:700,fontSize:15,border:"2px solid "+(maxQ===n?C.blue:C.border),background:maxQ===n?C.blue+"14":C.solid,color:maxQ===n?C.blue:C.sub,cursor:"pointer"}}>{n}</button>)}
+      </div>
+      <Btn label={"Démarrer — "+maxQ+" questions"} variant="primary" onClick={startQuiz}/>
+    </Card>
+  );
+
+  if (done) {
+    const perfect = score === maxQ; const totalXp = xpSession + (perfect ? 50 : 0);
+    return (
+      <Card style={{textAlign:"center",padding:"36px 24px"}}>
+        <div style={{fontSize:56,marginBottom:12}}>{perfect?"🏆":score>=maxQ*0.8?"👍":"💪"}</div>
+        <h2 style={{fontSize:24,fontWeight:800,color:C.text,marginBottom:8}}>{score} / {maxQ}</h2>
+        <p style={{fontSize:15,color:C.sub,marginBottom:8}}>+{totalXp} XP{perfect?" · Session parfaite !":""}</p>
+        <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap",marginTop:16}}>
+          <Btn label="Rejouer" variant="primary" onClick={startQuiz}/>
+          <Btn label="Changer le nombre" variant="ghost" onClick={()=>{setDone(false);setStarted(false);}}/>
+        </div>
+      </Card>
+    );
+  }
+
+  if (!w || !quiz) return <div style={{color:C.sub,textAlign:"center",padding:48}}>Chargement…</div>;
+  const wrong = selected && selected !== w.id;
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:12}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{flex:1}}><Bar value={(count/maxQ)*100} color={C.blue}/></div>
+        <span style={{fontSize:13,color:C.sub,fontWeight:600}}>{count+1}/{maxQ}</span>
+        <span style={{fontSize:13,color:C.red,fontWeight:700}}>{"♥".repeat(Math.max(0,hearts))}{"♡".repeat(Math.max(0,3-hearts))}</span>
+        <span style={{fontSize:13,color:C.orange,fontWeight:700}}>+{xpSession}</span>
+      </div>
+      <Card>
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}><Pill label={w.nature} color={C.purple}/><Pill label={w.theme} color={THEME_COLOR[w.theme]}/></div>
+        <WordTitle>{w.word}</WordTitle>
+        <div className="choice-grid">
+          {quiz.options.map(o => {
+            let bg=C.solid,border=C.border,color=C.text,weight=500;
+            if (selected) { if(o.id===w.id){bg=C.green+"22";border=C.green;weight=700;} else if(o.id===selected){bg=C.red+"18";border=C.red;color=C.sub;} else color=C.ter; }
+            return <button key={o.id} onClick={()=>handleAnswer(o)} disabled={!!selected} style={{padding:"13px 12px",borderRadius:14,border:"1.5px solid "+border,background:bg,textAlign:"left",cursor:selected?"default":"pointer",fontSize:13,fontWeight:weight,color,lineHeight:1.45,transition:"all 0.25s"}}>{o.compact}{o.id===w.id&&selected?" ✓":""}</button>;
+          })}
+        </div>
+        {wrong && (
+          <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
+            <ExampleBlock word={w}/>
+            <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}>{w.definition}</p>
+            <Btn label="J'ai compris" variant="primary" full onClick={()=>moveNext(count+1)}/>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+`;
+      p = p.replace('function App() {', NEW_CODE + 'function App() {');
+
+      // ── P8 : Remplace LearnTab par LearnTabNew dans le rendu App ──────────
+      p = p.replace(
+        /\{tab==="learn"\s+&&\s+<LearnTab[\s\S]*?\/>\}/,
+        '{tab==="learn"   && <LearnTabNew words={words} state={state} setState={setState} onMilestone={setMilestone} initialMode={learnMode}/>}'
+      );
+
+      // ── P9 : Remplace QuizTab par QuizTabNew dans le rendu App ─────────────
+      p = p.replace(
+        /\{tab==="quiz"\s+&&\s+<QuizTab[\s\S]*?\/>\}/,
+        '{tab==="quiz"    && <QuizTabNew  key={"quiz-"+quizMode} words={words} state={state} setState={setState} onMilestone={setMilestone} mode={quizMode} onModeChange={setQuizMode}/>}'
+      );
+
+      // ── P10 : startReview mappe les modes Dashboard → modes LearnTabNew ──
+      p = p.replace(
+        'const startReview = (mode="smart") => { setLearnMode(mode); setTab("learn"); };',
+        'const startReview = (mode="smart") => { const m={"smart":null,"fragile":"quiz-errors","due":"quiz-review"}; setLearnMode(m[mode]!==undefined?m[mode]:null); setTab("learn"); };'
+      );
+
+      return p;
     }
-  ];
 
-  const seen = new Set();
-
-  return pairs
-    .filter(item => hasMeaningfulExample(item.example))
-    .filter(item => {
-      const key = norm(item.example);
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-}`
-      );
-
-      patched = patched.replace(
-        /const rawExamples = \[[\s\S]*?\]\.filter\(item => item\.example && item\.example\.length > 20 && !isGeneric\(item\.example\)\);\s*const fallbackExample = String\(w\.example \|\| ""\)\.trim\(\);\s*const examples = rawExamples\.length[\s\S]*?const hasGoodExample = rawExamples\.length > 0 \|\| \(fallbackExample\.length > 20 && !isGeneric\(fallbackExample\)\);/,
-        `const examples = buildExamplePairs(w);
-
-const hasGoodExample = examples.length > 0;`
-      );
-
-      patched = patched.replace(
-        /example: examples\[0\]\?\.example \|\| makeContextSentence\(\{ word: w\.word, compact \}\),/g,
-        `example: examples[0]?.example || "",`
-      );
-
-      return patched;
-    }
-
-    function showError(message) {
+    function showError(msg) {
       const el = document.getElementById("error");
-      if (!el) return;
-      el.hidden = false;
-      el.textContent = message;
+      if (!el) return; el.hidden = false; el.textContent = msg;
     }
 
     async function boot() {
       try {
-        const response = await fetch(APP_SOURCE_URL, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error("Impossible de charger l'application source : HTTP " + response.status);
-        }
-
-        const sourceHtml = await response.text();
-        const patchedHtml = patchAppHtml(sourceHtml);
-
-        if (!patchedHtml.includes("buildExamplePairs")) {
-          throw new Error("La correction des exemples n'a pas pu être injectée.");
-        }
-
-        document.open();
-        document.write(patchedHtml);
-        document.close();
-      } catch (error) {
-        console.error(error);
-        showError(
-          "Erreur de chargement de l'application.\n\n" +
-          String(error && error.message ? error.message : error)
-        );
+        const r = await fetch(APP_SOURCE_URL, { cache: "no-store" });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        const src = await r.text();
+        const patched = patchAppHtml(src);
+        if (!patched.includes("QuizTabNew")) throw new Error("Patch QuizTabNew non appliqué.");
+        if (!patched.includes("LearnTabNew")) throw new Error("Patch LearnTabNew non appliqué.");
+        if (!patched.includes("calcXP")) throw new Error("Patch XP non appliqué.");
+        document.open(); document.write(patched); document.close();
+      } catch(e) {
+        showError("Erreur de chargement.\n\n" + String(e && e.message ? e.message : e));
       }
     }
 
