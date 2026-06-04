@@ -449,6 +449,15 @@ function validateVocabArray(arr) {
   return null;
 }
 
+function extractProfilePayload(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+  const payload = data.profileData && typeof data.profileData === "object" ? data.profileData : data;
+  if (!payload || typeof payload !== "object") return null;
+  if (payload.progress && payload.meta) return payload;
+  if (payload.profileData && payload.profileData.progress && payload.profileData.meta) return payload.profileData;
+  return null;
+}
+
 function uniqueById(arr) {
   return [...new Map(arr.map(w => [w.id, w])).values()];
 }
@@ -1270,6 +1279,10 @@ function ImportModal({open, onClose, onImport, currentCount}) {
   const handleImport = () => {
     try {
       const parsed = JSON.parse(text);
+      if (extractProfilePayload(parsed)) {
+        setFeedback({type:"error",msg:"Ce fichier est un profil de progression. Utilise plutot Stats -> Importer profil."});
+        return;
+      }
       const error = validateVocabArray(parsed);
       if (error) { setFeedback({type:"error",msg:error}); return; }
       const ok = saveCustomWords(parsed);
@@ -1325,7 +1338,7 @@ function SyncModal({open,onClose,onImportProgress}) {
   const handleImport = () => {
     try {
       const parsed = JSON.parse(text);
-      if (!parsed.progress || !parsed.meta) { setFeedback({type:"error",msg:"Fichier invalide."}); return; }
+      if (!extractProfilePayload(parsed)) { setFeedback({type:"error",msg:"Fichier de profil invalide : progression ou metadonnees introuvables."}); return; }
       onImportProgress(parsed);
       setFeedback({type:"ok",msg:"Profil importé."});
       setTimeout(()=>{ onClose(); setText(""); setFeedback(null); }, 500);
