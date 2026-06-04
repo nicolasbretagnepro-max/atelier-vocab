@@ -166,7 +166,7 @@ function shuffle(a) {
 }
 
 function placeAnswerAt(answer, distractors, index) {
-  const options = shuffle(distractors).slice(0, 3);
+  const options = (distractors || []).slice(0, 3);
   const safeIndex = Math.max(0, Math.min(3, index || 0));
   options.splice(safeIndex, 0, answer);
   return options;
@@ -313,6 +313,43 @@ function getConfusionItems(word, words, limit = 3) {
     .filter(Boolean);
   if (explicit.length) return explicit.slice(0, limit);
   return inferredConfusions(word, words, limit);
+}
+
+function uniqueWordOptions(items) {
+  const seen = new Set();
+  return (items || []).filter(item => {
+    if (!item || !item.id) return false;
+    const key = item.id || norm(item.word);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function smartDistractors(answer, words, limit = 3) {
+  const pool = (words || []).filter(w => w && w.id !== answer.id);
+  const confusionLabels = getConfusionItems(answer, words || [], 8).map(item => norm(item.word));
+  const scored = pool.map(w => {
+    const sameTheme = w.theme && answer.theme && w.theme === answer.theme;
+    const sameNature = w.nature && answer.nature && w.nature === answer.nature;
+    const explicitConfusion = confusionLabels.includes(norm(w.word));
+    const overlap = lexicalOverlap(answer, w);
+    const levelGap = Math.abs((parseInt(w.level, 10) || 0) - (parseInt(answer.level, 10) || 0));
+    let score = 0;
+    if (explicitConfusion) score += 100;
+    if (sameTheme) score += 35;
+    if (sameNature) score += 18;
+    score += overlap * 25;
+    score -= Math.min(levelGap, 3) * 2;
+    score += Math.random() * 4;
+    return { w, score };
+  });
+  const strong = scored
+    .filter(x => x.score >= 18)
+    .sort((a,b)=>b.score-a.score)
+    .map(x=>x.w);
+  const fallback = shuffle(pool);
+  return uniqueWordOptions([...strong, ...fallback]).slice(0, limit);
 }
 
 function inferFigureFamily(w) {
@@ -477,6 +514,21 @@ function getExampleText(word, cloze = false) {
   cloze: picked.cloze || word.cloze || ""
  });
 }
+
+function textContainsAnswer(text, word) {
+  const normalizedText = norm(text);
+  if (!normalizedText) return false;
+  return acceptedAnswers(word)
+    .filter(answer => answer.length >= 3)
+    .some(answer => new RegExp(`(^| )${escapeRegExp(answer)}( |$)`).test(normalizedText));
+}
+
+function getReviewExamplePrompt(word) {
+  const prompt = getExampleText(word, true);
+  if (!textContainsAnswer(prompt, word)) return prompt;
+  return blankSentence({ ...word, example: prompt, cloze: "" });
+}
+
 function blankSentence(w) {
   if (w.cloze && String(w.cloze).includes("________")) return w.cloze;
   if (w.cloze && String(w.cloze).includes("[…]")) return w.cloze;
@@ -1711,7 +1763,7 @@ function StepChoice({word,words,mode,onAnswer}) {
   }, []);
 
   const pool = useMemo(
-    ()=>shuffle(words.filter(x=>x.id!==word.id)).slice(0,3),
+    ()=>smartDistractors(word, words, 3),
     [word.id, words]
   );
   const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
@@ -1787,15 +1839,17 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
   const answerIndex = pattern[questionIndex % pattern.length];
   const mode = ["definition", "example", "term"][questionIndex % 3];
   const options = useMemo(
-    ()=>placeAnswerAt(word, words.filter(x=>x.id!==word.id), answerIndex),
+    ()=>placeAnswerAt(word, smartDistractors(word, words, 3), answerIndex),
     [word.id, words, answerIndex]
   );
-  const prompt = mode === "definition"
-    ? (word.compact || word.definition)
-    : mode === "example"
-      ? getExampleText(word, false)
-      : word.word;
-  const label = mode === "definition" ? "Définition → mot" : mode === "example" ? "Exemple → mot" : "Mot → définition";
+  const prompt = useMemo(() => (
+    mode === "definition"
+      ? (word.compact || word.definition)
+      : mode === "example"
+        ? getReviewExamplePrompt(word)
+        : word.word
+  ), [mode, word.id]);
+  const label = mode === "definition" ? "Définition → mot" : mode === "example" ? "Exemple masqué → mot" : "Mot → définition";
   const helper = mode === "term" ? "Quelle définition correspond à ce mot ?" : "Quel mot correspond à cet indice ?";
   const renderOption = (o) => mode === "term" ? o.compact : o.word;
 
@@ -1851,7 +1905,7 @@ function StepContext({word,words,onAnswer}) {
   }, []);
 
   const pool = useMemo(
-    ()=>shuffle(words.filter(x=>x.id!==word.id)).slice(0,3),
+    ()=>smartDistractors(word, words, 3),
     [word.id, words]
   );
   const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
@@ -2112,7 +2166,7 @@ function FigureDetail({figure, figures, state, onBack}) {
 }
 
 function buildFigureQuestion(figure, figures, mode) {
-  const pool = shuffle(figures.filter(f => f.id !== figure.id)).slice(0, 3);
+  const pool = smartDistractors(figure, figures, 3);
   const options = shuffle([figure, ...pool]);
   if (mode === "definition") {
     return {
@@ -2711,11 +2765,17 @@ function calcStreakBonus(prev, next) {
 
 // ─── QUIZ SESSION (cœurs + XP) ────────────────────────────────────────────────
 function QuizSession({words, state, setState, onMilestone, onBack, title, color, filterFn}) {
-  const pool = useMemo(() => {
-    let base = filterFn ? words.filter(filterFn) : words;
-    if (base.length < 4) base = [...base, ...shuffle(words.filter(w => !base.find(b => b.id === w.id))).slice(0, 4 - base.length)];
-    return shuffle(base).slice(0, 20);
-  }, []);
+  const SIZES = [5,10,15,20];
+  const availableWords = useMemo(() => {
+    const base = filterFn ? words.filter(filterFn) : words;
+    return base.length ? base : words;
+  }, [words, state, filterFn]);
+  const availableCount = availableWords.length;
+  const enabledSizes = SIZES.filter(n => availableCount >= n);
+  const defaultSize = enabledSizes.includes(10) ? 10 : (enabledSizes[0] || 5);
+  const [maxQ, setMaxQ] = useState(defaultSize);
+  const [started, setStarted] = useState(false);
+  const [pool, setPool] = useState([]);
   const [idx, setIdx] = useState(0);
   const [hearts, setHearts] = useState(3);
   const [streak, setStreak] = useState(0);
@@ -2727,10 +2787,20 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const current = pool[idx];
   const total = pool.length;
-  const restartSession = useCallback(() => {
+  const resetSession = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setIdx(0); setHearts(3); setStreak(0); setXpSession(0); setLog([]); setDone(false); setBonusAwarded(false);
   }, []);
+  const startSession = useCallback(() => {
+    resetSession();
+    setPool(shuffle(availableWords).slice(0, maxQ));
+    setStarted(true);
+  }, [availableWords, maxQ, resetSession]);
+  const restartSession = useCallback(() => {
+    resetSession();
+    setPool(shuffle(availableWords).slice(0, maxQ));
+    setStarted(true);
+  }, [availableWords, maxQ, resetSession]);
   const perfectSession = done && log.length > 0 && log.every(e => e.ok);
   useEffect(() => {
     if (!perfectSession || bonusAwarded) return;
@@ -2755,6 +2825,37 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
     if (!ok && newHearts <= 0) return;
     timerRef.current = setTimeout(() => { if (idx + 1 >= total) setDone(true); else setIdx(i => i + 1); }, ok ? 600 : 0);
   }, [current, state, setState, streak, hearts, idx, total, words, onMilestone, log]);
+
+  if (!started) return (
+    <Card style={{display:"flex",flexDirection:"column",gap:16,animation:"fadeSlideIn 0.25s ease"}}>
+      <div>
+        <button onClick={onBack} style={{background:"none",border:"none",color:C.blue,fontSize:14,cursor:"pointer",padding:0,marginBottom:12,fontWeight:650}}>← Retour</button>
+        <h2 style={{fontSize:22,fontWeight:850,color:C.text,margin:"0 0 6px"}}>{title}</h2>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.55,margin:0}}>
+          Choisis la durée de ta session selon le temps disponible. Les mots sont tirés parmi ceux disponibles pour ce mode.
+        </p>
+      </div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        {SIZES.map(n => {
+          const disabled = availableCount < n;
+          return (
+            <button key={n} onClick={()=>!disabled&&setMaxQ(n)} disabled={disabled} style={{
+              padding:"10px 20px",borderRadius:14,fontWeight:750,fontSize:15,
+              border:`2px solid ${maxQ===n?color||C.blue:C.border}`,
+              background:maxQ===n?`${color||C.blue}14`:C.solid,
+              color:disabled?C.ter:maxQ===n?color||C.blue:C.sub,
+              cursor:disabled?"not-allowed":"pointer",
+              opacity:disabled?0.5:1
+            }}>{n}</button>
+          );
+        })}
+      </div>
+      <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:0}}>
+        {availableCount >= 5 ? `${availableCount} mots disponibles pour ce quiz.` : `Il faut au moins 5 mots disponibles. Actuellement : ${availableCount}.`}
+      </p>
+      <Btn label={`Démarrer — ${maxQ} mots`} variant="primary" onClick={startSession} disabled={availableCount < 5}/>
+    </Card>
+  );
 
   if (hearts <= 0 && !done) return (
     <div style={{textAlign:"center",padding:"40px 0"}}>
@@ -2906,8 +3007,8 @@ function LearnTabNew({words, state, setState, onMilestone, initialMode=null}) {
         <p style={{fontSize:13,color:C.sub,margin:0}}>{seenWords.length} mots déjà vus · {errorWords.length} avec des erreurs</p>
       </div>
       {card(C.purple, false, ()=>setMode("cards"), "📚", "Définitions", "Revois les mots par lot de 20. Retourne la carte pour voir la définition.", seenWords.length+" mots vus disponibles")}
-      {card(C.blue, seenWords.length<4, ()=>setMode("quiz-review"), "⚡", "Quiz de révision", "QCM sur les mots vus au moins une fois. 3 cœurs par session.", seenWords.length>=4 ? seenWords.length+" mots disponibles" : "Il faut au moins 4 mots vus")}
-      {card(C.red, errorWords.length<4, ()=>setMode("quiz-errors"), "🎯", "Quiz erreurs", "QCM sur les mots déjà ratés. 3 cœurs. +20 XP par correction.", errorWords.length>=4 ? errorWords.length+" mots avec erreurs" : errorWords.length+" mots avec erreurs (4 min.)")}
+      {card(C.blue, seenWords.length<5, ()=>setMode("quiz-review"), "⚡", "Quiz de révision", "QCM sur les mots vus au moins une fois. Sessions de 5, 10, 15 ou 20 mots.", seenWords.length>=5 ? seenWords.length+" mots disponibles" : "Il faut au moins 5 mots vus")}
+      {card(C.red, errorWords.length<5, ()=>setMode("quiz-errors"), "🎯", "Quiz erreurs", "QCM sur les mots déjà ratés. Sessions de 5, 10, 15 ou 20 mots.", errorWords.length>=5 ? errorWords.length+" mots avec erreurs" : errorWords.length+" mots avec erreurs (5 min.)")}
     </div>
   );
 }
@@ -2945,7 +3046,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
     setBonusAwarded(true);
   }, [perfectSession, bonusAwarded, setState, words, onMilestone]);
 
-  const quiz = useMemo(() => w ? {w, options: shuffle([w,...shuffle(words.filter(x=>x.id!==w.id)).slice(0,3)])} : null, [w, words]);
+  const quiz = useMemo(() => w ? {w, options: shuffle([w,...smartDistractors(w, words, 3)])} : null, [w, words]);
 
   const getNext = useCallback(() => {
     const next = candidates(stateRef.current, words, "smart", 1, askedRef.current)[0];
