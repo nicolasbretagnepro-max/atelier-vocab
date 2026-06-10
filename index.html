@@ -1669,12 +1669,12 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     const ns = gradeWord(state, current.id, ok ? "good" : "again", mode, ok ? _dailyXp : 0);
     setState(ns);
     setSessionStreak(newStreak);
-    if (ok) setXpToday(x => x + _dailyXp); else setHearts(h => h - 1);
+    if (ok) { haptic("correct"); setXpToday(x => x + _dailyXp); } else { haptic("wrong"); setHearts(h => h - 1); }
     setLog(l=>[...l,{word:current,ok}]);
     setFeedback(ok?"correct":"wrong");
 
     const m = checkMilestones(ns, words);
-    if (m) onMilestone(m);
+    if (m) { haptic("milestone"); onMilestone(m); }
 
     timerRef.current = setTimeout(() => {
       setFeedback(null); setShown(false); setInputVal("");
@@ -1850,6 +1850,7 @@ function StepChoice({word,words,mode,onAnswer}) {
     if (selected) return;
     setSelected(o.id);
     const ok = o.id === word.id;
+    haptic(ok ? "correct" : "wrong");
     if (ok) timerRef.current = setTimeout(()=>onAnswer(true), 650);
   };
 
@@ -1935,6 +1936,7 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
     if (selected) return;
     setSelected(o.id);
     const ok = o.id === word.id;
+    haptic(ok ? "correct" : "wrong");
     if (ok) timerRef.current = setTimeout(()=>onAnswer(true), 650);
   };
 
@@ -2001,6 +2003,7 @@ function StepContext({word,words,onAnswer,exampleIndex=0}) {
     if (selected) return;
     setSelected(o.id);
     const ok = o.id === word.id;
+    haptic(ok ? "correct" : "wrong");
     if (ok) timerRef.current = setTimeout(()=>onAnswer(true),650);
   };
 
@@ -2064,6 +2067,7 @@ function StepProd({word,inputVal,setInputVal,onAnswer,exampleIndex=1}) {
   const submit = () => {
     if (result) return;
     const ok = answerMatches(inputVal, word);
+    haptic(ok ? "correct" : "wrong");
     if (ok) {
       setResult("ok");
       timerRef.current = setTimeout(()=>onAnswer(true), 650);
@@ -2679,9 +2683,9 @@ function FiguresTab({figures,state,setState,onMilestone,onReloadFigures,figuresS
 }
 
 // ─── LIBRARY TAB ──────────────────────────────────────────────────────────────
-function LibraryTab({words,state}) {
-  const [query,setQuery] = useState("");
-  const [filter,setFilter] = useState("Tous");
+function LibraryTab({words, state, initialFilter="Tous"}) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState(initialFilter);
   const [selected,setSelected] = useState(null);
 
   const themes = useMemo(()=>["Tous","Nouveau","À revoir","Maîtrisé","Fragile",...Array.from(new Set(words.map(w=>w.theme))).sort()],[words]);
@@ -2744,7 +2748,7 @@ function LibraryTab({words,state}) {
 }
 
 // ─── STATS TAB ────────────────────────────────────────────────────────────────
-function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,onReloadRemote,canReloadRemote,onReloadFigures,canReloadFigures,onOpenSources,extraSources=[],duplicateCount=0,sourcesStatus}) {
+function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,onReloadRemote,canReloadRemote,onReloadFigures,canReloadFigures,onOpenSources,extraSources=[],duplicateCount=0,sourcesStatus,onNavigateLibrary}) {
   const total = words.length;
   const mastered = words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
   const dueN = words.filter(w=>isDue(state,w)).length;
@@ -2753,6 +2757,7 @@ function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,o
   const figureTotal = figures.length;
   const figureSeen = figures.filter(w=>readP(state,w.id).seen>0).length;
   const figureMastered = figures.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
+  const newCount = words.filter(w=>!readP(state,w.id).seen).length;
 
   const themeStats = useMemo(()=>{
     const map = {};
@@ -2764,23 +2769,44 @@ function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,o
     return Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
   },[words,state]);
 
-  const StatCard = ({icon,label,value,color,sub}) => (
-    <div style={{background:C.surface,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,padding:"14px 16px",boxShadow:"0 1px 8px rgba(0,0,0,0.05)"}}>
-      <div style={{fontSize:20,marginBottom:4}}>{icon}</div>
-      <div style={{fontSize:24,fontWeight:800,color:color||C.text,fontVariantNumeric:"tabular-nums"}}>{value}</div>
-      <div style={{fontSize:12,color:C.sub,marginTop:2,fontWeight:500}}>{label}</div>
-      {sub&&<div style={{fontSize:11,color:C.ter,marginTop:2,lineHeight:1.4}}>{sub}</div>}
-    </div>
-  );
+  // Tuile de stat cliquable si onNavigateLibrary est fourni et filterKey est défini
+  const StatCard = ({icon,label,value,color,sub,filterKey}) => {
+    const clickable = !!onNavigateLibrary && !!filterKey;
+    return (
+      <div
+        onClick={clickable ? ()=>onNavigateLibrary(filterKey) : undefined}
+        title={clickable ? `Voir les mots : ${label}` : undefined}
+        style={{
+          background:C.surface,backdropFilter:"blur(20px)",border:`1px solid ${clickable?"transparent":C.border}`,
+          borderRadius:18,padding:"14px 16px",boxShadow:"0 1px 8px rgba(0,0,0,0.05)",
+          cursor:clickable?"pointer":"default",
+          transition:"box-shadow 0.18s, border-color 0.18s",
+          outline:"none",
+          ...(clickable ? {border:`1.5px solid ${color}30`} : {})
+        }}
+        onMouseEnter={e=>{ if(clickable){ e.currentTarget.style.boxShadow=`0 4px 18px ${color}28`; e.currentTarget.style.borderColor=`${color}70`; }}}
+        onMouseLeave={e=>{ if(clickable){ e.currentTarget.style.boxShadow="0 1px 8px rgba(0,0,0,0.05)"; e.currentTarget.style.borderColor=`${color}30`; }}}
+      >
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div style={{fontSize:20,marginBottom:4}}>{icon}</div>
+          {clickable && <span style={{fontSize:10,color,fontWeight:700,opacity:0.7,letterSpacing:0.5}}>VOIR →</span>}
+        </div>
+        <div style={{fontSize:24,fontWeight:800,color:color||C.text,fontVariantNumeric:"tabular-nums"}}>{value}</div>
+        <div style={{fontSize:12,color:C.sub,marginTop:2,fontWeight:500}}>{label}</div>
+        {sub&&<div style={{fontSize:11,color:C.ter,marginTop:2,lineHeight:1.4}}>{sub}</div>}
+      </div>
+    );
+  };
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <div className="stats-grid">
-        <StatCard icon="📖" label="Total" value={total} color={C.blue}/>
-        <StatCard icon="✅" label="Maîtrisés" value={mastered} color={C.green} sub="mastery≥5, prod≥2"/>
-        <StatCard icon="🔄" label="À revoir" value={dueN} color={C.red}/>
-        <StatCard icon="⚠️" label="Fragiles" value={fragile} color={C.orange} sub="≥2 erreurs, taux<70%"/>
-        <StatCard icon="👁" label="Vus" value={seen} color={C.purple}/>
+        <StatCard icon="📖" label="Total" value={total} color={C.blue} filterKey="Tous"/>
+        <StatCard icon="✅" label="Maîtrisés" value={mastered} color={C.green} sub="mastery≥5, prod≥2" filterKey="Maîtrisé"/>
+        <StatCard icon="🔄" label="À revoir" value={dueN} color={C.red} filterKey="À revoir"/>
+        <StatCard icon="⚠️" label="Fragiles" value={fragile} color={C.orange} sub="≥2 erreurs, taux<70%" filterKey="Fragile"/>
+        <StatCard icon="👁" label="Vus" value={seen} color={C.purple} filterKey="En cours"/>
+        <StatCard icon="✨" label="Nouveaux" value={newCount} color={C.blue} filterKey="Nouveau"/>
         <StatCard icon="🔥" label="Série" value={`${state.meta.streak||0}j`} color={C.orange}/>
         <StatCard icon="✒️" label="Figures" value={figureTotal} color={C.indigo} sub={`${figureSeen} vues · ${figureMastered} maîtrisées`}/>
       </div>
@@ -2864,6 +2890,18 @@ function calcStreakBonus(prev, next) {
   return 0;
 }
 
+// ─── HAPTIC FEEDBACK ──────────────────────────────────────────────────────────
+// Vibration légère sur bonne réponse, double impulsion sur erreur.
+// Silencieux si navigator.vibrate n'est pas supporté (iOS, desktop).
+function haptic(type) {
+  if (!navigator || !navigator.vibrate) return;
+  try {
+    if (type === "correct") navigator.vibrate(40);
+    else if (type === "wrong") navigator.vibrate([60, 40, 60]);
+    else if (type === "milestone") navigator.vibrate([30, 20, 30, 20, 80]);
+  } catch {}
+}
+
 // ─── QUIZ SESSION (cœurs + XP) ────────────────────────────────────────────────
 function QuizSession({words, state, setState, onMilestone, onBack, title, color, filterFn}) {
   const SIZES = [5,10,15,20];
@@ -2913,6 +2951,7 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
   }, [perfectSession, bonusAwarded, state, setState, words, onMilestone]);
   const advance = useCallback((ok) => {
     if (!current) return;
+    haptic(ok ? "correct" : "wrong");
     const newStreak = ok ? streak + 1 : 0;
     let xp = 0;
     if (ok) { xp = calcXP(state, current, "recog"); xp += calcStreakBonus(streak, newStreak); }
@@ -3003,17 +3042,62 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
 
 // ─── FLASHCARD SESSION ────────────────────────────────────────────────────────
 function FlashcardSession({words, state, setState, onMilestone, onBack}) {
-  const BATCH = 20;
+  const SIZES = [5, 10, 15, 20];
+  const [maxQ, setMaxQ] = useState(null);
   const [batchOffset, setBatchOffset] = useState(0);
-  // Shuffle une seule fois au montage → lots non redondants
+
   const shuffledAll = useMemo(() => {
     const seen = words.filter(w => readP(state, w.id).seen > 0);
     return shuffle(seen.length ? seen : words);
-  }, []);
-  const pool = useMemo(() => shuffledAll.slice(batchOffset, batchOffset + BATCH), [batchOffset]);
+  }, [maxQ]);
+
+  const pool = useMemo(() => {
+    if (!maxQ) return [];
+    return shuffledAll.slice(batchOffset, batchOffset + maxQ);
+  }, [shuffledAll, batchOffset, maxQ]);
+
   const [idx, setIdx] = useState(0);
   const [shown, setShown] = useState(false);
   const [batchDone, setBatchDone] = useState(false);
+
+  const availableCount = useMemo(() => {
+    const seen = words.filter(w => readP(state, w.id).seen > 0);
+    return (seen.length ? seen : words).length;
+  }, [words, state]);
+
+  const startSession = (size) => { setMaxQ(size); setBatchOffset(0); setIdx(0); setShown(false); setBatchDone(false); };
+
+  if (!maxQ) {
+    return (
+      <Card style={{display:"flex",flexDirection:"column",gap:18,animation:"fadeSlideIn 0.25s ease"}}>
+        <div>
+          <button onClick={onBack} style={{background:"none",border:"none",color:C.blue,fontSize:14,cursor:"pointer",padding:0,marginBottom:12,fontWeight:650}}>← Retour</button>
+          <h2 style={{fontSize:22,fontWeight:850,color:C.text,margin:"0 0 6px"}}>Révision Définitions</h2>
+          <p style={{fontSize:14,color:C.sub,lineHeight:1.55,margin:"0 0 16px"}}>
+            Retourne les cartes, rappelle la définition mentalement, puis auto-évalue. Choisis le nombre de mots.
+          </p>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {SIZES.map(n => {
+            const disabled = availableCount < n;
+            return (
+              <button key={n} onClick={()=>!disabled&&startSession(n)} disabled={disabled} style={{
+                padding:"10px 22px",borderRadius:14,fontWeight:750,fontSize:15,
+                border:"2px solid "+(disabled?C.border:C.purple),
+                background:disabled?C.solid:`${C.purple}10`,
+                color:disabled?C.ter:C.purple,
+                cursor:disabled?"not-allowed":"pointer",
+                opacity:disabled?0.5:1
+              }}>{n}</button>
+            );
+          })}
+        </div>
+        <p style={{fontSize:13,color:C.sub,margin:0}}>
+          {availableCount} mots disponibles (vus au moins une fois).
+        </p>
+      </Card>
+    );
+  }
 
   if (!pool.length) return (
     <Card style={{textAlign:"center",padding:"40px 24px"}}>
@@ -3025,12 +3109,13 @@ function FlashcardSession({words, state, setState, onMilestone, onBack}) {
   const current = pool[idx];
 
   if (batchDone) {
-    const hasMore = batchOffset + BATCH < shuffledAll.length;
+    const hasMore = batchOffset + maxQ < shuffledAll.length;
     return (
       <div style={{textAlign:"center",padding:"32px 0",display:"flex",flexDirection:"column",gap:14,alignItems:"center"}}>
         <div style={{fontSize:48}}>✅</div>
         <h2 style={{fontSize:20,fontWeight:800,color:C.text}}>Lot de {pool.length} mots revu !</h2>
-        {hasMore ? <Btn label="Continuer avec 20 autres mots" variant="primary" onClick={()=>{setBatchOffset(b=>b+BATCH);setIdx(0);setShown(false);setBatchDone(false);}}/> : <Btn label="Tout revu !" variant="default" disabled/>}
+        {hasMore ? <Btn label="Continuer avec d'autres mots" variant="primary" onClick={()=>{setBatchOffset(b=>b+maxQ);setIdx(0);setShown(false);setBatchDone(false);}}/> : <Btn label="Tout revu !" variant="default" disabled/>}
+        <Btn label="Changer le nombre" variant="ghost" onClick={()=>setMaxQ(null)}/>
         <Btn label="Retour" variant="ghost" onClick={onBack}/>
       </div>
     );
@@ -3039,6 +3124,7 @@ function FlashcardSession({words, state, setState, onMilestone, onBack}) {
   const cx = readP(state, current.id);
 
   const grade = (rating) => {
+    haptic(rating === "again" ? "wrong" : "correct");
     const xp = rating === "again" ? 0 : rating === "easy" ? 8 : rating === "good" ? 10 : 15;
     const ns = gradeWord(state, current.id, rating, "recog", xp);
     setState(ns); const m = checkMilestones(ns, words); if (m) onMilestone(m);
@@ -3174,6 +3260,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
     setSelected(o.id);
     askedRef.current.add(w.id);
     const ok = o.id === w.id;
+    haptic(ok ? "correct" : "wrong");
     const newStreak = ok ? streak + 1 : 0;
     let xp = 0;
     if (ok) { xp = calcXP(stateRef.current, w, "recog"); xp += calcStreakBonus(streak, newStreak); }
@@ -3517,6 +3604,9 @@ function App() {
   const startQuiz = (mode="quick") => { setQuizMode(mode); setTab("quiz"); };
   const startFigures = () => setTab("figures");
 
+  const [libraryFilter, setLibraryFilter] = useState("Tous");
+  const navigateLibrary = (filter) => { setLibraryFilter(filter); setTab("library"); };
+
   return (
     <div style={{minHeight:"100vh",background:C.bg}}>
       {milestone&&<MilestoneToast milestone={milestone} onDone={()=>setMilestone(null)}/>} 
@@ -3581,8 +3671,8 @@ function App() {
             {tab==="learn"   && <LearnTabNew words={words} state={state} setState={setState} onMilestone={setMilestone} initialMode={learnMode}/>} 
             {tab==="quiz"    && <QuizTabNew  key={"quiz-"+quizMode} words={words} state={state} setState={setState} onMilestone={setMilestone} mode={quizMode} onModeChange={setQuizMode}/>} 
             {tab==="figures" && <FiguresTab figures={figures} state={state} setState={setState} onMilestone={setMilestone} onReloadFigures={()=>loadRemoteFigures(true)} figuresStatus={figuresStatus}/>}
-            {tab==="library" && <LibraryTab words={words} state={state}/>} 
-            {tab==="stats"   && <StatsTab   words={words} figures={figures} state={state} onOpenImport={()=>setShowImport(true)} onReset={()=>setShowReset(true)} onExport={handleExport} onSync={()=>setShowSync(true)} onReloadRemote={()=>loadRemoteVocabulary(true)} canReloadRemote={!!VOCAB_URL} onReloadFigures={()=>loadRemoteFigures(true)} canReloadFigures={!!FIGURES_URL} onOpenSources={()=>setShowSources(true)} extraSources={extraSources} duplicateCount={duplicateWords.length} sourcesStatus={sourcesStatus}/>} 
+            {tab==="library" && <LibraryTab key={"lib-"+libraryFilter} words={words} state={state} initialFilter={libraryFilter}/>} 
+            {tab==="stats"   && <StatsTab   words={words} figures={figures} state={state} onOpenImport={()=>setShowImport(true)} onReset={()=>setShowReset(true)} onExport={handleExport} onSync={()=>setShowSync(true)} onReloadRemote={()=>loadRemoteVocabulary(true)} canReloadRemote={!!VOCAB_URL} onReloadFigures={()=>loadRemoteFigures(true)} canReloadFigures={!!FIGURES_URL} onOpenSources={()=>setShowSources(true)} extraSources={extraSources} duplicateCount={duplicateWords.length} sourcesStatus={sourcesStatus} onNavigateLibrary={navigateLibrary}/>} 
           </>
         )}
       </div>
