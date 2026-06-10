@@ -352,6 +352,45 @@ function smartDistractors(answer, words, limit = 3) {
   return uniqueWordOptions([...strong, ...fallback]).slice(0, limit);
 }
 
+// Variante de smartDistractors pour StepContext : priorité forte à la même nature
+// grammaticale, pour que les choix soient syntaxiquement plausibles dans la phrase.
+function smartDistractorsContext(answer, words, limit = 3) {
+  const pool = (words || []).filter(w => w && w.id !== answer.id);
+  const confusionLabels = getConfusionItems(answer, words || [], 8).map(item => norm(item.word));
+  // Normalise la nature pour comparer : "verbe pronominal" ≈ "verbe", "nom féminin" ≈ "nom"
+  function normNature(n) {
+    const s = norm(n || "");
+    if (/^verbe/.test(s)) return "verbe";
+    if (/^nom/.test(s)) return "nom";
+    if (/^adjectif/.test(s)) return "adjectif";
+    if (/^adverbe/.test(s)) return "adverbe";
+    if (/^locution/.test(s)) return "locution";
+    return s;
+  }
+  const answerNorm = normNature(answer.nature);
+  const scored = pool.map(w => {
+    const sameNatureExact = w.nature && answer.nature && w.nature === answer.nature;
+    const sameNatureFamily = normNature(w.nature) === answerNorm;
+    const sameTheme = w.theme && answer.theme && w.theme === answer.theme;
+    const explicitConfusion = confusionLabels.includes(norm(w.word));
+    const overlap = lexicalOverlap(answer, w);
+    let score = 0;
+    if (explicitConfusion) score += 100;
+    if (sameNatureExact) score += 60;  // bonus fort : même nature exacte
+    else if (sameNatureFamily) score += 40;  // bonus moyen : même famille grammaticale
+    if (sameTheme) score += 25;
+    score += overlap * 20;
+    score += Math.random() * 4;
+    return { w, score };
+  });
+  const strong = scored
+    .filter(x => x.score >= 25)
+    .sort((a,b) => b.score - a.score)
+    .map(x => x.w);
+  const fallback = shuffle(pool);
+  return uniqueWordOptions([...strong, ...fallback]).slice(0, limit);
+}
+
 function inferFigureFamily(w) {
   const t = norm([w.word, w.definition_courte, w.definition, w.example].join(" "));
   if (/comparaison|metaphore|personnification|allegorie|symbole|image|ressemblance/.test(t)) return "Figures d'image";
@@ -522,6 +561,20 @@ function getExampleText(word, cloze = false) {
   example: picked.example || word.example || "",
   cloze: picked.cloze || word.cloze || ""
  });
+}
+
+// Retourne l'exemple à l'index donné (0 = ex1, 1 = ex2).
+// Si l'index demandé n'existe pas, replie sur l'index 0.
+// Utilisé par StepContext et StepProd pour ne pas réutiliser le même exemple.
+function getExampleByIndex(word, idx, cloze = false) {
+  const examples = Array.isArray(word.examples) ? word.examples.filter(e => e && e.example) : [];
+  const picked = examples[idx] || examples[0] || {
+    example: word.example || "",
+    cloze: word.cloze || word.example_cloze || word.phrase_trouee || ""
+  };
+  if (!cloze) return picked.example || word.example || "";
+  if (picked.cloze) return picked.cloze;
+  return blankSentence({ ...word, example: picked.example || word.example || "", cloze: picked.cloze || word.cloze || "" });
 }
 
 function textContainsAnswer(text, word) {
@@ -1138,8 +1191,12 @@ const Bar = ({value, color}) => (
   </div>
 );
 
-const ExampleBlock = ({word, showLabel=true, fontSize=15, cloze=false}) => {
-  const text = useMemo(() => getExampleText(word, cloze), [word.id, cloze]);
+const ExampleBlock = ({word, showLabel=true, fontSize=15, cloze=false, exampleIndex=null}) => {
+  // Si exampleIndex est fourni, on fixe l'exemple à cet index (0 ou 1) plutôt que de le tirer au sort.
+  const text = useMemo(() => {
+    if (exampleIndex !== null) return getExampleByIndex(word, exampleIndex, cloze);
+    return getExampleText(word, cloze);
+  }, [word.id, cloze, exampleIndex]);
 
   return (
     <div style={{background:`${C.blue}07`,borderLeft:`4px solid ${C.blue}`,borderRadius:"0 14px 14px 0",padding:"14px 16px",margin:"12px 0"}}>
@@ -1571,6 +1628,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
   const [idx,setIdx] = useState(0);
   const [hearts,setHearts] = useState(3);
   const [xpToday,setXpToday] = useState(0);
+  const [sessionStreak,setSessionStreak] = useState(0);
   const [done,setDone] = useState(()=>loadDailyDone());
   const [feedback,setFeedback] = useState(null);
   const [inputVal,setInputVal] = useState("");
@@ -1581,7 +1639,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
 
   useEffect(() => {
     setSession(buildDailySession(state, words));
-    setStep(0); setIdx(0); setHearts(3); setXpToday(0); setFeedback(null); setInputVal(""); setShown(false); setLog([]);
+    setStep(0); setIdx(0); setHearts(3); setXpToday(0); setSessionStreak(0); setFeedback(null); setInputVal(""); setShown(false); setLog([]);
     advancingRef.current = false;
     setDone(loadDailyDone());
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
@@ -1603,12 +1661,14 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
   const advance = useCallback((ok, mode="recog") => {
     if (!current || feedback || advancingRef.current) return;
     advancingRef.current = true;
+    const newStreak = ok ? sessionStreak + 1 : 0;
     let _dailyXp = 0;
     if (ok) {
-      _dailyXp = calcXP(state, current, step === 0 ? "discover" : mode);
+      _dailyXp = calcXP(state, current, step === 0 ? "discover" : mode, newStreak);
     }
     const ns = gradeWord(state, current.id, ok ? "good" : "again", mode, ok ? _dailyXp : 0);
     setState(ns);
+    setSessionStreak(newStreak);
     if (ok) setXpToday(x => x + _dailyXp); else setHearts(h => h - 1);
     setLog(l=>[...l,{word:current,ok}]);
     setFeedback(ok?"correct":"wrong");
@@ -1624,7 +1684,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
         else { setStep(s=>s+1); setIdx(0); }
       } else setIdx(i=>i+1);
     }, 600);
-  }, [current, feedback, state, setState, words, onMilestone, idx, sources.length, step, finishRoutine]);
+  }, [current, feedback, state, setState, words, onMilestone, idx, sources.length, step, sessionStreak, finishRoutine]);
 
   if (done && log.length === 0) {
     return (
@@ -1692,7 +1752,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
       <div style={{fontSize:56,marginBottom:16}}>💔</div>
       <h2 style={{fontSize:22,fontWeight:700,marginBottom:10,color:C.text}}>Session terminée</h2><p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>Tes erreurs ont été ajoutées à tes révisions.</p>
       <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-        <Btn label="Rejouer" variant="primary" onClick={()=>{setHearts(3);setStep(0);setIdx(0);setLog([]);setFeedback(null);setInputVal("");setShown(false);advancingRef.current=false;setSession(buildDailySession(state,words));}}/>
+        <Btn label="Rejouer" variant="primary" onClick={()=>{setHearts(3);setStep(0);setIdx(0);setLog([]);setFeedback(null);setInputVal("");setShown(false);setSessionStreak(0);advancingRef.current=false;setSession(buildDailySession(state,words));}}/>
         <Btn label="Réviser mes erreurs" variant="ghost" onClick={onGoReview}/>
       </div>
     </div>
@@ -1720,6 +1780,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
           ))}
         </div>
         <span style={{fontSize:14,color:C.red,fontWeight:700,minWidth:52,textAlign:"right"}}>{"♥".repeat(Math.max(0,hearts))}{"♡".repeat(Math.max(0,3-hearts))}</span>
+        {sessionStreak >= 3 && <span style={{fontSize:13,color:C.orange,fontWeight:800,minWidth:28}} title={`Série de ${sessionStreak} bonne(s) réponse(s)`}>🔥{sessionStreak}</span>}
         <span style={{fontSize:14,color:C.orange,fontWeight:700}}>+{xpToday}</span>
       </div>
       <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>{STEPS[step]} · {idx+1} / {sources.length}</div>
@@ -1727,8 +1788,8 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
       <div className={`question-card ${feedback==="correct"?"feedback-correct":feedback==="wrong"?"feedback-wrong":""}`} style={{background:cardBg,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",transition:"background 0.4s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
         {step===0 && <StepDiscover key={`discover-${current.id}-${idx}`} word={current} words={words} shown={shown} setShown={setShown} onNext={()=>advance(true)} />}
         {step===1 && <StepChoice key={`association-${current.id}-${idx}`} word={current} words={words} mode="termToDefinition" onAnswer={ok=>advance(ok,"recog")} />}
-        {step===2 && <StepContext key={`context-${current.id}-${idx}`} word={current} words={words} onAnswer={ok=>advance(ok,"prod")} />}
-        {step===3 && <StepProd key={`production-${current.id}-${idx}`} word={current} inputVal={inputVal} setInputVal={setInputVal} onAnswer={ok=>advance(ok,"prod")} />}
+        {step===2 && <StepContext key={`context-${current.id}-${idx}`} word={current} words={words} exampleIndex={idx % 2} onAnswer={ok=>advance(ok,"prod")} />}
+        {step===3 && <StepProd key={`production-${current.id}-${idx}`} word={current} inputVal={inputVal} setInputVal={setInputVal} exampleIndex={idx % 2 === 0 ? 1 : 0} onAnswer={ok=>advance(ok,"prod")} />}
         {step===4 && <StepChoice key={`boss-${current.id}-${idx}`} word={current} words={words} mode="mixed" onAnswer={ok=>advance(ok,"recog")} />}
       </div>
     </div>
@@ -1827,7 +1888,11 @@ function StepChoice({word,words,mode,onAnswer}) {
       {wrong && (
         <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
           <ExampleBlock word={word}/>
-          <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}><strong style={{color:C.text}}>{word.word}</strong> — {word.definition}</p>
+          <div style={{padding:"10px 14px",borderRadius:14,background:`${C.red}06`,border:`1px solid ${C.red}20`,marginBottom:12}}>
+            <p style={{fontSize:13,fontWeight:800,color:C.text,margin:"0 0 3px"}}>{word.word}</p>
+            <p style={{fontSize:13,color:C.sub,lineHeight:1.55,margin:"0 0 4px"}}>{word.compact}</p>
+            <p style={{fontSize:12,color:C.ter,lineHeight:1.5,margin:0}}>{word.definition}</p>
+          </div>
           <Btn label="J'ai compris" variant="primary" full onClick={()=>onAnswer(false)}/>
         </div>
       )}
@@ -1896,7 +1961,11 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
       {wrong && (
         <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
           <ExampleBlock word={word}/>
-          <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}><strong style={{color:C.text}}>{word.word}</strong> — {word.definition}</p>
+          <div style={{padding:"10px 14px",borderRadius:14,background:`${C.red}06`,border:`1px solid ${C.red}20`,marginBottom:12}}>
+            <p style={{fontSize:13,fontWeight:800,color:C.text,margin:"0 0 3px"}}>{word.word}</p>
+            <p style={{fontSize:13,color:C.sub,lineHeight:1.55,margin:"0 0 4px"}}>{word.compact}</p>
+            <p style={{fontSize:12,color:C.ter,lineHeight:1.5,margin:0}}>{word.definition}</p>
+          </div>
           <Btn label="J'ai compris" variant="primary" full onClick={()=>onAnswer(false)}/>
         </div>
       )}
@@ -1904,7 +1973,7 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
   );
 }
 
-function StepContext({word,words,onAnswer}) {
+function StepContext({word,words,onAnswer,exampleIndex=0}) {
   const [selected,setSelected] = useState(null);
   const timerRef = useRef(null);
 
@@ -1917,11 +1986,16 @@ function StepContext({word,words,onAnswer}) {
     if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
 
+  // Utilise smartDistractorsContext pour prioriser la même nature grammaticale
   const pool = useMemo(
-    ()=>smartDistractors(word, words, 3),
+    ()=>smartDistractorsContext(word, words, 3),
     [word.id, words]
   );
   const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
+
+  // L'index de l'exemple alternatif pour le feedback : si on a montré l'ex index 0,
+  // on montre l'ex index 1 dans le feedback, et vice versa.
+  const altIndex = exampleIndex === 0 ? 1 : 0;
 
   const handleClick = (o) => {
     if (selected) return;
@@ -1935,7 +2009,8 @@ function StepContext({word,words,onAnswer}) {
   return (
     <div>
       <p style={{fontSize:12,color:C.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Complète la phrase</p>
-      <ExampleBlock word={word} showLabel={false} fontSize={16} cloze />
+      {/* Phrase à trou avec l'exemple à l'index choisi */}
+      <ExampleBlock word={word} showLabel={false} fontSize={16} cloze exampleIndex={exampleIndex} />
       <div className="choice-grid">
         {options.map(o=>{
           let bg=C.solid,border=C.border,color=C.blue;
@@ -1957,7 +2032,15 @@ function StepContext({word,words,onAnswer}) {
       </div>
       {wrong&&(
         <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
-          <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}><strong style={{color:C.text}}>{word.word}</strong> — {word.compact}</p>
+          {/* Feedback enrichi : définition longue + deuxième exemple complet */}
+          <div style={{padding:"12px 14px",borderRadius:14,background:`${C.red}06`,border:`1px solid ${C.red}20`,marginBottom:10}}>
+            <p style={{fontSize:13,fontWeight:800,color:C.text,margin:"0 0 4px"}}>{word.word} <span style={{fontWeight:500,color:C.sub}}>— {word.nature}</span></p>
+            <p style={{fontSize:13,color:C.sub,lineHeight:1.6,margin:0}}>{word.compact}</p>
+          </div>
+          <p style={{fontSize:12,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:0.7,margin:"0 0 4px"}}>Définition complète</p>
+          <p style={{fontSize:13,color:C.sub,lineHeight:1.6,marginBottom:10}}>{word.definition}</p>
+          {/* Exemple alternatif pour ancrer la mémorisation sans répéter la phrase à trou */}
+          <ExampleBlock word={word} showLabel={true} fontSize={13} cloze={false} exampleIndex={altIndex} />
           <Btn label="J'ai compris" variant="primary" full onClick={()=>onAnswer(false)}/>
         </div>
       )}
@@ -1965,7 +2048,7 @@ function StepContext({word,words,onAnswer}) {
   );
 }
 
-function StepProd({word,inputVal,setInputVal,onAnswer}) {
+function StepProd({word,inputVal,setInputVal,onAnswer,exampleIndex=1}) {
   const [result,setResult] = useState(null);
   const timerRef = useRef(null);
 
@@ -1995,7 +2078,8 @@ function StepProd({word,inputVal,setInputVal,onAnswer}) {
       <div style={{background:`${C.blue}10`,borderRadius:14,padding:"13px 16px",marginBottom:12}}>
         <p style={{fontSize:15,color:C.text,margin:0,lineHeight:1.5}}>{word.compact}</p>
       </div>
-      <ExampleBlock word={word} showLabel={false} fontSize={13} cloze />
+      {/* Utilise l'exemple alternatif (index 1 par défaut) pour ne pas répéter l'exemple de l'étape Contexte */}
+      <ExampleBlock word={word} showLabel={false} fontSize={13} cloze exampleIndex={exampleIndex} />
       <input value={inputVal} onChange={e=>setInputVal(e.target.value)}
         onKeyDown={e=>e.key==="Enter"&&submit()}
         placeholder="Écris le mot…" autoFocus disabled={!!result}
@@ -2009,7 +2093,7 @@ function StepProd({word,inputVal,setInputVal,onAnswer}) {
       )}
 
       {result === "ok" && (
-        <div style={{padding:"10px 12px",borderRadius:14,background:`${C.green}10`,border:`1px solid ${C.green}25`,marginBottom:12,color:C.green,fontSize:14,fontWeight:700}}>Correct</div>
+        <div style={{padding:"10px 12px",borderRadius:14,background:`${C.green}10`,border:`1px solid ${C.green}25`,marginBottom:12,color:C.green,fontSize:14,fontWeight:700}}>Correct ✓</div>
       )}
 
       <div style={{display:"flex",gap:10}}>
@@ -2762,11 +2846,15 @@ function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,o
 // ─── ROOT ─────────────────────────────────────────────────────────────────────
 
 // ─── XP HELPERS ──────────────────────────────────────────────────────────────
-function calcXP(state, word, mode) {
+function calcXP(state, word, mode, sessionStreak = 0) {
   let xp = mode === "discover" ? 3 : mode === "prod" ? 10 : 5;
   const wp = readP(state, word.id);
   if ((wp.wrong || 0) > 0) xp = Math.max(xp, 10);
   else if (wordStatus(state, word) === "Maîtrisé") xp = Math.min(xp, 3);
+  // Bonus de série dans la session : +2 à 3 consécutives, +5 à 5, +10 à 10
+  if (sessionStreak >= 10) xp += 10;
+  else if (sessionStreak >= 5) xp += 5;
+  else if (sessionStreak >= 3) xp += 2;
   return xp;
 }
 function calcStreakBonus(prev, next) {
