@@ -262,6 +262,56 @@ function lexicalOverlap(a, b) {
   return n / Math.max(ta.size, tb.size);
 }
 
+function natureFamily(n) {
+  const s = norm(n || "");
+  if (/^verbe/.test(s)) return "verbe";
+  if (/^nom/.test(s)) return "nom";
+  if (/^adjectif/.test(s)) return "adjectif";
+  if (/^adverbe/.test(s)) return "adverbe";
+  if (/^locution/.test(s)) return "locution";
+  return s;
+}
+
+function explicitConfusionLabels(word) {
+  return normalizeConfusions(word?.confusions || []).map(item => norm(item.word));
+}
+
+function getNearbyWords(word, words, limit = 8) {
+  if (!word || !Array.isArray(words)) return [];
+  const explicit = explicitConfusionLabels(word);
+  const reverseExplicit = new Map(
+    words.map(w => [w.id, explicitConfusionLabels(w).includes(norm(word.word))])
+  );
+  const baseNature = natureFamily(word.nature);
+  return words
+    .filter(w => w && w.id !== word.id)
+    .map(w => {
+      const sameTheme = w.theme && word.theme && w.theme === word.theme;
+      const sameNatureExact = w.nature && word.nature && w.nature === word.nature;
+      const sameNatureFamily = natureFamily(w.nature) === baseNature;
+      const overlap = lexicalOverlap(word, w);
+      const explicitMatch = explicit.includes(norm(w.word)) || reverseExplicit.get(w.id);
+      const registerMatch = w.register && word.register && w.register === word.register;
+      const levelGap = Math.abs((parseInt(w.level, 10) || 0) - (parseInt(word.level, 10) || 0));
+      const aw = norm(word.word).replace(/\s+/g, "");
+      const bw = norm(w.word).replace(/\s+/g, "");
+      const typoDistance = aw.length >= 5 && bw.length >= 5 ? editDistance(aw, bw) / Math.max(aw.length, bw.length) : 1;
+      let score = 0;
+      if (explicitMatch) score += 140;
+      if (sameTheme) score += 34;
+      if (sameNatureExact) score += 30;
+      else if (sameNatureFamily) score += 20;
+      if (registerMatch) score += 10;
+      score += overlap * 55;
+      if (typoDistance <= 0.35) score += Math.round((0.35 - typoDistance) * 45);
+      score -= Math.min(levelGap, 3) * 2;
+      return { ...w, nearbyScore:score, nearbyOverlap:overlap };
+    })
+    .filter(w => w.nearbyScore >= 22 || w.nearbyOverlap >= 0.18)
+    .sort((a, b) => b.nearbyScore - a.nearbyScore)
+    .slice(0, limit);
+}
+
 function findWordByLabel(words, label) {
   const wanted = norm(label);
   return (words || []).find(w => norm(w.word) === wanted) || null;
@@ -285,16 +335,7 @@ function enrichConfusionItem(item, word, words) {
 }
 
 function inferredConfusions(word, words, limit = 3) {
-  return (words || [])
-    .filter(w => w.id !== word.id)
-    .map(w => {
-      const overlap = lexicalOverlap(word, w);
-      const score = (w.theme === word.theme ? 2 : 0) + (w.nature === word.nature ? 0.5 : 0) + overlap;
-      return { ...w, score, overlap };
-    })
-    .filter(w => w.score >= 2 || w.overlap >= 0.18)
-    .sort((a,b)=>b.score-a.score)
-    .slice(0, limit)
+  return getNearbyWords(word, words, limit)
     .map(w => ({
       id: w.id,
       word: w.word,
@@ -328,24 +369,10 @@ function uniqueWordOptions(items) {
 
 function smartDistractors(answer, words, limit = 3) {
   const pool = (words || []).filter(w => w && w.id !== answer.id);
-  const confusionLabels = getConfusionItems(answer, words || [], 8).map(item => norm(item.word));
-  const scored = pool.map(w => {
-    const sameTheme = w.theme && answer.theme && w.theme === answer.theme;
-    const sameNature = w.nature && answer.nature && w.nature === answer.nature;
-    const explicitConfusion = confusionLabels.includes(norm(w.word));
-    const overlap = lexicalOverlap(answer, w);
-    const levelGap = Math.abs((parseInt(w.level, 10) || 0) - (parseInt(answer.level, 10) || 0));
-    let score = 0;
-    if (explicitConfusion) score += 100;
-    if (sameTheme) score += 35;
-    if (sameNature) score += 18;
-    score += overlap * 25;
-    score -= Math.min(levelGap, 3) * 2;
-    score += Math.random() * 4;
-    return { w, score };
-  });
+  const nearbyIds = new Map(getNearbyWords(answer, words || [], 12).map(w => [w.id, w.nearbyScore || 0]));
+  const scored = pool.map(w => ({ w, score:(nearbyIds.get(w.id) || 0) + Math.random() * 4 }));
   const strong = scored
-    .filter(x => x.score >= 18)
+    .filter(x => x.score >= 22)
     .sort((a,b)=>b.score-a.score)
     .map(x=>x.w);
   const fallback = shuffle(pool);
@@ -356,30 +383,15 @@ function smartDistractors(answer, words, limit = 3) {
 // grammaticale, pour que les choix soient syntaxiquement plausibles dans la phrase.
 function smartDistractorsContext(answer, words, limit = 3) {
   const pool = (words || []).filter(w => w && w.id !== answer.id);
-  const confusionLabels = getConfusionItems(answer, words || [], 8).map(item => norm(item.word));
-  // Normalise la nature pour comparer : "verbe pronominal" ≈ "verbe", "nom féminin" ≈ "nom"
-  function normNature(n) {
-    const s = norm(n || "");
-    if (/^verbe/.test(s)) return "verbe";
-    if (/^nom/.test(s)) return "nom";
-    if (/^adjectif/.test(s)) return "adjectif";
-    if (/^adverbe/.test(s)) return "adverbe";
-    if (/^locution/.test(s)) return "locution";
-    return s;
-  }
-  const answerNorm = normNature(answer.nature);
+  const nearbyIds = new Map(getNearbyWords(answer, words || [], 12).map(w => [w.id, w.nearbyScore || 0]));
+  const answerNorm = natureFamily(answer.nature);
   const scored = pool.map(w => {
     const sameNatureExact = w.nature && answer.nature && w.nature === answer.nature;
-    const sameNatureFamily = normNature(w.nature) === answerNorm;
-    const sameTheme = w.theme && answer.theme && w.theme === answer.theme;
-    const explicitConfusion = confusionLabels.includes(norm(w.word));
-    const overlap = lexicalOverlap(answer, w);
+    const sameNatureFamily = natureFamily(w.nature) === answerNorm;
     let score = 0;
-    if (explicitConfusion) score += 100;
+    score += nearbyIds.get(w.id) || 0;
     if (sameNatureExact) score += 60;  // bonus fort : même nature exacte
     else if (sameNatureFamily) score += 40;  // bonus moyen : même famille grammaticale
-    if (sameTheme) score += 25;
-    score += overlap * 20;
     score += Math.random() * 4;
     return { w, score };
   });
@@ -1223,12 +1235,36 @@ function candidates(state, words, mode = "smart", n = 20, excludeIds = new Set()
     let s = 0;
     if (!x.seen) s += 900;
     if (isDue(state, w)) s += 800;
+    if (x.needsRebuild || x.lapsed) s += 650;
     if (x.wrong) s += x.wrong * 90;
+    if ((x.recall || 0) < 3 && x.seen > 0) s += (3 - (x.recall || 0)) * 70;
+    if ((x.context || 0) < 2 && x.seen > 0) s += (2 - (x.context || 0)) * 25;
     if (mode === "production" && (x.prod || 0) < 2) s += 200;
     s -= (x.mastery || 0) * 35;
     s += Math.random() * 40;
     return { w, s };
   }).sort((a, b) => b.s - a.s).slice(0, n).map(o => o.w);
+}
+
+function learningLoad(state, words) {
+  return (words || []).reduce((acc, w) => {
+    const p = readP(state, w.id);
+    const status = wordStatus(state, w);
+    if (p.seen > 0 && status === "Fragile") acc.fragile += 1;
+    if (isDue(state, w)) acc.due += 1;
+    if (p.needsRebuild || p.lapsed) acc.rebuild += 1;
+    if (p.seen > 0 && status !== "Maîtrisé" && (p.recall || 0) < 4) acc.unconsolidated += 1;
+    return acc;
+  }, { fragile:0, due:0, rebuild:0, unconsolidated:0 });
+}
+
+function dailyNewWordLimit(state, words) {
+  const load = learningLoad(state, words);
+  const pressure = load.fragile + load.due + load.rebuild + Math.floor(load.unconsolidated / 4);
+  if (pressure >= 12) return 0;
+  if (pressure >= 6) return 2;
+  if (pressure >= 3) return 3;
+  return 5;
 }
 
 function shuffleAwayFrom(items, reference = []) {
@@ -1278,21 +1314,23 @@ function getMotDuJour(words) {
 }
 
 function buildDailySession(state, words) {
-  const discover = shuffle(candidates(state, words, "new", 5));
+  const newLimit = dailyNewWordLimit(state, words);
+  const discover = shuffle(candidates(state, words, "new", newLimit));
   const discoverIds = new Set(discover.map(w => w.id));
-  let review = candidates(state, words, "smart", 8, discoverIds);
+  const reviewCount = Math.min(10, Math.max(8, 8 + (5 - newLimit)));
+  let review = candidates(state, words, "smart", reviewCount, discoverIds);
 
   // Si le vocabulaire est très court, exclure les mots de découverte peut vider
   // les étapes Association/Contexte/Production. Dans ce cas, on réutilise le
   // même petit corpus plutôt que de bloquer la routine.
-  if (!review.length && words.length) review = candidates(state, words, "smart", Math.min(8, words.length));
+  if (!review.length && words.length) review = candidates(state, words, "smart", Math.min(reviewCount, words.length));
 
   const association = shuffle(review);
   const context = shuffleAwayFrom(review, association);
   const production = shuffleAwayFrom(review, context);
   const bossBase = uniqueById([...discover, ...review]).slice(0, Math.min(8, words.length));
   const boss = shuffleAwayFrom(bossBase, production);
-  return { discover, review, association, context, production, boss };
+  return { discover, review, association, context, production, boss, newLimit };
 }
 
 const MILESTONES = [
@@ -1734,6 +1772,7 @@ function Dashboard({words,figures,state,onStartDaily,onStartReview,onStartFragil
   const due = words.filter(w=>isDue(state,w)&&readP(state,w.id).seen>0).length;
   const fragile = words.filter(w=>wordStatus(state,w)==="Fragile").length;
   const newCount = words.filter(w=>!readP(state,w.id).seen).length;
+  const newToday = Math.min(newCount, dailyNewWordLimit(state, words));
   const mastered = words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
   const today = loadActivity()[localDateKey()] || {answers:0,correct:0,xp:0};
   const routineDone = loadDailyDone();
@@ -1745,7 +1784,7 @@ function Dashboard({words,figures,state,onStartDaily,onStartReview,onStartFragil
         <p style={{fontSize:11,fontWeight:800,color:C.blue,textTransform:"uppercase",letterSpacing:1,margin:"0 0 6px"}}>Aujourd'hui</p>
         <h2 style={{fontSize:24,fontWeight:850,color:C.text,letterSpacing:-0.8,margin:"0 0 8px"}}>{recommended}</h2>
         <p style={{fontSize:14,color:C.sub,lineHeight:1.55,margin:"0 0 16px"}}>
-          {due} mot{due>1?"s":""} à revoir · {fragile} fragile{fragile>1?"s":""} · {newCount} nouveau{newCount>1?"x":""} disponible{newCount>1?"s":""}.
+          {due} mot{due>1?"s":""} à revoir · {fragile} fragile{fragile>1?"s":""} · {newToday} nouveau{newToday>1?"x":""} prévu{newToday>1?"s":""} aujourd'hui.
         </p>
         <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:16}}>
           <div><p style={{fontSize:20,fontWeight:850,color:C.text,margin:0}}>{seen}</p><p style={{fontSize:11,color:C.sub,margin:0}}>vus</p></div>
@@ -1836,7 +1875,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     if (step === 3) return (session.production || session.review).slice(0,8);
     if (step === 4) return session.boss.slice(0,8);
     return session.review.slice(0,8);
-  }, [step, session]);
+  }, [step, session, stepQueues]);
 
   const current = sources[idx];
 
@@ -1844,6 +1883,12 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     saveDailyDone();
     setDone(true);
   }, []);
+
+  useEffect(() => {
+    if (done || sources.length > 0) return;
+    if (step + 1 >= STEPS.length) finishRoutine();
+    else { setStep(s => s + 1); setIdx(0); }
+  }, [done, sources.length, step, finishRoutine]);
 
   const advance = useCallback((ok, mode="recog") => {
     if (!current || feedback || advancingRef.current) return;
@@ -1951,7 +1996,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
       <div style={{fontSize:56,marginBottom:16}}>💔</div>
       <h2 style={{fontSize:22,fontWeight:700,marginBottom:10,color:C.text}}>Session terminée</h2><p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>Tes erreurs ont été ajoutées à tes révisions.</p>
       <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-        <Btn label="Rejouer" variant="primary" onClick={()=>{setHearts(3);setStep(0);setIdx(0);setLog([]);setFeedback(null);setInputVal("");setShown(false);setSessionStreak(0);advancingRef.current=false;setSession(buildDailySession(state,words));}}/>
+        <Btn label="Rejouer" variant="primary" onClick={()=>{const nextSession=buildDailySession(state,words);setHearts(3);setStep(0);setIdx(0);setLog([]);setFeedback(null);setInputVal("");setShown(false);setSessionStreak(0);advancingRef.current=false;retryRef.current={};setSession(nextSession);setStepQueues(buildDailyQueues(nextSession));}}/>
         <Btn label="Réviser mes erreurs" variant="ghost" onClick={onGoReview}/>
       </div>
     </div>
@@ -2319,7 +2364,7 @@ function StepProd({word,inputVal,setInputVal,onAnswer,exampleIndex=1}) {
 const QUIZ_SIZES = [5,10,15,20];
 
 function buildNuanceQuestion(word, words) {
-  const close = getConfusionItems(word, words, 5).map(item => {
+  const explicit = getConfusionItems(word, words, 5).map(item => {
     const existing = words.find(w => norm(w.word) === norm(item.word));
     if (existing) return existing;
     return {
@@ -2331,7 +2376,8 @@ function buildNuanceQuestion(word, words) {
       nature:word.nature
     };
   });
-  const fillers = words.filter(w => w.id !== word.id && !close.some(c => norm(c.word) === norm(w.word)) && w.theme === word.theme).slice(0, 6);
+  const close = uniqueWordOptions([...explicit, ...getNearbyWords(word, words, 8)]);
+  const fillers = words.filter(w => w.id !== word.id && !close.some(c => norm(c.word) === norm(w.word)) && (w.theme === word.theme || natureFamily(w.nature) === natureFamily(word.nature))).slice(0, 6);
   const options = uniqueById([word, ...close, ...shuffle(fillers)]).slice(0, 4);
   while (options.length < Math.min(4, words.length)) {
     const candidate = shuffle(words.filter(w => w.id !== word.id && !options.some(o => o.id === w.id)))[0];
@@ -2351,7 +2397,7 @@ function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
 
   const getNext = useCallback(() => {
     const base = candidates(state, words, "smart", words.length, askedRef.current);
-    return base.find(w => getConfusionItems(w, words, 3).length > 0) || base[0] || words[0];
+    return base.find(w => getNearbyWords(w, words, 3).length > 0) || base[0] || words[0];
   }, [state, words]);
 
   useEffect(()=>{ setCurrent(getNext()); setSelected(null); }, [getNext]);
