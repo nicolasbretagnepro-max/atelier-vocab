@@ -635,7 +635,7 @@ const STORE_SOURCE_CACHE = "atelier_vocab_source_cache";
 const STORE_MILESTONE = "atelier_vocab_milestone";
 const STORE_DAILY     = "atelier_vocab_daily_done";
 const STORE_ACTIVITY  = "atelier_vocab_activity";
-const PROFILE_SCHEMA_VERSION = 1;
+const PROFILE_SCHEMA_VERSION = 2;
 
 const LEGACY_PROGRESS_KEYS = [
   "atelier_vocab_progress_v4",
@@ -651,7 +651,9 @@ const LEGACY_DAILY_KEYS = ["atelier_vocab_daily_done_v1", "atelier_vocab_daily_d
 
 const EMPTY_PROGRESS = Object.freeze({
   seen:0, correct:0, wrong:0, mastery:0, recog:0, prod:0, streak:0, next:null,
-  firstCorrectDay:null, lastCorrectDay:null, lastWrongDay:null, correctDays:null
+  context:0, recall:0, recallStreak:0, firstCorrectDay:null, lastCorrectDay:null,
+  firstRecallDay:null, lastRecallDay:null, lastWrongDay:null, correctDays:null,
+  recallDays:null, lapsed:false, needsRebuild:false
 });
 const DEFAULT_META = Object.freeze({ xp:0, streak:0, lastDay:null });
 
@@ -660,11 +662,51 @@ function safeParseJSON(value, fallback = null) {
   catch { return fallback; }
 }
 
+function normalizeDayMap(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const out = {};
+  Object.entries(value).forEach(([key, count]) => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(key)) out[key] = Math.max(1, Number(count) || 1);
+  });
+  return Object.keys(out).length ? out : null;
+}
+
+function migrateProgressEntry(raw) {
+  const x = { ...EMPTY_PROGRESS, ...(raw && typeof raw === "object" ? raw : {}) };
+  const num = key => Math.max(0, Number(x[key]) || 0);
+  x.seen = num("seen");
+  x.correct = num("correct");
+  x.wrong = num("wrong");
+  x.mastery = Math.max(0, Math.min(6, Number(x.mastery) || 0));
+  x.recog = Math.max(num("recog"), Math.min(6, x.correct));
+  x.prod = Math.max(0, Math.min(6, num("prod")));
+  x.context = Math.max(0, Math.min(6, num("context")));
+  x.recall = Math.max(num("recall"), x.prod);
+  x.streak = num("streak");
+  x.recallStreak = Math.max(num("recallStreak"), Math.min(x.streak, x.recall));
+  x.correctDays = normalizeDayMap(x.correctDays);
+  x.recallDays = normalizeDayMap(x.recallDays);
+  x.firstCorrectDay = typeof x.firstCorrectDay === "string" ? x.firstCorrectDay : null;
+  x.lastCorrectDay = typeof x.lastCorrectDay === "string" ? x.lastCorrectDay : null;
+  x.firstRecallDay = typeof x.firstRecallDay === "string" ? x.firstRecallDay : null;
+  x.lastRecallDay = typeof x.lastRecallDay === "string" ? x.lastRecallDay : null;
+  x.lastWrongDay = typeof x.lastWrongDay === "string" ? x.lastWrongDay : null;
+  x.next = x.next || null;
+  x.lapsed = !!x.lapsed;
+  x.needsRebuild = !!x.needsRebuild;
+  return x;
+}
+
+function migrateProgressMap(progress) {
+  if (!progress || typeof progress !== "object") return {};
+  return Object.fromEntries(Object.entries(progress).map(([id, entry]) => [id, migrateProgressEntry(entry)]));
+}
+
 function normalizeLoadedProgress(data) {
   if (!data || typeof data !== "object") return { progress:{}, meta:{...DEFAULT_META} };
   const source = data.profileData && typeof data.profileData === "object" ? data.profileData : data;
   return {
-    progress: source.progress && typeof source.progress === "object" ? source.progress : {},
+    progress: migrateProgressMap(source.progress),
     meta: { ...DEFAULT_META, ...(source.meta && typeof source.meta === "object" ? source.meta : {}) }
   };
 }
@@ -697,7 +739,7 @@ function loadProfile() {
       ...stored,
       profile: { ...defaultProfile().profile, ...(stored.profile || {}) },
       meta: { ...DEFAULT_META, ...(stored.meta || {}) },
-      progress: stored.progress && typeof stored.progress === "object" ? stored.progress : {},
+      progress: migrateProgressMap(stored.progress),
       sources: Array.isArray(stored.sources) ? stored.sources : [],
       activity: stored.activity && typeof stored.activity === "object" ? stored.activity : {},
       milestones: Array.isArray(stored.milestones) ? stored.milestones : [],
@@ -713,6 +755,8 @@ function saveProfile(profile) {
       ...defaultProfile(),
       ...profile,
       schemaVersion: PROFILE_SCHEMA_VERSION,
+      progress: migrateProgressMap(profile.progress),
+      meta: { ...DEFAULT_META, ...(profile.meta || {}) },
       profile: { ...(profile.profile || defaultProfile().profile), updatedAt: new Date().toISOString() }
     };
     localStorage.setItem(STORE_PROFILE, JSON.stringify(next));
@@ -1037,16 +1081,26 @@ function correctDayCount(x) {
   return (x.correct || 0) > 0 ? 1 : 0;
 }
 
+function recallDayCount(x) {
+  if (x.recallDays && typeof x.recallDays === "object") return Object.keys(x.recallDays).length;
+  return 0;
+}
+
 function isMasteredProgress(state, w) {
   const x = readP(state, w.id);
   return (
     !isDue(state, w) &&
+    !x.lapsed &&
+    !x.needsRebuild &&
     (x.mastery || 0) >= 5.5 &&
     (x.prod || 0) >= 3 &&
+    (x.recall || 0) >= 4 &&
+    (x.recallStreak || 0) >= 2 &&
     (x.correct || 0) >= 8 &&
     (x.streak || 0) >= 5 &&
     getRate(state, w) >= 85 &&
     correctDayCount(x) >= 4 &&
+    recallDayCount(x) >= 3 &&
     dayDiff(x.firstCorrectDay, x.lastCorrectDay) >= 14
   );
 }
@@ -1054,6 +1108,7 @@ function isMasteredProgress(state, w) {
 function wordStatus(state, w) {
   const x = readP(state, w.id);
   if (!x.seen) return "Nouveau";
+  if (x.lapsed || x.needsRebuild) return "Fragile";
   if ((x.wrong || 0) >= 2 && getRate(state, w) < 70) return "Fragile";
   if (isDue(state, w)) return "À revoir";
   if (isMasteredProgress(state, w)) return "Maîtrisé";
@@ -1066,13 +1121,20 @@ function gradeWord(state, id, rating, mode = "recog", customXp) {
   ns.progress[id] = x;
 
   x.seen = (x.seen || 0) + 1;
+  const wasMastered = (x.mastery || 0) >= 5.5 && (x.prod || 0) >= 3 && getRate(ns, { id }) >= 85;
 
   if (rating === "again") {
     x.wrong = (x.wrong || 0) + 1;
-    x.mastery = Math.max(0, (x.mastery || 0) - 1);
+    const loss = wasMastered ? (mode === "prod" || mode === "recall" ? 2.5 : 1.5) : 1;
+    x.mastery = Math.max(0, (x.mastery || 0) - loss);
     x.streak = 0;
+    if (mode === "prod" || mode === "recall") x.recallStreak = 0;
     x.next = addMin(20);
     x.lastWrongDay = localDateKey();
+    if (wasMastered) {
+      x.lapsed = true;
+      x.needsRebuild = true;
+    }
   } else {
     x.correct = (x.correct || 0) + 1;
     x.streak = (x.streak || 0) + 1;
@@ -1082,8 +1144,17 @@ function gradeWord(state, id, rating, mode = "recog", customXp) {
     x.correctDays = { ...(x.correctDays && typeof x.correctDays === "object" ? x.correctDays : {}) };
     x.correctDays[todayKey] = (x.correctDays[todayKey] || 0) + 1;
 
-    if (mode === "prod") x.prod = Math.min(6, (x.prod || 0) + 1);
-    else x.recog = Math.min(6, (x.recog || 0) + 1);
+    if (mode === "context") x.context = Math.min(6, (x.context || 0) + 1);
+    else if (mode === "prod" || mode === "recall") {
+      x.prod = Math.min(6, (x.prod || 0) + 1);
+      x.recall = Math.min(99, (x.recall || 0) + 1);
+      x.recallStreak = (x.recallStreak || 0) + 1;
+      x.firstRecallDay = x.firstRecallDay || todayKey;
+      x.lastRecallDay = todayKey;
+      x.recallDays = { ...(x.recallDays && typeof x.recallDays === "object" ? x.recallDays : {}) };
+      x.recallDays[todayKey] = (x.recallDays[todayKey] || 0) + 1;
+      if ((x.recallStreak || 0) >= 2) x.needsRebuild = false;
+    } else x.recog = Math.min(6, (x.recog || 0) + 1);
 
     if (rating === "hard") x.mastery = Math.min(6, (x.mastery || 0) + 0.5);
     if (rating === "good") x.mastery = Math.min(6, (x.mastery || 0) + 1);
@@ -1459,7 +1530,7 @@ function SyncModal({open,onClose,onImportProgress}) {
       <div style={{background:C.solid,borderRadius:20,padding:24,maxWidth:500,width:"100%",boxShadow:"0 24px 64px rgba(0,0,0,0.25)"}} onClick={e=>e.stopPropagation()}>
         <h2 style={{fontSize:20,fontWeight:800,color:C.text,marginBottom:8}}>Synchroniser le profil</h2>
         <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:16}}>
-          Sur cet appareil : Stats → Exporter profil. Sur l'autre appareil : importer le fichier ci-dessous. Le profil contient la progression, les sources ajoutées et l'activité récente.
+          Sur cet appareil : Stats → Exporter profil. Sur l'autre appareil : importer le fichier ci-dessous. Le profil contient la progression complète, les compteurs de reconnaissance/rappel, les sources ajoutées et l'activité récente.
         </p>
         <label style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:12,border:`1.5px dashed ${C.blue}60`,cursor:"pointer",marginBottom:12,background:`${C.blue}06`,color:C.blue,fontWeight:600,fontSize:14}}>
           Charger le fichier de profil
@@ -1843,7 +1914,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
       <div className={`question-card ${feedback==="correct"?"feedback-correct":feedback==="wrong"?"feedback-wrong":""}`} style={{background:cardBg,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",transition:"background 0.4s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
         {step===0 && <StepDiscover key={`discover-${current.id}-${idx}`} word={current} words={words} shown={shown} setShown={setShown} onNext={()=>advance(true)} />}
         {step===1 && <StepChoice key={`association-${current.id}-${idx}`} word={current} words={words} mode="termToDefinition" onAnswer={ok=>advance(ok,"recog")} />}
-        {step===2 && <StepContext key={`context-${current.id}-${idx}`} word={current} words={words} exampleIndex={idx % 2} onAnswer={ok=>advance(ok,"prod")} />}
+        {step===2 && <StepContext key={`context-${current.id}-${idx}`} word={current} words={words} exampleIndex={idx % 2} onAnswer={ok=>advance(ok,"context")} />}
         {step===3 && <StepProd key={`production-${current.id}-${idx}`} word={current} inputVal={inputVal} setInputVal={setInputVal} exampleIndex={idx % 2 === 0 ? 1 : 0} onAnswer={ok=>advance(ok,"prod")} />}
         {step===4 && <StepChoice key={`boss-${current.id}-${idx}`} word={current} words={words} mode="mixed" onAnswer={ok=>advance(ok,"recog")} />}
       </div>
@@ -3204,7 +3275,7 @@ function FlashcardSession({words, state, setState, onMilestone, onBack}) {
             <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:10}}>{current.definition}</p>
             <ExampleBlock word={current}/><ConfusionBlock word={current} words={words} compact/>
             <div style={{background:"rgba(0,0,0,0.04)",borderRadius:12,padding:"10px 14px",marginBottom:14}}>
-              <div style={{fontSize:12,color:C.sub,display:"flex",gap:16,marginBottom:6,flexWrap:"wrap"}}><span>Recog. {cx.recog}/6</span><span>Prod. {cx.prod}/6</span><span>{getRate(state,current)}%</span></div>
+              <div style={{fontSize:12,color:C.sub,display:"flex",gap:16,marginBottom:6,flexWrap:"wrap"}}><span>Recog. {cx.recog}/6</span><span>Contexte {cx.context||0}/6</span><span>Prod. {cx.prod}/6</span><span>Rappel {cx.recall||0}</span><span>{getRate(state,current)}%</span></div>
               <Bar value={(cx.mastery/6)*100} color={C.blue}/>
             </div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
@@ -3619,6 +3690,13 @@ function App() {
       try { localStorage.setItem(STORE_MILESTONE, JSON.stringify(profileData.milestones)); } catch {}
       updateProfilePatch({ milestones: profileData.milestones });
     }
+    if (profileData.dailyDone) {
+      try { localStorage.setItem(STORE_DAILY, profileData.dailyDone); } catch {}
+      updateProfilePatch({ dailyDone: profileData.dailyDone });
+    }
+    if (profileData.profile && typeof profileData.profile === "object") {
+      updateProfilePatch({ profile: { ...loadProfile().profile, ...profileData.profile } });
+    }
     setShowSync(false);
   };
 
@@ -3629,6 +3707,13 @@ function App() {
       type: "atelier-vocab-profile",
       schemaVersion: PROFILE_SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
+      progressSchema: {
+        version: PROFILE_SCHEMA_VERSION,
+        counters: ["seen","correct","wrong","mastery","recog","context","prod","recall","streak","recallStreak"],
+        dayMaps: ["correctDays","recallDays"],
+        dates: ["firstCorrectDay","lastCorrectDay","firstRecallDay","lastRecallDay","lastWrongDay"],
+        flags: ["lapsed","needsRebuild"]
+      },
       vocabCount: words.length,
       figuresCount: figures.length,
       duplicateIgnoredCount: duplicateWords.length,
