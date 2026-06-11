@@ -649,7 +649,10 @@ const LEGACY_MILESTONE_KEYS = ["atelier_vocab_milestone_v4", "atelier_vocab_mile
 const LEGACY_ACTIVITY_KEYS = ["atelier_vocab_activity_v1", "atelier_vocab_activity"];
 const LEGACY_DAILY_KEYS = ["atelier_vocab_daily_done_v1", "atelier_vocab_daily_done"];
 
-const EMPTY_PROGRESS = Object.freeze({ seen:0, correct:0, wrong:0, mastery:0, recog:0, prod:0, streak:0, next:null });
+const EMPTY_PROGRESS = Object.freeze({
+  seen:0, correct:0, wrong:0, mastery:0, recog:0, prod:0, streak:0, next:null,
+  firstCorrectDay:null, lastCorrectDay:null, lastWrongDay:null, correctDays:null
+});
 const DEFAULT_META = Object.freeze({ xp:0, streak:0, lastDay:null });
 
 function safeParseJSON(value, fallback = null) {
@@ -1021,12 +1024,39 @@ function getRate(state, w) {
   return t ? Math.round(((x.correct || 0) / t) * 100) : 0;
 }
 
+function dayDiff(startKey, endKey) {
+  if (!startKey || !endKey) return 0;
+  const start = new Date(`${startKey}T00:00:00`);
+  const end = new Date(`${endKey}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  return Math.max(0, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+}
+
+function correctDayCount(x) {
+  if (x.correctDays && typeof x.correctDays === "object") return Object.keys(x.correctDays).length;
+  return (x.correct || 0) > 0 ? 1 : 0;
+}
+
+function isMasteredProgress(state, w) {
+  const x = readP(state, w.id);
+  return (
+    !isDue(state, w) &&
+    (x.mastery || 0) >= 5.5 &&
+    (x.prod || 0) >= 3 &&
+    (x.correct || 0) >= 8 &&
+    (x.streak || 0) >= 5 &&
+    getRate(state, w) >= 85 &&
+    correctDayCount(x) >= 4 &&
+    dayDiff(x.firstCorrectDay, x.lastCorrectDay) >= 14
+  );
+}
+
 function wordStatus(state, w) {
   const x = readP(state, w.id);
   if (!x.seen) return "Nouveau";
   if ((x.wrong || 0) >= 2 && getRate(state, w) < 70) return "Fragile";
   if (isDue(state, w)) return "À revoir";
-  if ((x.mastery || 0) >= 5 && (x.prod || 0) >= 2 && getRate(state, w) >= 75) return "Maîtrisé";
+  if (isMasteredProgress(state, w)) return "Maîtrisé";
   return "En cours";
 }
 
@@ -1042,9 +1072,15 @@ function gradeWord(state, id, rating, mode = "recog", customXp) {
     x.mastery = Math.max(0, (x.mastery || 0) - 1);
     x.streak = 0;
     x.next = addMin(20);
+    x.lastWrongDay = localDateKey();
   } else {
     x.correct = (x.correct || 0) + 1;
     x.streak = (x.streak || 0) + 1;
+    const todayKey = localDateKey();
+    x.firstCorrectDay = x.firstCorrectDay || todayKey;
+    x.lastCorrectDay = todayKey;
+    x.correctDays = { ...(x.correctDays && typeof x.correctDays === "object" ? x.correctDays : {}) };
+    x.correctDays[todayKey] = (x.correctDays[todayKey] || 0) + 1;
 
     if (mode === "prod") x.prod = Math.min(6, (x.prod || 0) + 1);
     else x.recog = Math.min(6, (x.recog || 0) + 1);
@@ -1095,6 +1131,18 @@ function candidates(state, words, mode = "smart", n = 20, excludeIds = new Set()
   }).sort((a, b) => b.s - a.s).slice(0, n).map(o => o.w);
 }
 
+function shuffleAwayFrom(items, reference = []) {
+  if (!Array.isArray(items) || items.length <= 1) return [...(items || [])];
+  const referenceIds = reference.map(w => w && w.id);
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const candidate = shuffle(items);
+    if (candidate.every((w, i) => !referenceIds[i] || referenceIds[i] !== w.id)) return candidate;
+  }
+  const rotated = [...items];
+  rotated.push(rotated.shift());
+  return rotated;
+}
+
 function getMotDuJour(words) {
   if (!words.length) return null;
   const day = Math.floor(Date.now() / (1000 * 60 * 60 * 24));
@@ -1104,7 +1152,7 @@ function getMotDuJour(words) {
 }
 
 function buildDailySession(state, words) {
-  const discover = candidates(state, words, "new", 5);
+  const discover = shuffle(candidates(state, words, "new", 5));
   const discoverIds = new Set(discover.map(w => w.id));
   let review = candidates(state, words, "smart", 8, discoverIds);
 
@@ -1113,8 +1161,12 @@ function buildDailySession(state, words) {
   // même petit corpus plutôt que de bloquer la routine.
   if (!review.length && words.length) review = candidates(state, words, "smart", Math.min(8, words.length));
 
-  const boss = uniqueById([...discover, ...review]).slice(0, Math.min(8, words.length));
-  return { discover, review, boss };
+  const association = shuffle(review);
+  const context = shuffleAwayFrom(review, association);
+  const production = shuffleAwayFrom(review, context);
+  const bossBase = uniqueById([...discover, ...review]).slice(0, Math.min(8, words.length));
+  const boss = shuffleAwayFrom(bossBase, production);
+  return { discover, review, association, context, production, boss };
 }
 
 const MILESTONES = [
@@ -1647,6 +1699,9 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
 
   const sources = useMemo(() => {
     if (step === 0) return session.discover.slice(0,5);
+    if (step === 1) return (session.association || session.review).slice(0,8);
+    if (step === 2) return (session.context || session.review).slice(0,8);
+    if (step === 3) return (session.production || session.review).slice(0,8);
     if (step === 4) return session.boss.slice(0,8);
     return session.review.slice(0,8);
   }, [step, session]);
@@ -1711,7 +1766,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
         </div>
         {mastered.length>0&&(
           <Card style={{padding:"14px 18px"}}>
-            <p style={{fontSize:12,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>Bien mémorisés ({mastered.length})</p>
+            <p style={{fontSize:12,fontWeight:700,color:C.green,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 10px"}}>Réussis aujourd'hui ({mastered.length})</p>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
               {mastered.map(w=><Pill key={w.id} label={w.word} color={C.green}/>) }
             </div>
@@ -2802,7 +2857,7 @@ function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,o
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <div className="stats-grid">
         <StatCard icon="📖" label="Total" value={total} color={C.blue} filterKey="Tous"/>
-        <StatCard icon="✅" label="Maîtrisés" value={mastered} color={C.green} sub="mastery≥5, prod≥2" filterKey="Maîtrisé"/>
+        <StatCard icon="✅" label="Maîtrisés" value={mastered} color={C.green} sub="4 jours, 14j d'écart, 85%+" filterKey="Maîtrisé"/>
         <StatCard icon="🔄" label="À revoir" value={dueN} color={C.red} filterKey="À revoir"/>
         <StatCard icon="⚠️" label="Fragiles" value={fragile} color={C.orange} sub="≥2 erreurs, taux<70%" filterKey="Fragile"/>
         <StatCard icon="👁" label="Vus" value={seen} color={C.purple} filterKey="En cours"/>
