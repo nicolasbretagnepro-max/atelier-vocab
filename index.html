@@ -618,9 +618,38 @@ function acceptedAnswers(word) {
   return [...variants].filter(Boolean);
 }
 
-function answerMatches(input, word) {
+function editDistance(a, b) {
+  const left = String(a || "");
+  const right = String(b || "");
+  if (!left || !right) return Math.max(left.length, right.length);
+  const prev = Array.from({ length: right.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= left.length; i++) {
+    let last = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= right.length; j++) {
+      const saved = prev[j];
+      prev[j] = left[i - 1] === right[j - 1]
+        ? last
+        : Math.min(last + 1, prev[j] + 1, prev[j - 1] + 1);
+      last = saved;
+    }
+  }
+  return prev[right.length];
+}
+
+function closeAnswerMatches(input, word) {
   const n = norm(input);
-  return acceptedAnswers(word).includes(n);
+  if (!n) return false;
+  return acceptedAnswers(word).some(answer => {
+    if (answer === n) return true;
+    if (answer.length < 7 || n.length < 7) return false;
+    const maxDistance = answer.length >= 11 ? 2 : 1;
+    return Math.abs(answer.length - n.length) <= maxDistance && editDistance(answer, n) <= maxDistance;
+  });
+}
+
+function answerMatches(input, word) {
+  return closeAnswerMatches(input, word);
 }
 
 // ─── STORAGE & PROFILE ────────────────────────────────────────────────────────
@@ -1214,6 +1243,32 @@ function shuffleAwayFrom(items, reference = []) {
   return rotated;
 }
 
+function insertRetryItem(list, index, item, retryRef, scope = "session") {
+  if (!item || !Array.isArray(list)) return { list, inserted:false };
+  const key = `${scope}:${item.id}`;
+  const counts = retryRef.current || {};
+  const currentCount = counts[key] || 0;
+  const baseLength = Math.max(1, new Set(list.map(w => w && w.id).filter(Boolean)).size);
+  const maxExtra = Math.max(1, Math.ceil(baseLength * 0.3));
+  const totalKey = `${scope}:__total`;
+  if (currentCount >= 2 || (counts[totalKey] || 0) >= maxExtra) return { list, inserted:false };
+  retryRef.current = { ...counts, [key]: currentCount + 1, [totalKey]: (counts[totalKey] || 0) + 1 };
+  const next = [...list];
+  const insertAt = Math.min(next.length, index + 3);
+  next.splice(insertAt, 0, item);
+  return { list:next, inserted:true };
+}
+
+function buildDailyQueues(session) {
+  return [
+    session.discover || [],
+    session.association || session.review || [],
+    session.context || session.review || [],
+    session.production || session.review || [],
+    session.boss || []
+  ].map(step => [...step]);
+}
+
 function getMotDuJour(words) {
   if (!words.length) return null;
   const day = Math.floor(Date.now() / (1000 * 60 * 60 * 24));
@@ -1721,7 +1776,7 @@ function Dashboard({words,figures,state,onStartDaily,onStartReview,onStartFragil
           <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}><Pill label={`${total} mots`} color={C.blue}/><Pill label={`${figuresTotal} figures`} color={C.indigo}/></div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}} className="choice-grid">
-          <SessionButton title="Routine complète" subtitle="Découverte, contexte, production et boss." icon="☀️" color={C.blue} onClick={onStartDaily}/>
+          <SessionButton title="Routine complète" subtitle="Découverte, contexte, rappel actif et boss." icon="☀️" color={C.blue} onClick={onStartDaily}/>
           <SessionButton title="Révision rapide" subtitle="Revoir les mots déjà rencontrés." icon="📚" color={C.purple} onClick={onStartReview}/>
           <SessionButton title="Mots fragiles" subtitle="Priorité aux erreurs récurrentes." icon="⚠" color={C.orange} onClick={onStartFragile}/>
           <SessionButton title="À revoir" subtitle="Répétition espacée des mots dus." icon="↻" color={C.red} onClick={onStartDue}/>
@@ -1741,12 +1796,13 @@ function Dashboard({words,figures,state,onStartDaily,onStartReview,onStartFragil
 }
 
 // ─── DAILY TAB ────────────────────────────────────────────────────────────────
-const STEPS = ["Découverte", "Association", "Contexte", "Production", "Boss"];
+const STEPS = ["Découverte", "Association", "Contexte", "Rappel actif", "Boss"];
 
 function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuance}) {
   const motDuJour = useMemo(()=>getMotDuJour(words),[words]);
   const wordsSignature = useMemo(()=>words.map(w=>w.id).join("|"),[words]);
   const [session,setSession] = useState(()=>buildDailySession(state,words));
+  const [stepQueues,setStepQueues] = useState(null);
   const [step,setStep] = useState(0);
   const [idx,setIdx] = useState(0);
   const [hearts,setHearts] = useState(3);
@@ -1759,16 +1815,21 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
   const [log,setLog] = useState([]);
   const timerRef = useRef(null);
   const advancingRef = useRef(false);
+  const retryRef = useRef({});
 
   useEffect(() => {
-    setSession(buildDailySession(state, words));
+    const nextSession = buildDailySession(state, words);
+    setSession(nextSession);
+    setStepQueues(buildDailyQueues(nextSession));
     setStep(0); setIdx(0); setHearts(3); setXpToday(0); setSessionStreak(0); setFeedback(null); setInputVal(""); setShown(false); setLog([]);
     advancingRef.current = false;
+    retryRef.current = {};
     setDone(loadDailyDone());
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [wordsSignature]);
 
   const sources = useMemo(() => {
+    if (stepQueues && stepQueues[step]) return stepQueues[step];
     if (step === 0) return session.discover.slice(0,5);
     if (step === 1) return (session.association || session.review).slice(0,8);
     if (step === 2) return (session.context || session.review).slice(0,8);
@@ -1798,6 +1859,18 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     if (ok) { haptic("correct"); setXpToday(x => x + _dailyXp); } else { haptic("wrong"); setHearts(h => h - 1); }
     setLog(l=>[...l,{word:current,ok}]);
     setFeedback(ok?"correct":"wrong");
+    let effectiveLength = sources.length;
+    if (!ok) {
+      const retry = insertRetryItem(sources, idx, current, retryRef, `daily-${step}`);
+      effectiveLength = retry.list.length;
+      if (retry.inserted) {
+        setStepQueues(q => {
+          const next = q ? q.map(stepItems => [...stepItems]) : buildDailyQueues(session);
+          next[step] = retry.list;
+          return next;
+        });
+      }
+    }
 
     const m = checkMilestones(ns, words);
     if (m) { haptic("milestone"); onMilestone(m); }
@@ -1805,7 +1878,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     timerRef.current = setTimeout(() => {
       setFeedback(null); setShown(false); setInputVal("");
       advancingRef.current = false;
-      if (idx + 1 >= sources.length) {
+      if (idx + 1 >= effectiveLength) {
         if (step + 1 >= STEPS.length) finishRoutine();
         else { setStep(s=>s+1); setIdx(0); }
       } else setIdx(i=>i+1);
@@ -3049,12 +3122,14 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
   const [done, setDone] = useState(false);
   const [bonusAwarded, setBonusAwarded] = useState(false);
   const timerRef = useRef(null);
+  const retryRef = useRef({});
   useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
   const current = pool[idx];
   const total = pool.length;
   const resetSession = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setIdx(0); setHearts(3); setStreak(0); setXpSession(0); setLog([]); setDone(false); setBonusAwarded(false);
+    retryRef.current = {};
   }, []);
   const startSession = useCallback(() => {
     resetSession();
@@ -3088,9 +3163,15 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
     setXpSession(x => x + xp);
     const newLog = [...log, {word: current, ok}]; setLog(newLog);
     const m = checkMilestones(ns, words); if (m) onMilestone(m);
+    let effectiveTotal = total;
+    if (!ok) {
+      const retry = insertRetryItem(pool, idx, current, retryRef, "review-quiz");
+      effectiveTotal = retry.list.length;
+      if (retry.inserted) setPool(retry.list);
+    }
     if (!ok && newHearts <= 0) return;
-    timerRef.current = setTimeout(() => { if (idx + 1 >= total) setDone(true); else setIdx(i => i + 1); }, ok ? 600 : 0);
-  }, [current, state, setState, streak, hearts, idx, total, words, onMilestone, log]);
+    timerRef.current = setTimeout(() => { if (idx + 1 >= effectiveTotal) setDone(true); else setIdx(i => i + 1); }, ok ? 600 : 0);
+  }, [current, state, setState, streak, hearts, idx, total, words, onMilestone, log, pool]);
 
   if (!started) return (
     <Card style={{display:"flex",flexDirection:"column",gap:16,animation:"fadeSlideIn 0.25s ease"}}>
@@ -3162,6 +3243,148 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
       </div>
       <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>{title} · {idx+1}/{total}</div>
       <ReviewQuizChoice key={"qs-"+current.id+"-"+idx} word={current} words={words} questionIndex={idx} onAnswer={(ok)=>advance(ok)}/>
+    </div>
+  );
+}
+
+function ActiveRecallSession({words, allWords=words, state, setState, onMilestone, onBack}) {
+  const SIZES = [5,10,15,20];
+  const availableWords = useMemo(() => {
+    const seen = words.filter(w => readP(state, w.id).seen > 0);
+    const base = seen.length ? seen : words;
+    return [...base].sort((a, b) => {
+      const ap = readP(state, a.id);
+      const bp = readP(state, b.id);
+      const scoreA = (ap.needsRebuild ? 1000 : 0) + (isDue(state, a) ? 500 : 0) + Math.max(0, 4 - (ap.recall || 0)) * 80 + Math.max(0, 3 - (ap.prod || 0)) * 60 + (ap.wrong || 0) * 30;
+      const scoreB = (bp.needsRebuild ? 1000 : 0) + (isDue(state, b) ? 500 : 0) + Math.max(0, 4 - (bp.recall || 0)) * 80 + Math.max(0, 3 - (bp.prod || 0)) * 60 + (bp.wrong || 0) * 30;
+      return scoreB - scoreA;
+    });
+  }, [words, state]);
+  const availableCount = availableWords.length;
+  const enabledSizes = SIZES.filter(n => availableCount >= n);
+  const defaultSize = enabledSizes.includes(10) ? 10 : (enabledSizes[0] || 5);
+  const [maxQ, setMaxQ] = useState(defaultSize);
+  const [started, setStarted] = useState(false);
+  const [pool, setPool] = useState([]);
+  const [idx, setIdx] = useState(0);
+  const [inputVal, setInputVal] = useState("");
+  const [streak, setStreak] = useState(0);
+  const [xpSession, setXpSession] = useState(0);
+  const [log, setLog] = useState([]);
+  const [done, setDone] = useState(false);
+  const timerRef = useRef(null);
+  const retryRef = useRef({});
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const total = pool.length;
+  const current = pool[idx];
+
+  const resetSession = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setIdx(0); setInputVal(""); setStreak(0); setXpSession(0); setLog([]); setDone(false);
+    retryRef.current = {};
+  }, []);
+
+  const startSession = useCallback(() => {
+    resetSession();
+    const priority = availableWords.slice(0, maxQ);
+    setPool(priority);
+    setStarted(true);
+  }, [availableWords, maxQ, resetSession]);
+
+  const restartSession = useCallback(() => {
+    resetSession();
+    setPool(availableWords.slice(0, maxQ));
+    setStarted(true);
+  }, [availableWords, maxQ, resetSession]);
+
+  const advance = useCallback((ok) => {
+    if (!current) return;
+    const newStreak = ok ? streak + 1 : 0;
+    let xp = 0;
+    if (ok) { xp = calcXP(state, current, "prod", newStreak); xp += calcStreakBonus(streak, newStreak); }
+    const ns = gradeWord(state, current.id, ok ? "good" : "again", "prod", xp);
+    setState(ns);
+    setStreak(newStreak);
+    setXpSession(x => x + xp);
+    setLog(l => [...l, { word:current, ok }]);
+    const m = checkMilestones(ns, allWords); if (m) onMilestone(m);
+    let effectiveTotal = total;
+    if (!ok) {
+      const retry = insertRetryItem(pool, idx, current, retryRef, "active-recall");
+      effectiveTotal = retry.list.length;
+      if (retry.inserted) setPool(retry.list);
+    }
+    timerRef.current = setTimeout(() => {
+      setInputVal("");
+      if (idx + 1 >= effectiveTotal) setDone(true);
+      else setIdx(i => i + 1);
+    }, ok ? 650 : 0);
+  }, [current, streak, state, setState, allWords, onMilestone, total, pool, idx]);
+
+  if (!started) return (
+    <Card style={{display:"flex",flexDirection:"column",gap:16,animation:"fadeSlideIn 0.25s ease"}}>
+      <div>
+        <button onClick={onBack} style={{background:"none",border:"none",color:C.blue,fontSize:14,cursor:"pointer",padding:0,marginBottom:12,fontWeight:650}}>← Retour</button>
+        <h2 style={{fontSize:22,fontWeight:850,color:C.text,margin:"0 0 6px"}}>Rappel actif</h2>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.55,margin:0}}>
+          Lis la définition puis retrouve le mot sans choix. Les erreurs reviennent quelques questions plus tard.
+        </p>
+      </div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        {SIZES.map(n => {
+          const disabled = availableCount < n;
+          return (
+            <button key={n} onClick={()=>!disabled&&setMaxQ(n)} disabled={disabled} style={{
+              padding:"10px 20px",borderRadius:14,fontWeight:750,fontSize:15,
+              border:`2px solid ${maxQ===n?C.green:C.border}`,
+              background:maxQ===n?`${C.green}14`:C.solid,
+              color:disabled?C.ter:maxQ===n?C.green:C.sub,
+              cursor:disabled?"not-allowed":"pointer",
+              opacity:disabled?0.5:1
+            }}>{n}</button>
+          );
+        })}
+      </div>
+      <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:0}}>
+        {availableCount >= 5 ? `${availableCount} mots disponibles, priorité aux rappels faibles.` : `Actuellement : ${availableCount} mot${availableCount>1?"s":""} disponible${availableCount>1?"s":""}.`}
+      </p>
+      <Btn label={`Démarrer — ${Math.min(maxQ, availableCount)} mots`} variant="primary" onClick={startSession} disabled={availableCount < 1}/>
+    </Card>
+  );
+
+  if (done || !current) {
+    const nOk = log.filter(e => e.ok).length;
+    const nWrong = log.filter(e => !e.ok).length;
+    return (
+      <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.3s ease"}}>
+        <div style={{textAlign:"center",padding:"24px 0 12px"}}>
+          <div style={{fontSize:52,marginBottom:10}}>{nWrong ? "🧠" : "🏆"}</div>
+          <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:6}}>Rappel terminé</h2>
+          <p style={{color:C.sub,fontSize:14}}>+{xpSession} XP · {nOk} ✓ · {nWrong} ✗</p>
+        </div>
+        <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
+          <Btn label="Rejouer" variant="primary" onClick={restartSession}/>
+          <Btn label="Retour" variant="ghost" onClick={onBack}/>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
+      <div style={{display:"flex",gap:8,alignItems:"center"}}>
+        <div style={{flex:1,background:"rgba(0,0,0,0.08)",borderRadius:99,height:5,overflow:"hidden"}}>
+          <div style={{height:"100%",borderRadius:99,background:C.green,width:(Math.round(idx/Math.max(total,1)*100))+"%",transition:"width 0.3s"}}/>
+        </div>
+        {streak >= 3 && <span style={{fontSize:13,color:C.orange,fontWeight:800}}>🔥{streak}</span>}
+        <span style={{fontSize:14,color:C.orange,fontWeight:700}}>+{xpSession}</span>
+      </div>
+      <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>Rappel actif · {idx+1}/{total}</div>
+      <div className="question-card" style={{background:C.surface,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
+        <StepProd key={`active-recall-${current.id}-${idx}`} word={current} inputVal={inputVal} setInputVal={setInputVal} exampleIndex={idx % 2} onAnswer={advance}/>
+      </div>
     </div>
   );
 }
@@ -3295,8 +3518,16 @@ function LearnTabNew({words, state, setState, onMilestone, initialMode=null}) {
   const [mode, setMode] = useState(initialMode);
   const seenWords = useMemo(() => words.filter(w => readP(state, w.id).seen > 0), [state, words]);
   const errorWords = useMemo(() => words.filter(w => (readP(state, w.id).wrong||0) > 0), [state, words]);
+  const recallWords = useMemo(() => {
+    const seen = seenWords.length ? seenWords : words;
+    return seen.filter(w => {
+      const p = readP(state, w.id);
+      return (p.recall || 0) < 4 || (p.prod || 0) < 3 || p.needsRebuild || isDue(state, w);
+    });
+  }, [state, words, seenWords]);
 
   if (mode === "cards") return <FlashcardSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)}/>;
+  if (mode === "active-recall") return <ActiveRecallSession words={recallWords.length ? recallWords : words} allWords={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)}/>;
   if (mode === "quiz-review") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="Quiz de révision" color={C.purple} filterFn={w=>readP(state,w.id).seen>0}/>;
   if (mode === "quiz-errors") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="Quiz erreurs" color={C.red} filterFn={w=>(readP(state,w.id).wrong||0)>0}/>;
 
@@ -3320,6 +3551,7 @@ function LearnTabNew({words, state, setState, onMilestone, initialMode=null}) {
         <p style={{fontSize:13,color:C.sub,margin:0}}>{seenWords.length} mots déjà vus · {errorWords.length} avec des erreurs</p>
       </div>
       {card(C.purple, false, ()=>setMode("cards"), "📚", "Définitions", "Revois les mots par lot de 20. Retourne la carte pour voir la définition.", seenWords.length+" mots vus disponibles")}
+      {card(C.green, recallWords.length<1, ()=>setMode("active-recall"), "⌨️", "Rappel actif", "Retrouve le mot à partir de sa définition, sans choix. Les erreurs reviennent dans la session.", recallWords.length+" mots prioritaires")}
       {card(C.blue, seenWords.length<5, ()=>setMode("quiz-review"), "⚡", "Quiz de révision", "QCM sur les mots vus au moins une fois. Sessions de 5, 10, 15 ou 20 mots.", seenWords.length>=5 ? seenWords.length+" mots disponibles" : "Il faut au moins 5 mots vus")}
       {card(C.red, errorWords.length<5, ()=>setMode("quiz-errors"), "🎯", "Quiz erreurs", "QCM sur les mots déjà ratés. Sessions de 5, 10, 15 ou 20 mots.", errorWords.length>=5 ? errorWords.length+" mots avec erreurs" : errorWords.length+" mots avec erreurs (5 min.)")}
     </div>
