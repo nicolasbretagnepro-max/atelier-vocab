@@ -262,6 +262,48 @@ function lexicalOverlap(a, b) {
   return n / Math.max(ta.size, tb.size);
 }
 
+const DEFINITION_STOPWORDS = new Set([
+  "alors","ainsi","avec","avoir","chez","comme","dans","dont","elle","elles","entre","etre","fait",
+  "faire","leur","leurs","mais","meme","pour","quand","quel","quelle","quelles","quels","sans",
+  "selon","sont","sous","tres","vers","vous","celui","celle","ceux","cette","dune","dun","dun",
+  "dune","lors","plus","moins","tout","toute","tous","toutes","ainsi","designe","qualifie",
+  "signifie","notion","personne","quelquun","quelque","chose","caractere","maniere","forme",
+  "sentiment","etat","action","processus","rapport","element","realite","idee","fait"
+]);
+
+function definitionTokens(word) {
+  const text = norm([word?.compact, word?.definition].join(" "));
+  return text
+    .split(" ")
+    .map(t => t.trim())
+    .filter(t => t.length > 3 && !DEFINITION_STOPWORDS.has(t));
+}
+
+function definitionSimilarity(a, b) {
+  const aTokens = definitionTokens(a);
+  const bTokens = definitionTokens(b);
+  if (aTokens.length < 2 || bTokens.length < 2) return 0;
+  const aSet = new Set(aTokens);
+  const bSet = new Set(bTokens);
+  let common = 0;
+  aSet.forEach(t => { if (bSet.has(t)) common++; });
+  const overlapSmall = common / Math.min(aSet.size, bSet.size);
+  const overlapLarge = common / Math.max(aSet.size, bSet.size);
+  const joinedA = aTokens.join(" ");
+  const joinedB = bTokens.join(" ");
+  const containment = joinedA.includes(joinedB) || joinedB.includes(joinedA) ? 1 : 0;
+  return Math.max(overlapSmall, overlapLarge * 1.15, containment);
+}
+
+function isAmbiguousDistractor(answer, candidate) {
+  const similarity = definitionSimilarity(answer, candidate);
+  if (similarity >= 0.72) return true;
+  const answerTokens = definitionTokens(answer);
+  const candidateTokens = definitionTokens(candidate);
+  const shortDefinition = Math.min(answerTokens.length, candidateTokens.length) <= 5;
+  return shortDefinition && similarity >= 0.58;
+}
+
 function natureFamily(n) {
   const s = norm(n || "");
   if (/^verbe/.test(s)) return "verbe";
@@ -370,13 +412,15 @@ function uniqueWordOptions(items) {
 function smartDistractors(answer, words, limit = 3) {
   const pool = (words || []).filter(w => w && w.id !== answer.id);
   const nearbyIds = new Map(getNearbyWords(answer, words || [], 12).map(w => [w.id, w.nearbyScore || 0]));
-  const scored = pool.map(w => ({ w, score:(nearbyIds.get(w.id) || 0) + Math.random() * 4 }));
+  const safePool = pool.filter(w => !isAmbiguousDistractor(answer, w));
+  const scored = safePool.map(w => ({ w, score:(nearbyIds.get(w.id) || 0) + Math.random() * 4 }));
   const strong = scored
     .filter(x => x.score >= 22)
     .sort((a,b)=>b.score-a.score)
     .map(x=>x.w);
-  const fallback = shuffle(pool);
-  return uniqueWordOptions([...strong, ...fallback]).slice(0, limit);
+  const fallback = shuffle(safePool);
+  const relaxedFallback = shuffle(pool);
+  return uniqueWordOptions([...strong, ...fallback, ...relaxedFallback]).slice(0, limit);
 }
 
 // Variante de smartDistractors pour StepContext : priorité forte à la même nature
@@ -385,7 +429,8 @@ function smartDistractorsContext(answer, words, limit = 3) {
   const pool = (words || []).filter(w => w && w.id !== answer.id);
   const nearbyIds = new Map(getNearbyWords(answer, words || [], 12).map(w => [w.id, w.nearbyScore || 0]));
   const answerNorm = natureFamily(answer.nature);
-  const scored = pool.map(w => {
+  const safePool = pool.filter(w => !isAmbiguousDistractor(answer, w));
+  const scored = safePool.map(w => {
     const sameNatureExact = w.nature && answer.nature && w.nature === answer.nature;
     const sameNatureFamily = natureFamily(w.nature) === answerNorm;
     let score = 0;
@@ -399,8 +444,9 @@ function smartDistractorsContext(answer, words, limit = 3) {
     .filter(x => x.score >= 25)
     .sort((a,b) => b.score - a.score)
     .map(x => x.w);
-  const fallback = shuffle(pool);
-  return uniqueWordOptions([...strong, ...fallback]).slice(0, limit);
+  const fallback = shuffle(safePool);
+  const relaxedFallback = shuffle(pool);
+  return uniqueWordOptions([...strong, ...fallback, ...relaxedFallback]).slice(0, limit);
 }
 
 function inferFigureFamily(w) {
