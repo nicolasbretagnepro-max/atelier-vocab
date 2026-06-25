@@ -3647,6 +3647,7 @@ function LearnTabNew({words, state, setState, onMilestone, initialMode=null, onS
   const [mode, setMode] = useState(initialMode);
   const seenWords = useMemo(() => words.filter(w => readP(state, w.id).seen > 0), [state, words]);
   const errorWords = useMemo(() => words.filter(w => (readP(state, w.id).wrong||0) > 0), [state, words]);
+  const dueWords = useMemo(() => words.filter(w => isDue(state, w) && readP(state, w.id).seen > 0), [state, words]);
   const recallWords = useMemo(() => {
     const seen = seenWords.length ? seenWords : words;
     return seen.filter(w => {
@@ -3658,6 +3659,7 @@ function LearnTabNew({words, state, setState, onMilestone, initialMode=null, onS
   if (mode === "cards") return <FlashcardSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)}/>;
   if (mode === "active-recall") return <ActiveRecallSession words={recallWords.length ? recallWords : words} allWords={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)}/>;
   if (mode === "quiz-review") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="Quiz de révision" color={C.purple} filterFn={w=>readP(state,w.id).seen>0}/>;
+  if (mode === "quiz-due") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="À revoir" color={C.orange} filterFn={w=>isDue(state,w)&&readP(state,w.id).seen>0}/>;
   if (mode === "quiz-errors") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="Quiz erreurs" color={C.red} filterFn={w=>(readP(state,w.id).wrong||0)>0}/>;
 
   const card = (col, disabled, onClick, icon, title, desc, badge) => (
@@ -3676,12 +3678,13 @@ function LearnTabNew({words, state, setState, onMilestone, initialMode=null, onS
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.25s ease"}}>
       <div style={{marginBottom:4}}>
-        <h2 style={{fontSize:22,fontWeight:800,color:C.text,margin:"0 0 4px",letterSpacing:-0.5}}>Révision</h2>
-        <p style={{fontSize:13,color:C.sub,margin:0}}>{seenWords.length} mots déjà vus · {errorWords.length} avec des erreurs</p>
+        <h2 style={{fontSize:22,fontWeight:800,color:C.text,margin:"0 0 4px",letterSpacing:-0.5}}>Révision ciblée</h2>
+        <p style={{fontSize:13,color:C.sub,margin:0}}>Sessions guidées par ta progression : mots vus, dus, fragiles ou erreurs.</p>
       </div>
       {card(C.purple, false, ()=>setMode("cards"), "📚", "Définitions", "Revois les mots par lot de 20. Retourne la carte pour voir la définition.", seenWords.length+" mots vus disponibles")}
       {card(C.green, recallWords.length<1, ()=>setMode("active-recall"), "⌨️", "Rappel actif", "Retrouve le mot à partir de sa définition, sans choix. Les erreurs reviennent dans la session.", recallWords.length+" mots prioritaires")}
-      {card(C.blue, seenWords.length<5, ()=>setMode("quiz-review"), "⚡", "Quiz de révision", "QCM sur les mots vus au moins une fois. Sessions de 5, 10, 15 ou 20 mots.", seenWords.length>=5 ? seenWords.length+" mots disponibles" : "Il faut au moins 5 mots vus")}
+      {card(C.orange, dueWords.length<5, ()=>setMode("quiz-due"), "↻", "À revoir", "QCM ciblé sur les mots dus selon la répétition espacée.", dueWords.length>=5 ? dueWords.length+" mots à revoir" : dueWords.length+" mots à revoir (5 min.)")}
+      {card(C.blue, seenWords.length<5, ()=>setMode("quiz-review"), "⚡", "Quiz des mots vus", "QCM ciblé sur les mots déjà rencontrés, sans inclure les mots totalement nouveaux.", seenWords.length>=5 ? seenWords.length+" mots disponibles" : "Il faut au moins 5 mots vus")}
       {card(C.red, errorWords.length<5, ()=>setMode("quiz-errors"), "🎯", "Quiz erreurs", "QCM sur les mots déjà ratés. Sessions de 5, 10, 15 ou 20 mots.", errorWords.length>=5 ? errorWords.length+" mots avec erreurs" : errorWords.length+" mots avec erreurs (5 min.)")}
       {card(C.indigo, words.length<4, onStartNuance, "🎯", "Nuance", "Distingue les mots proches et choisis le terme le plus precis dans un contexte.", words.length>=4 ? "Mode precision" : "Il faut au moins 4 mots")}
     </div>
@@ -3779,12 +3782,12 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   if (!started && !done) return (
     <Card style={{textAlign:"center",padding:"36px 24px"}}>
       <div style={{fontSize:48,marginBottom:14}}>⚡️</div>
-      <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:8}}>Quiz rapide</h2>
-      <p style={{fontSize:14,color:C.sub,marginBottom:24,lineHeight:1.6}}>3 cœurs par session. Bonne réponse = +XP.</p>
+      <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:8}}>Quiz libres</h2>
+      <p style={{fontSize:14,color:C.sub,marginBottom:24,lineHeight:1.6}}>Exercices courts à lancer quand tu veux, sans priorité de révision imposée.</p>
       <div style={{display:"flex",gap:10,justifyContent:"center",marginBottom:28,flexWrap:"wrap"}}>
         {SIZES.map(n=><button key={n} onClick={()=>setMaxQ(n)} style={{padding:"10px 22px",borderRadius:14,fontWeight:700,fontSize:15,border:"2px solid "+(maxQ===n?C.blue:C.border),background:maxQ===n?C.blue+"14":C.solid,color:maxQ===n?C.blue:C.sub,cursor:"pointer"}}>{n}</button>)}
       </div>
-      <Btn label={"Démarrer — "+maxQ+" questions"} variant="primary" onClick={startQuiz}/>
+      <Btn label={"Démarrer le quiz rapide — "+maxQ+" questions"} variant="primary" onClick={startQuiz}/>
       <div style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${C.border}`}}>
         <SessionButton title="Mode nuance" subtitle="Distinguer les mots proches dans un contexte." icon="🎯" color={C.indigo} onClick={()=>onModeChange&&onModeChange("nuance")}/>
       </div>
@@ -4105,7 +4108,7 @@ function App() {
   };
 
   const startDaily = () => setTab("daily");
-  const startReview = (mode="smart") => { const m={"smart":null,"fragile":"quiz-errors","due":"quiz-review"}; setLearnMode(m[mode]!==undefined?m[mode]:null); setTab("learn"); };
+  const startReview = (mode="smart") => { const m={"smart":null,"fragile":"quiz-errors","due":"quiz-due"}; setLearnMode(m[mode]!==undefined?m[mode]:null); setTab("learn"); };
   const startQuiz = (mode="quick") => { setQuizMode(mode); setTab("quiz"); };
   const startFigures = () => setTab("figures");
   const selectTab = (nextTab) => {
