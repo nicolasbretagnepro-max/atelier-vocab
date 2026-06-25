@@ -172,6 +172,12 @@ function placeAnswerAt(answer, distractors, index) {
   return options;
 }
 
+const BALANCED_ANSWER_PATTERN = [0, 2, 1, 3];
+
+function answerPosition(index = 0) {
+  return BALANCED_ANSWER_PATTERN[Math.abs(index) % BALANCED_ANSWER_PATTERN.length];
+}
+
 const addDays = (n) => {
   const d = new Date();
   d.setDate(d.getDate() + n);
@@ -1882,6 +1888,7 @@ function Dashboard({words,figures,state,onStartDaily,onStartReview,onStartFragil
 
 // ─── DAILY TAB ────────────────────────────────────────────────────────────────
 const STEPS = ["Découverte", "Association", "Contexte", "Rappel actif", "Boss"];
+const ROUTINE_COMPLETION_BONUS = 15;
 
 function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuance}) {
   const motDuJour = useMemo(()=>getMotDuJour(words),[words]);
@@ -1901,6 +1908,26 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
   const timerRef = useRef(null);
   const advancingRef = useRef(false);
   const retryRef = useRef({});
+  const completionBonusRef = useRef(false);
+  const answerPositionsRef = useRef({});
+  const answerBagsRef = useRef({});
+
+  const resetRoutineAnswerPositions = useCallback(() => {
+    answerPositionsRef.current = {};
+    answerBagsRef.current = {};
+  }, []);
+
+  const getRoutineAnswerIndex = useCallback((stepIndex, questionIndex) => {
+    const key = `${stepIndex}:${questionIndex}`;
+    if (typeof answerPositionsRef.current[key] !== "number") {
+      const bagKey = String(stepIndex);
+      if (!answerBagsRef.current[bagKey] || answerBagsRef.current[bagKey].length === 0) {
+        answerBagsRef.current[bagKey] = shuffle([0, 1, 2, 3]);
+      }
+      answerPositionsRef.current[key] = answerBagsRef.current[bagKey].pop();
+    }
+    return answerPositionsRef.current[key];
+  }, []);
 
   useEffect(() => {
     const nextSession = buildDailySession(state, words);
@@ -1909,9 +1936,11 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     setStep(0); setIdx(0); setHearts(3); setXpToday(0); setSessionStreak(0); setFeedback(null); setInputVal(""); setShown(false); setLog([]);
     advancingRef.current = false;
     retryRef.current = {};
+    completionBonusRef.current = false;
+    resetRoutineAnswerPositions();
     setDone(loadDailyDone());
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [wordsSignature]);
+  }, [wordsSignature, resetRoutineAnswerPositions]);
 
   const sources = useMemo(() => {
     if (stepQueues && stepQueues[step]) return stepQueues[step];
@@ -1926,9 +1955,14 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
   const current = sources[idx];
 
   const finishRoutine = useCallback(() => {
+    if (!completionBonusRef.current) {
+      completionBonusRef.current = true;
+      setState(prev => awardXpBonus(prev, ROUTINE_COMPLETION_BONUS, "daily-complete"));
+      setXpToday(x => x + ROUTINE_COMPLETION_BONUS);
+    }
     saveDailyDone();
     setDone(true);
-  }, []);
+  }, [setState]);
 
   useEffect(() => {
     if (done || sources.length > 0) return;
@@ -2042,7 +2076,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
       <div style={{fontSize:56,marginBottom:16}}>💔</div>
       <h2 style={{fontSize:22,fontWeight:700,marginBottom:10,color:C.text}}>Session terminée</h2><p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>Tes erreurs ont été ajoutées à tes révisions.</p>
       <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-        <Btn label="Rejouer" variant="primary" onClick={()=>{const nextSession=buildDailySession(state,words);setHearts(3);setStep(0);setIdx(0);setLog([]);setFeedback(null);setInputVal("");setShown(false);setSessionStreak(0);advancingRef.current=false;retryRef.current={};setSession(nextSession);setStepQueues(buildDailyQueues(nextSession));}}/>
+        <Btn label="Rejouer" variant="primary" onClick={()=>{const nextSession=buildDailySession(state,words);setHearts(3);setStep(0);setIdx(0);setLog([]);setFeedback(null);setInputVal("");setShown(false);setSessionStreak(0);advancingRef.current=false;retryRef.current={};completionBonusRef.current=false;resetRoutineAnswerPositions();setSession(nextSession);setStepQueues(buildDailyQueues(nextSession));}}/>
         <Btn label="Réviser mes erreurs" variant="ghost" onClick={onGoReview}/>
       </div>
     </div>
@@ -2077,10 +2111,10 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
 
       <div className={`question-card ${feedback==="correct"?"feedback-correct":feedback==="wrong"?"feedback-wrong":""}`} style={{background:cardBg,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",transition:"background 0.4s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
         {step===0 && <StepDiscover key={`discover-${current.id}-${idx}`} word={current} words={words} shown={shown} setShown={setShown} onNext={()=>advance(true)} />}
-        {step===1 && <StepChoice key={`association-${current.id}-${idx}`} word={current} words={words} mode="termToDefinition" onAnswer={ok=>advance(ok,"recog")} />}
-        {step===2 && <StepContext key={`context-${current.id}-${idx}`} word={current} words={words} exampleIndex={idx % 2} onAnswer={ok=>advance(ok,"context")} />}
+        {step===1 && <StepChoice key={`association-${current.id}-${idx}`} word={current} words={words} mode="termToDefinition" answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={ok=>advance(ok,"recog")} />}
+        {step===2 && <StepContext key={`context-${current.id}-${idx}`} word={current} words={words} exampleIndex={idx % 2} answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={ok=>advance(ok,"context")} />}
         {step===3 && <StepProd key={`production-${current.id}-${idx}`} word={current} inputVal={inputVal} setInputVal={setInputVal} exampleIndex={idx % 2 === 0 ? 1 : 0} onAnswer={ok=>advance(ok,"prod")} />}
-        {step===4 && <StepChoice key={`boss-${current.id}-${idx}`} word={current} words={words} mode="mixed" onAnswer={ok=>advance(ok,"recog")} />}
+        {step===4 && <StepChoice key={`boss-${current.id}-${idx}`} word={current} words={words} mode="mixed" answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={ok=>advance(ok,"recog")} />}
       </div>
     </div>
   );
@@ -2113,7 +2147,7 @@ function StepDiscover({word,words,shown,setShown,onNext}) {
   );
 }
 
-function StepChoice({word,words,mode,onAnswer}) {
+function StepChoice({word,words,mode,onAnswer,answerIndex=0}) {
   const [selected,setSelected] = useState(null);
   const timerRef = useRef(null);
 
@@ -2130,7 +2164,7 @@ function StepChoice({word,words,mode,onAnswer}) {
     ()=>smartDistractors(word, words, 3),
     [word.id, words]
   );
-  const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
+  const options = useMemo(()=>placeAnswerAt(word, pool, answerIndex),[word,pool,answerIndex]);
   const showTerm = useMemo(
     ()=>mode==="termToDefinition" || (mode==="mixed" && Math.random()>0.5),
     [mode, word.id]
@@ -2204,8 +2238,7 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
     if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
 
-  const pattern = [0, 2, 1, 3];
-  const answerIndex = pattern[questionIndex % pattern.length];
+  const answerIndex = answerPosition(questionIndex);
   const mode = ["definition", "example", "term"][questionIndex % 3];
   const options = useMemo(
     ()=>placeAnswerAt(word, smartDistractors(word, words, 3), answerIndex),
@@ -2265,7 +2298,7 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
   );
 }
 
-function StepContext({word,words,onAnswer,exampleIndex=0}) {
+function StepContext({word,words,onAnswer,exampleIndex=0,answerIndex=0}) {
   const [selected,setSelected] = useState(null);
   const timerRef = useRef(null);
 
@@ -2283,7 +2316,7 @@ function StepContext({word,words,onAnswer,exampleIndex=0}) {
     ()=>smartDistractorsContext(word, words, 3),
     [word.id, words]
   );
-  const options = useMemo(()=>shuffle([word,...pool]),[word,pool]);
+  const options = useMemo(()=>placeAnswerAt(word, pool, answerIndex),[word,pool,answerIndex]);
 
   // L'index de l'exemple alternatif pour le feedback : si on a montré l'ex index 0,
   // on montre l'ex index 1 dans le feedback, et vice versa.
@@ -2440,11 +2473,14 @@ function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
   const [current,setCurrent] = useState(null);
   const [selected,setSelected] = useState(null);
   const askedRef = useRef(new Set());
+  const stateRef = useRef(state);
+
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   const getNext = useCallback(() => {
-    const base = candidates(state, words, "smart", words.length, askedRef.current);
+    const base = candidates(stateRef.current, words, "smart", words.length, askedRef.current);
     return base.find(w => getNearbyWords(w, words, 3).length > 0) || base[0] || words[0];
-  }, [state, words]);
+  }, [words]);
 
   useEffect(()=>{ setCurrent(getNext()); setSelected(null); }, [getNext]);
 
@@ -2464,7 +2500,8 @@ function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
     setSelected(o.id);
     askedRef.current.add(current.id);
     const ok = o.id === current.id;
-    const ns = gradeWord(state, current.id, ok ? "good" : "again", "nuance");
+    const ns = gradeWord(stateRef.current, current.id, ok ? "good" : "again", "nuance");
+    stateRef.current = ns;
     setState(ns);
     const m = checkMilestones(ns, words);
     if (m) onMilestone(m);
@@ -3606,7 +3643,7 @@ function FlashcardSession({words, state, setState, onMilestone, onBack}) {
 }
 
 // ─── LEARN TAB NEW ────────────────────────────────────────────────────────────
-function LearnTabNew({words, state, setState, onMilestone, initialMode=null}) {
+function LearnTabNew({words, state, setState, onMilestone, initialMode=null, onStartNuance}) {
   const [mode, setMode] = useState(initialMode);
   const seenWords = useMemo(() => words.filter(w => readP(state, w.id).seen > 0), [state, words]);
   const errorWords = useMemo(() => words.filter(w => (readP(state, w.id).wrong||0) > 0), [state, words]);
@@ -3646,6 +3683,7 @@ function LearnTabNew({words, state, setState, onMilestone, initialMode=null}) {
       {card(C.green, recallWords.length<1, ()=>setMode("active-recall"), "⌨️", "Rappel actif", "Retrouve le mot à partir de sa définition, sans choix. Les erreurs reviennent dans la session.", recallWords.length+" mots prioritaires")}
       {card(C.blue, seenWords.length<5, ()=>setMode("quiz-review"), "⚡", "Quiz de révision", "QCM sur les mots vus au moins une fois. Sessions de 5, 10, 15 ou 20 mots.", seenWords.length>=5 ? seenWords.length+" mots disponibles" : "Il faut au moins 5 mots vus")}
       {card(C.red, errorWords.length<5, ()=>setMode("quiz-errors"), "🎯", "Quiz erreurs", "QCM sur les mots déjà ratés. Sessions de 5, 10, 15 ou 20 mots.", errorWords.length>=5 ? errorWords.length+" mots avec erreurs" : errorWords.length+" mots avec erreurs (5 min.)")}
+      {card(C.indigo, words.length<4, onStartNuance, "🎯", "Nuance", "Distingue les mots proches et choisis le terme le plus precis dans un contexte.", words.length>=4 ? "Mode precision" : "Il faut au moins 4 mots")}
     </div>
   );
 }
@@ -3747,6 +3785,9 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
         {SIZES.map(n=><button key={n} onClick={()=>setMaxQ(n)} style={{padding:"10px 22px",borderRadius:14,fontWeight:700,fontSize:15,border:"2px solid "+(maxQ===n?C.blue:C.border),background:maxQ===n?C.blue+"14":C.solid,color:maxQ===n?C.blue:C.sub,cursor:"pointer"}}>{n}</button>)}
       </div>
       <Btn label={"Démarrer — "+maxQ+" questions"} variant="primary" onClick={startQuiz}/>
+      <div style={{marginTop:16,paddingTop:16,borderTop:`1px solid ${C.border}`}}>
+        <SessionButton title="Mode nuance" subtitle="Distinguer les mots proches dans un contexte." icon="🎯" color={C.indigo} onClick={()=>onModeChange&&onModeChange("nuance")}/>
+      </div>
     </Card>
   );
 
@@ -4067,6 +4108,11 @@ function App() {
   const startReview = (mode="smart") => { const m={"smart":null,"fragile":"quiz-errors","due":"quiz-review"}; setLearnMode(m[mode]!==undefined?m[mode]:null); setTab("learn"); };
   const startQuiz = (mode="quick") => { setQuizMode(mode); setTab("quiz"); };
   const startFigures = () => setTab("figures");
+  const selectTab = (nextTab) => {
+    if (nextTab === "learn") setLearnMode(null);
+    if (nextTab === "quiz") setQuizMode("quick");
+    setTab(nextTab);
+  };
 
   const [libraryFilter, setLibraryFilter] = useState("Tous");
   const navigateLibrary = (filter) => { setLibraryFilter(filter); setTab("library"); };
@@ -4128,11 +4174,11 @@ function App() {
           </Card>
         ) : (
           <>
-            <TabBar active={tab} onSelect={setTab} dueCount={dueCount}/>
+            <TabBar active={tab} onSelect={selectTab} dueCount={dueCount}/>
 
             {tab==="home"    && <Dashboard words={words} figures={figures} state={state} onStartDaily={startDaily} onStartReview={()=>startReview("smart")} onStartFragile={()=>startReview("fragile")} onStartDue={()=>startReview("due")} onStartQuiz={()=>startQuiz("quick")} onStartNuance={()=>startQuiz("nuance")} onStartFigures={startFigures}/>} 
             {tab==="daily"   && <DailyTab   words={words} state={state} setState={setState} onMilestone={setMilestone} onGoReview={()=>startReview("fragile")} onGoQuiz={()=>startQuiz("quick")} onGoNuance={()=>startQuiz("nuance")}/>} 
-            {tab==="learn"   && <LearnTabNew words={words} state={state} setState={setState} onMilestone={setMilestone} initialMode={learnMode}/>} 
+            {tab==="learn"   && <LearnTabNew words={words} state={state} setState={setState} onMilestone={setMilestone} initialMode={learnMode} onStartNuance={()=>startQuiz("nuance")}/>} 
             {tab==="quiz"    && <QuizTabNew  key={"quiz-"+quizMode} words={words} state={state} setState={setState} onMilestone={setMilestone} mode={quizMode} onModeChange={setQuizMode}/>} 
             {tab==="figures" && <FiguresTab figures={figures} state={state} setState={setState} onMilestone={setMilestone} onReloadFigures={()=>loadRemoteFigures(true)} figuresStatus={figuresStatus}/>}
             {tab==="library" && <LibraryTab key={"lib-"+libraryFilter} words={words} state={state} initialFilter={libraryFilter}/>} 
