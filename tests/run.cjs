@@ -2,6 +2,7 @@ require('./learning.test.cjs');
 require('./acquisition.test.cjs');
 require('./daily-selection.test.cjs');
 require('./guided-exercise.test.cjs');
+require('./routine-settings.test.cjs');
 require('./engagement.test.cjs');
 require('./feedback.test.cjs');
 require('./short-session.test.cjs');

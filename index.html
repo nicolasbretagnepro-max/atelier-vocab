@@ -890,6 +890,11 @@ function normalizeLoadedProgress(data) {
   };
 }
 
+function normalizeLearningSettings(value={}) {
+  const n=Number(value?.newPerDay);
+  return {newPerDay:Number.isFinite(n)?Math.max(1,Math.min(3,Math.round(n))):2};
+}
+
 function defaultProfile() {
   return {
     type: "atelier-vocab-profile",
@@ -906,6 +911,7 @@ function defaultProfile() {
     activity: {},
     milestones: [],
     dailyDone: null,
+    learningSettings: {newPerDay:2},
     sourceCache: {}
   };
 }
@@ -919,6 +925,7 @@ function loadProfile() {
       profile: { ...defaultProfile().profile, ...(stored.profile || {}) },
       meta: { ...DEFAULT_META, ...(stored.meta || {}) },
       progress: migrateProgressMap(stored.progress),
+      learningSettings:normalizeLearningSettings(stored.learningSettings),
       sources: Array.isArray(stored.sources) ? stored.sources : [],
       activity: stored.activity && typeof stored.activity === "object" ? stored.activity : {},
       milestones: Array.isArray(stored.milestones) ? stored.milestones : [],
@@ -935,6 +942,7 @@ function saveProfile(profile) {
       ...profile,
       schemaVersion: PROFILE_SCHEMA_VERSION,
       progress: migrateProgressMap(profile.progress),
+      learningSettings:normalizeLearningSettings(profile.learningSettings),
       meta: { ...DEFAULT_META, ...(profile.meta || {}) },
       profile: { ...(profile.profile || defaultProfile().profile), updatedAt: new Date().toISOString() }
     };
@@ -1396,7 +1404,7 @@ function gradeWord(state, id, rating, mode = "recog", customXp, evidence = null)
 
   const justConsolidated=previous.learning.phase!=="consolidated"&&x.learning.phase==="consolidated";
   const scheduled = justConsolidated ? scheduleReview({...previous,next:null,repetitions:0,intervalDays:0,lastScheduledDay:null},rating)
-    : evidence&&rating!=="again"&&(event.assisted||x.learning.phase==="active") ? previous
+    : rating!=="again"&&(event.assisted||(evidence&&x.learning.phase==="active")) ? previous
     : scheduleReview(previous, rating);
   for (const key of ["easeFactor", "intervalDays", "repetitions", "next", "lastScheduledDay", "relearning"]) x[key] = scheduled[key];
   if(!x.next)x.next=addDays(1);
@@ -1585,6 +1593,14 @@ function learningFeedbackContent(word,chosen=null) {
   return {definition:word.definition||word.compact||"", example:word.hasRealExample?getExampleText(word):"",
     memoryTip:word.memoryTip||"", etymology:word.etymology||"",
     difference:chosen?(normalizeConfusions(word.confusions).find(c=>norm(c.word)===norm(chosen.word))?.difference||""):""};
+}
+
+function routineSummary(log,state) {
+  const words=uniqueById(log.map(e=>e.word));
+  return {assisted:log.filter(e=>e.ok&&e.kind==="recall"&&e.assisted&&!e.neutral).length,
+    independent:log.filter(e=>e.ok&&e.kind==="recall"&&!e.assisted&&!e.neutral).length,
+    tomorrow:words.filter(w=>AtelierLearning.normalize(readP(state,w.id),localDateKey()).phase==="active"),
+    difficulties:words.filter(w=>log.some(e=>e.word.id===w.id&&!e.ok&&!e.neutral))};
 }
 
 const MILESTONES = [
@@ -2027,7 +2043,7 @@ function DailyGoal({meta,goal=5,now=new Date()}) {
   </Card>;
 }
 
-function Dashboard({words,figures,state,now=new Date(),onStartCrossword,onStartShort,onStartDaily,onStartReview,onStartFragile,onStartDue,onStartQuiz,onStartNuance,onStartFigures}) {
+function Dashboard({words,figures,state,settings=loadProfile().learningSettings,onSettingsChange,now=new Date(),onStartCrossword,onStartShort,onStartDaily,onStartReview,onStartFragile,onStartDue,onStartQuiz,onStartNuance,onStartFigures}) {
   const total = words.length;
   const figuresTotal = figures.length;
   const figuresSeen = figures.filter(w=>readP(state,w.id).seen>0).length;
@@ -2039,12 +2055,23 @@ function Dashboard({words,figures,state,now=new Date(),onStartCrossword,onStartS
   const mastered = words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;
   const today = loadActivity()[localDateKey()] || {answers:0,correct:0,xp:0};
   const routineDone = loadDailyDone();
+  const planned=buildDailySession(state,words,settings);
   const recommended = fragile > 0 ? "Réviser les mots fragiles" : due > 0 ? "Revoir les mots dus" : routineDone ? "Faire un quiz court" : "Lancer la routine";
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.25s ease"}}>
-      <DailyGoal meta={state.meta} now={now}/>
+      <DailyGoal meta={state.meta} goal={Math.max(1,Math.min(5,planned.review.length))} now={now}/>
       <Btn label={routineDone ? "Routine du jour terminée" : "Ma routine du jour"} variant="primary" full onClick={onStartDaily} disabled={routineDone}/>
+      <Card>
+        <p style={{fontSize:16,fontWeight:800,margin:"0 0 8px"}}>Ton rythme · 5 à 10 minutes</p>
+        <label style={{fontSize:15,lineHeight:1.5}}>Nouveaux mots par jour
+          <select aria-label="Nouveaux mots par jour" value={settings.newPerDay} onChange={e=>onSettingsChange?.(normalizeLearningSettings({newPerDay:e.target.value}))} style={{fontSize:16,padding:10,marginLeft:10,borderRadius:10,border:`1px solid ${C.border}`,background:C.solid}}>
+            {[1,2,3].map(n=><option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <p style={{fontSize:14,color:C.sub,lineHeight:1.5,margin:"10px 0 0"}}>{planned.active.length} mots en apprentissage · {planned.discover.length} nouveautés · {planned.due.length} anciennes révisions. Les nouveautés ralentissent quand les dix places sont occupées.</p>
+        {planned.waiting>0&&<p style={{fontSize:13,color:C.sub}}>{planned.waiting} autres mots en cours seront repris à tour de rôle pour garder une séance courte.</p>}
+      </Card>
       <Card style={{background:`${C.indigo}08`}}><h3 style={{fontSize:18,margin:"0 0 6px"}}>🧩 Mots croisés</h3><p style={{fontSize:14,color:C.sub,lineHeight:1.5,margin:"0 0 12px"}}>Une petite grille pour retrouver tes mots à revoir, avec quelques mots maîtrisés comme appui.</p><Btn label="Jouer aux mots croisés" full onClick={onStartCrossword}/></Card>
       <Card style={{background:`linear-gradient(135deg, ${C.blue}12 0%, ${C.purple}09 100%)`}}>
         <p style={{fontSize:11,fontWeight:800,color:C.blue,textTransform:"uppercase",letterSpacing:1,margin:"0 0 6px"}}>Aujourd'hui</p>
@@ -2237,7 +2264,8 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     const uniqueWords = [...new Map(log.map(e=>[e.word.id,e])).values()];
     const nOk = log.filter(e=>e.ok).length;
     const nWrong = log.filter(e=>!e.ok).length;
-    const toReview = uniqueWords.filter(e=>!e.ok).map(e=>e.word);
+    const summary=routineSummary(log,state);
+    const toReview = summary.difficulties;
     const mastered = uniqueWords.filter(e=>e.ok).map(e=>e.word);
     return (
       <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.3s ease"}}>
@@ -2269,9 +2297,13 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
           </Card>
         )}
         <Card style={{padding:"16px 18px",background:`${C.blue}08`}}>
+          <p style={{fontSize:16,fontWeight:800,margin:"0 0 8px"}}>Ce que tu as travaillé</p>
+          <p style={{fontSize:14,lineHeight:1.6}}>{summary.independent} rappel{summary.independent>1?"s":""} sans aide · {summary.assisted} rappel{summary.assisted>1?"s":""} accompagné{summary.assisted>1?"s":""}.</p>
+          {summary.tomorrow.length>0&&<div aria-label="Mots prévus demain"><p style={{fontSize:14,lineHeight:1.5}}>Ces mots reviennent demain, avec une aide adaptée :</p><div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>{summary.tomorrow.map(w=><Pill key={w.id} label={w.word} color={C.blue}/>)}</div></div>}
+          {summary.tomorrow.length===0&&<p style={{fontSize:14,lineHeight:1.5}}>Ces mots poursuivent leurs révisions espacées. De nouvelles découvertes pourront entrer dans la prochaine routine.</p>}
           <p style={{fontSize:12,fontWeight:800,color:C.blue,textTransform:"uppercase",letterSpacing:0.8,margin:"0 0 6px"}}>Prochaine action recommandée</p>
           <p style={{fontSize:14,color:C.text,lineHeight:1.55,margin:"0 0 12px"}}>
-            {toReview.length>0 ? "Revoir les mots ratés pendant 2 minutes, puis refaire un quiz court." : "Consolider avec un quiz court ou un exercice de nuance."}
+            Tu peux t’arrêter ici. Si tu en as envie, les autres modes restent disponibles.
           </p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             {toReview.length>0 && <Btn label="Réviser" variant="primary" small onClick={onGoReview}/>} 
@@ -2309,6 +2341,8 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
         <span style={{fontSize:14,color:C.orange,fontWeight:700}}>+{xpToday}</span>
       </div>
       <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>{STEPS[step]} · {idx+1} / {sources.length}</div>
+      <progress aria-label="Progression de la routine" value={log.length} max={session.questionCount+(retryRef.current.total||0)} style={{width:"100%",accentColor:C.blue}}/>
+      <p style={{fontSize:13,color:C.sub,margin:0}}>{log.length+1}/{session.questionCount+(retryRef.current.total||0)} rencontres · les aides diminuent au fil des jours</p>
 
       <div className={`question-card ${feedback==="correct"?"feedback-correct":feedback==="wrong"?"feedback-wrong":""}`} style={{background:cardBg,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",transition:"background 0.4s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
         {step===0 && <StepDiscover key={`discover-${current.id}-${idx}`} word={current} words={words} shown={shown} setShown={setShown} onNext={()=>advance(true)} />}
@@ -4048,6 +4082,7 @@ function ShortExercise({word,progress,words,onAnswer}) {
   const [shown,setShown]=useState(false);
   const [input,setInput]=useState("");
   const [result,setResult]=useState(null);
+  if(!progress.seen)return <StepDiscover word={word} words={words} onNext={()=>onAnswer("good","discover")}/>;
   if(format==="flashcard")return <div>
     <p>Flashcard · retrouve le sens du mot</p><h2>{word.word}</h2>
     {!shown?<Btn label="Afficher la réponse" full onClick={()=>setShown(true)}/>:<>
@@ -4055,14 +4090,8 @@ function ShortExercise({word,progress,words,onAnswer}) {
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{[["again","À revoir"],["hard","Difficile"],["good","Retrouvé"],["easy","Facile"]].map(([r,label])=><Btn key={r} label={label} onClick={()=>onAnswer(r,"recog")}/>)}</div>
     </>}
   </div>;
-  if(format==="qcm")return <StepChoice word={word} words={words} mode="term" answerIndex={answerIndex} onAnswer={ok=>onAnswer(ok?"good":"again","recog")}/>;
-  if(format==="typing")return <StepProd word={word} inputVal={input} setInputVal={setInput} hideExample onAnswer={ok=>onAnswer(ok?"good":"again","prod")}/>;
-  const submit=()=>{if(result)return;setResult(answerMatches(input,word)?"ok":"wrong");};
-  return <div><p>Complète la phrase</p><p style={{fontSize:18,lineHeight:1.6}}>{clozePrompt}</p>
-    <input aria-label="Mot manquant" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} disabled={!!result} autoFocus style={{width:"100%",padding:12,fontSize:16,marginBottom:12}}/>
-    {!result?<><Btn label="Valider" disabled={!input.trim()} onClick={submit}/><Btn label="Passer" onClick={()=>setResult("wrong")}/></>:
-      <><LearningFeedback word={word}/><Btn label={result==="ok"?"Correct · suite":"J'ai compris"} onClick={()=>onAnswer(result==="ok"?"good":"again","context")}/></>}
-  </div>;
+  if(format==="qcm")return <StepChoice word={word} words={words} mode="term" answerIndex={answerIndex} onAnswer={(ok,mode)=>onAnswer(ok?"good":"again",mode||"recog")}/>;
+  return <GuidedRecall word={word} level={AtelierLearning.level(progress,localDateKey())} context={format==="cloze"} onAnswer={r=>onAnswer(r.neutral?"good":r.ok?"good":"again",r.neutral?"discover":format==="cloze"?"context":r.assisted?"guided":"prod",r.neutral?{kind:"discover",assisted:true}:r)}/>;
 }
 
 function ShortSession({words,state,setState,onBack}) {
@@ -4075,10 +4104,10 @@ function ShortSession({words,state,setState,onBack}) {
   const [finished,setFinished]=useState([]);
   const initialCount=useRef(queue.length);
   const word=queue[index];
-  const answer=(rating,mode="prod")=>{
+  const answer=(rating,mode="prod",evidence=null)=>{
     if(answered.current||!word)return;
     answered.current=true;
-    const next=gradeWord(state,word.id,rating,mode,freePractice?0:undefined);
+    const next=gradeWord(state,word.id,rating,mode,freePractice?0:undefined,evidence);
     setState(next);
     setFinished(ids=>[...new Set([...ids,word.id])]);
     if(rating==="again")setQueue(q=>insertRetryItem(q,index,word,retries,"short").list);
@@ -4128,6 +4157,8 @@ function App() {
   const [learnMode,setLearnMode] = useState("smart");
   const [quizMode,setQuizMode] = useState("quick");
   const [state,setState] = useState(loadProgress);
+  const [learningSettings,setLearningSettings]=useState(()=>loadProfile().learningSettings);
+  const changeLearningSettings=value=>{const normalized=normalizeLearningSettings(value);updateProfilePatch({learningSettings:normalized});setLearningSettings(normalized);};
   const [rawWords,setRawWords] = useState(()=>initialStoredWords || (VOCAB_URL ? [] : SEED_WORDS));
   const [rawFigures,setRawFigures] = useState(()=>initialStoredFigures || (FIGURES_URL ? [] : SEED_FIGURES));
   const [hasStoredWords,setHasStoredWords] = useState(()=>!!initialStoredWords);
@@ -4338,6 +4369,7 @@ function App() {
       if (!ok) return;
     }
     const ns = normalizeLoadedProgress(profileData);
+    if(profileData.learningSettings)changeLearningSettings(profileData.learningSettings);
     saveProgress(ns);
     setState(ns);
     if (Array.isArray(profileData.sources)) {
@@ -4474,7 +4506,7 @@ function App() {
           <>
             <TabBar active={tab} onSelect={selectTab} dueCount={dueCount}/>
 
-            {tab==="home"    && <Dashboard onStartCrossword={()=>startCrossword()} onStartShort={()=>setTab("short")} words={words} figures={figures} state={state} now={now} onStartDaily={startDaily} onStartReview={()=>startReview("smart")} onStartFragile={()=>startReview("fragile")} onStartDue={()=>startReview("due")} onStartQuiz={()=>startQuiz("quick")} onStartNuance={()=>startQuiz("nuance")} onStartFigures={startFigures}/>} 
+            {tab==="home"    && <Dashboard settings={learningSettings} onSettingsChange={changeLearningSettings} onStartCrossword={()=>startCrossword()} onStartShort={()=>setTab("short")} words={words} figures={figures} state={state} now={now} onStartDaily={startDaily} onStartReview={()=>startReview("smart")} onStartFragile={()=>startReview("fragile")} onStartDue={()=>startReview("due")} onStartQuiz={()=>startQuiz("quick")} onStartNuance={()=>startQuiz("nuance")} onStartFigures={startFigures}/>} 
             {tab==="short" && <ShortSession words={words} state={state} setState={setState} onBack={()=>setTab("home")} onPractice={()=>startReview("all")}/>}
             {tab==="daily"   && <DailyTab   words={words} state={state} setState={setState} onMilestone={setMilestone} onGoReview={()=>startReview("fragile")} onGoQuiz={()=>startQuiz("quick")} onGoNuance={()=>startQuiz("nuance")}/>} 
             {tab==="learn"   && <LearnTabNew words={words} state={state} setState={setState} onMilestone={setMilestone} initialMode={learnMode} onStartNuance={()=>startQuiz("nuance")}/>} 
