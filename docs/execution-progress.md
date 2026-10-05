@@ -10,3 +10,4 @@ Prévol : les lots 1 et 3 partagent meta.practiceDays ; les lots 2 et 4 partagen
 
 Lot 0 : clone complet et icônes conservées ; seize régressions et compilation JSX passent.
 Lot 1 : objectif et flamme intégrés ; cinq tests de fonctionnalité et seize régressions passent. Les clés lastDay legacy sont lues, puis écrites en date locale ISO.
+Lot 2 : corrections partagées avec exemple réel, astuce et différence explicite ; suppression de toutes les vies et des écrans éliminatoires. Trois tests passent et le JSX compile. Vérification navigateur finale prévue.

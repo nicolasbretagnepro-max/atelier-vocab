@@ -1499,6 +1499,12 @@ function buildDailySession(state, words) {
   return { discover, review, association, context, production, boss, newLimit };
 }
 
+function learningFeedbackContent(word,chosen=null) {
+  return {definition:word.definition||word.compact||"", example:word.hasRealExample?getExampleText(word):"",
+    memoryTip:word.memoryTip||"", etymology:word.etymology||"",
+    difference:chosen?(normalizeConfusions(word.confusions).find(c=>norm(c.word)===norm(chosen.word))?.difference||""):""};
+}
+
 const MILESTONES = [
   { key:"streak3",    check:(s,_)=>s.meta.streak>=3,   icon:"🔥", text:"3 jours de suite !" },
   { key:"streak7",    check:(s,_)=>s.meta.streak>=7,   icon:"🔥🔥", text:"7 jours de suite !" },
@@ -2021,7 +2027,6 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
   const [stepQueues,setStepQueues] = useState(null);
   const [step,setStep] = useState(0);
   const [idx,setIdx] = useState(0);
-  const [hearts,setHearts] = useState(3);
   const [xpToday,setXpToday] = useState(0);
   const [sessionStreak,setSessionStreak] = useState(0);
   const [done,setDone] = useState(()=>loadDailyDone());
@@ -2057,7 +2062,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     const nextSession = buildDailySession(state, words);
     setSession(nextSession);
     setStepQueues(buildDailyQueues(nextSession));
-    setStep(0); setIdx(0); setHearts(3); setXpToday(0); setSessionStreak(0); setFeedback(null); setInputVal(""); setShown(false); setLog([]);
+    setStep(0); setIdx(0);  setXpToday(0); setSessionStreak(0); setFeedback(null); setInputVal(""); setShown(false); setLog([]);
     advancingRef.current = false;
     retryRef.current = {};
     completionBonusRef.current = false;
@@ -2106,7 +2111,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     const ns = gradeWord(state, current.id, ok ? "good" : "again", step === 0 ? "discover" : mode, ok ? _dailyXp : 0);
     setState(ns);
     setSessionStreak(newStreak);
-    if (ok) { haptic("correct"); setXpToday(x => x + _dailyXp); } else { haptic("wrong"); setHearts(h => h - 1); }
+    if (ok) { haptic("correct"); setXpToday(x => x + _dailyXp); } else { haptic("wrong");  }
     setLog(l=>[...l,{word:current,ok}]);
     setFeedback(ok?"correct":"wrong");
     let effectiveLength = sources.length;
@@ -2200,16 +2205,6 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     );
   }
 
-  if (hearts <= 0) return (
-    <div style={{textAlign:"center",padding:"48px 0"}}>
-      <div style={{fontSize:56,marginBottom:16}}>💔</div>
-      <h2 style={{fontSize:22,fontWeight:700,marginBottom:10,color:C.text}}>Session terminée</h2><p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:20}}>Tes erreurs ont été ajoutées à tes révisions.</p>
-      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-        <Btn label="Rejouer" variant="primary" onClick={()=>{const nextSession=buildDailySession(state,words);setHearts(3);setStep(0);setIdx(0);setLog([]);setFeedback(null);setInputVal("");setShown(false);setSessionStreak(0);advancingRef.current=false;retryRef.current={};completionBonusRef.current=false;resetRoutineAnswerPositions();setSession(nextSession);setStepQueues(buildDailyQueues(nextSession));}}/>
-        <Btn label="Réviser mes erreurs" variant="ghost" onClick={onGoReview}/>
-      </div>
-    </div>
-  );
 
   if (!current) return (
     <div>
@@ -2232,7 +2227,6 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
             <div key={i} style={{flex:1,height:5,borderRadius:99,background:i<step?C.green:i===step?C.blue:"rgba(0,0,0,0.1)",transition:"background 0.3s"}}/>
           ))}
         </div>
-        <span style={{fontSize:14,color:C.red,fontWeight:700,minWidth:52,textAlign:"right"}}>{"♥".repeat(Math.max(0,hearts))}{"♡".repeat(Math.max(0,3-hearts))}</span>
         {sessionStreak >= 3 && <span style={{fontSize:13,color:C.orange,fontWeight:800,minWidth:28}} title={`Série de ${sessionStreak} bonne(s) réponse(s)`}>🔥{sessionStreak}</span>}
         <span style={{fontSize:14,color:C.orange,fontWeight:700}}>+{xpToday}</span>
       </div>
@@ -2247,6 +2241,18 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
       </div>
     </div>
   );
+}
+
+function LearningFeedback({word,chosen=null}) {
+  const f=learningFeedbackContent(word,chosen);
+  return <aside aria-live="polite" style={{padding:14,borderRadius:14,background:`${C.blue}08`,marginBottom:12}}>
+    <p style={{fontWeight:800,margin:"0 0 8px"}}>Réponse : {word.word}</p>
+    <p style={{fontSize:14,lineHeight:1.6}}>{f.definition}</p>
+    {f.example&&<p style={{fontStyle:"italic",lineHeight:1.6}}>Exemple : {f.example}</p>}
+    {f.difference&&<p><strong>À distinguer de {chosen.word} : </strong>{f.difference}</p>}
+    {f.memoryTip&&<p><strong>Pour retenir : </strong>{f.memoryTip}</p>}
+    {f.etymology&&<p style={{fontSize:13,color:C.sub}}>Origine : {f.etymology}</p>}
+  </aside>;
 }
 
 function StepDiscover({word,words,shown,setShown,onNext}) {
@@ -2351,12 +2357,7 @@ function StepChoice({word,words,mode,onAnswer,answerIndex=0}) {
       </div>
       {wrong && (
         <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
-          <ExampleBlock word={word}/>
-          <div style={{padding:"10px 14px",borderRadius:14,background:`${C.red}06`,border:`1px solid ${C.red}20`,marginBottom:12}}>
-            <p style={{fontSize:13,fontWeight:800,color:C.text,margin:"0 0 3px"}}>{word.word}</p>
-            <p style={{fontSize:13,color:C.sub,lineHeight:1.55,margin:"0 0 4px"}}>{word.compact}</p>
-            <p style={{fontSize:12,color:C.ter,lineHeight:1.5,margin:0}}>{word.definition}</p>
-          </div>
+          <LearningFeedback word={word} chosen={options.find(o=>o.id===selected)}/>
           <Btn label="J'ai compris" variant="primary" full onClick={()=>onAnswer(false)}/>
         </div>
       )}
@@ -2428,12 +2429,7 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
       </div>
       {wrong && (
         <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
-          <ExampleBlock word={word}/>
-          <div style={{padding:"10px 14px",borderRadius:14,background:`${C.red}06`,border:`1px solid ${C.red}20`,marginBottom:12}}>
-            <p style={{fontSize:13,fontWeight:800,color:C.text,margin:"0 0 3px"}}>{word.word}</p>
-            <p style={{fontSize:13,color:C.sub,lineHeight:1.55,margin:"0 0 4px"}}>{word.compact}</p>
-            <p style={{fontSize:12,color:C.ter,lineHeight:1.5,margin:0}}>{word.definition}</p>
-          </div>
+          <LearningFeedback word={word} chosen={options.find(o=>o.id===selected)}/>
           <Btn label="J'ai compris" variant="primary" full onClick={()=>onAnswer(false)}/>
         </div>
       )}
@@ -2503,15 +2499,7 @@ function StepContext({word,words,onAnswer,exampleIndex=0,answerIndex=0}) {
       </div>
       {wrong&&(
         <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
-          {/* Feedback enrichi : définition longue + deuxième exemple complet */}
-          <div style={{padding:"12px 14px",borderRadius:14,background:`${C.red}06`,border:`1px solid ${C.red}20`,marginBottom:10}}>
-            <p style={{fontSize:13,fontWeight:800,color:C.text,margin:"0 0 4px"}}>{word.word} <span style={{fontWeight:500,color:C.sub}}>— {word.nature}</span></p>
-            <p style={{fontSize:13,color:C.sub,lineHeight:1.6,margin:0}}>{word.compact}</p>
-          </div>
-          <p style={{fontSize:12,fontWeight:700,color:C.sub,textTransform:"uppercase",letterSpacing:0.7,margin:"0 0 4px"}}>Définition complète</p>
-          <p style={{fontSize:13,color:C.sub,lineHeight:1.6,marginBottom:10}}>{word.definition}</p>
-          {/* Exemple alternatif pour ancrer la mémorisation sans répéter la phrase à trou */}
-          <ExampleBlock word={word} showLabel={true} fontSize={13} cloze={false} exampleIndex={altIndex} />
+          <LearningFeedback word={word} chosen={options.find(o=>o.id===selected)}/>
           <Btn label="J'ai compris" variant="primary" full onClick={()=>onAnswer(false)}/>
         </div>
       )}
@@ -2559,9 +2547,7 @@ function StepProd({word,inputVal,setInputVal,onAnswer,exampleIndex=1,hideExample
 
       {result === "wrong" && (
         <div style={{padding:"12px 14px",borderRadius:14,background:`${C.red}08`,border:`1px solid ${C.red}25`,marginBottom:12,animation:"fadeSlideIn 0.25s ease"}}>
-          <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:0}}>Réponse attendue : <strong style={{color:C.text}}>{word.word}</strong></p>
-          <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"6px 0 0"}}>{word.definition}</p>
-          {hideExample && <ExampleBlock word={word} showLabel fontSize={13}/>}
+          <LearningFeedback word={word}/>
         </div>
       )}
 
@@ -2764,7 +2750,6 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
   const [session,setSession] = useState(()=>buildFigureRoutine(state,figures,variant));
   const [step,setStep] = useState(0);
   const [idx,setIdx] = useState(0);
-  const [hearts,setHearts] = useState(3);
   const [xpSession,setXpSession] = useState(0);
   const [shown,setShown] = useState(false);
   const [selected,setSelected] = useState(null);
@@ -2775,7 +2760,7 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
 
   useEffect(() => {
     setSession(buildFigureRoutine(state,figures,variant));
-    setStep(0); setIdx(0); setHearts(3); setXpSession(0); setShown(false); setSelected(null); setDone(false); setLog([]);
+    setStep(0); setIdx(0);  setXpSession(0); setShown(false); setSelected(null); setDone(false); setLog([]);
     advancingRef.current = false;
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [figuresSignature, variant]);
@@ -2792,7 +2777,7 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
   const restart = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setSession(buildFigureRoutine(state,figures,variant));
-    setStep(0); setIdx(0); setHearts(3); setXpSession(0); setShown(false); setSelected(null); setDone(false); setLog([]);
+    setStep(0); setIdx(0);  setXpSession(0); setShown(false); setSelected(null); setDone(false); setLog([]);
     advancingRef.current = false;
   }, [state, figures, variant]);
 
@@ -2803,7 +2788,7 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
     const xp = ok ? calcXP(state, current, xpMode) : 0;
     const ns = gradeWord(state, current.id, ok ? "good" : "again", steps[step] === "Découverte" ? "discover" : mode, xp);
     setState(ns);
-    if (ok) setXpSession(x=>x+xp); else setHearts(h=>h-1);
+    if (ok) setXpSession(x=>x+xp);;
     setLog(l=>[...l,{figure:current,ok,step:steps[step]}]);
     const m = checkMilestones(ns, figures);
     if (m) onMilestone(m);
@@ -2850,17 +2835,6 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
     );
   }
 
-  if (hearts <= 0) return (
-    <div style={{textAlign:"center",padding:"44px 0"}}>
-      <div style={{fontSize:54,marginBottom:12}}>💔</div>
-      <h2 style={{fontSize:22,fontWeight:800,color:C.text,marginBottom:8}}>Session terminée</h2>
-      <p style={{fontSize:14,color:C.sub,lineHeight:1.6,margin:"0 0 20px"}}>Les figures manquées reviendront en priorité.</p>
-      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-        <Btn label="Rejouer" variant="primary" onClick={restart}/>
-        <Btn label="Retour" variant="ghost" onClick={onBack}/>
-      </div>
-    </div>
-  );
 
   if (!current) return <Card style={{textAlign:"center",padding:"40px 24px",color:C.sub}}>Aucune figure disponible pour cette routine.</Card>;
 
@@ -2876,7 +2850,6 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
         <div style={{flex:1,display:"flex",gap:4}}>
           {steps.map((s,i)=><div key={s} style={{flex:1,height:5,borderRadius:99,background:i<step?C.green:i===step?C.indigo:"rgba(0,0,0,0.1)",transition:"background 0.3s"}}/>)}
         </div>
-        <span style={{fontSize:14,color:C.red,fontWeight:800,minWidth:52,textAlign:"right"}}>{"♥".repeat(Math.max(0,hearts))}{"♡".repeat(Math.max(0,3-hearts))}</span>
         <span style={{fontSize:14,color:C.orange,fontWeight:800}}>+{xpSession}</span>
       </div>
       <div style={{fontSize:12,color:C.sub,fontWeight:750,letterSpacing:0.8,textTransform:"uppercase"}}>{steps[step]} · {idx+1} / {sources.length}</div>
@@ -3386,7 +3359,6 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
   const [started, setStarted] = useState(false);
   const [pool, setPool] = useState([]);
   const [idx, setIdx] = useState(0);
-  const [hearts, setHearts] = useState(3);
   const [streak, setStreak] = useState(0);
   const [xpSession, setXpSession] = useState(0);
   const [log, setLog] = useState([]);
@@ -3399,7 +3371,7 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
   const total = pool.length;
   const resetSession = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    setIdx(0); setHearts(3); setStreak(0); setXpSession(0); setLog([]); setDone(false); setBonusAwarded(false);
+    setIdx(0);  setStreak(0); setXpSession(0); setLog([]); setDone(false); setBonusAwarded(false);
     retryRef.current = {};
   }, []);
   const startSession = useCallback(() => {
@@ -3427,10 +3399,8 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
     const newStreak = ok ? streak + 1 : 0;
     let xp = 0;
     if (ok) { xp = calcXP(state, current, "recog"); xp += calcStreakBonus(streak, newStreak); }
-    const newHearts = ok ? hearts : hearts - 1;
     const ns = gradeWord(state, current.id, ok ? "good" : "again", responseMode, xp);
     setState(ns); setStreak(newStreak);
-    if (!ok) setHearts(newHearts);
     setXpSession(x => x + xp);
     const newLog = [...log, {word: current, ok}]; setLog(newLog);
     const m = checkMilestones(ns, words); if (m) onMilestone(m);
@@ -3442,7 +3412,7 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
     }
     if (!ok && newHearts <= 0) return;
     timerRef.current = setTimeout(() => { if (idx + 1 >= effectiveTotal) setDone(true); else setIdx(i => i + 1); }, ok ? 600 : 0);
-  }, [current, state, setState, streak, hearts, idx, total, words, onMilestone, log, pool]);
+  }, [current, state, setState, streak, idx, total, words, onMilestone, log, pool]);
 
   if (!started) return (
     <Card style={{display:"flex",flexDirection:"column",gap:16,animation:"fadeSlideIn 0.25s ease"}}>
@@ -3475,17 +3445,6 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
     </Card>
   );
 
-  if (hearts <= 0 && !done) return (
-    <div style={{textAlign:"center",padding:"40px 0"}}>
-      <div style={{fontSize:52,marginBottom:12}}>💔</div>
-      <h2 style={{fontSize:22,fontWeight:700,marginBottom:10,color:C.text}}>Session terminée</h2>
-      <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:24}}>Tes erreurs ont été ajoutées à tes révisions.</p>
-      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-        <Btn label="Rejouer" variant="primary" onClick={restartSession}/>
-        <Btn label="Retour" variant="ghost" onClick={onBack}/>
-      </div>
-    </div>
-  );
 
   if (done || !current) {
     const nOk = log.filter(e => e.ok).length; const nWrong = log.filter(e => !e.ok).length;
@@ -3509,7 +3468,6 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
         <div style={{flex:1,background:"rgba(0,0,0,0.08)",borderRadius:99,height:5,overflow:"hidden"}}>
           <div style={{height:"100%",borderRadius:99,background:color||C.blue,width:(Math.round(idx/Math.max(total,1)*100))+"%",transition:"width 0.3s"}}/>
         </div>
-        <span style={{fontSize:14,color:C.red,fontWeight:700}}>{"♥".repeat(Math.max(0,hearts))}{"♡".repeat(Math.max(0,3-hearts))}</span>
         <span style={{fontSize:14,color:C.orange,fontWeight:700}}>+{xpSession}</span>
       </div>
       <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>{title} · {idx+1}/{total}</div>
@@ -3840,7 +3798,6 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   const SIZES = [5,10,15,20];
   const [maxQ, setMaxQ] = useState(10);
   const [started, setStarted] = useState(false);
-  const [hearts, setHearts] = useState(3);
   const [streak, setStreak] = useState(0);
   const [xpSession, setXpSession] = useState(0);
   const [count, setCount] = useState(0);
@@ -3876,7 +3833,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   const startQuiz = () => {
     askedRef.current = new Set();
     setCount(0); setScore(0); setDone(false); setSelected(null);
-    setHearts(3); setStreak(0); setXpSession(0); setBonusAwarded(false);
+     setStreak(0); setXpSession(0); setBonusAwarded(false);
     const eligible = candidates(stateRef.current, words, "practice", words.length).length;
     if (!eligible) return;
     setMaxQ(Math.min(maxQ, eligible));
@@ -3902,29 +3859,15 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
     const newStreak = ok ? streak + 1 : 0;
     let xp = 0;
     if (ok) { xp = calcXP(stateRef.current, w, "recog"); xp += calcStreakBonus(streak, newStreak); }
-    const newHearts = ok ? hearts : hearts - 1;
     const ns = gradeWord(stateRef.current, w.id, ok ? "good" : "again", responseMode, xp);
     stateRef.current = ns; setState(ns); setStreak(newStreak);
-    if (!ok) setHearts(newHearts);
     setXpSession(x => x + xp);
     const m = checkMilestones(ns, words); if (m) onMilestone(m);
     if (ok) setScore(s => s+1);
     const next = count + 1;
-    if (!ok && newHearts <= 0) return; // hearts=0 screen
     if (ok) timerRef.current = setTimeout(() => moveNext(next), 650);
   };
 
-  if (hearts <= 0 && started && !done) return (
-    <div style={{textAlign:"center",padding:"40px 0"}}>
-      <div style={{fontSize:52,marginBottom:12}}>💔</div>
-      <h2 style={{fontSize:22,fontWeight:700,marginBottom:10,color:C.text}}>Session terminée</h2>
-      <p style={{fontSize:14,color:C.sub,lineHeight:1.6,marginBottom:24}}>Tes erreurs ont été ajoutées à tes révisions.</p>
-      <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
-        <Btn label="Rejouer" variant="primary" onClick={startQuiz}/>
-        <Btn label="Changer le nombre" variant="ghost" onClick={()=>{setStarted(false);setDone(false);}}/>
-      </div>
-    </div>
-  );
 
   if (!started && !done) return (
     <Card style={{textAlign:"center",padding:"36px 24px"}}>
@@ -3958,10 +3901,10 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
 
   if (!w || !quiz) return <div style={{color:C.sub,textAlign:"center",padding:48}}>Chargement…</div>;
   if (quiz.options.length < 3) return <Card>
-    <p style={{color:C.sub,marginBottom:8}}>Question {count+1}/{maxQ} · {hearts} ♥ · +{xpSession} XP</p>
+    <p style={{color:C.sub,marginBottom:8}}>Question {count+1}/{maxQ} · +{xpSession} XP</p>
     <Bar value={(count/maxQ)*100} color={C.blue}/>
     <SafeRecallFallback key={w.id} word={w}
-    onAnswer={ok=>{handleAnswer({id:ok?w.id:"__wrong__"},"prod");if(!ok&&hearts>1)moveNext(count+1);}}/></Card>;
+    onAnswer={ok=>{handleAnswer({id:ok?w.id:"__wrong__"},"prod");if(!ok)moveNext(count+1);}}/></Card>;
   const wrong = selected && selected !== w.id;
 
   return (
@@ -3969,7 +3912,6 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
       <div style={{display:"flex",alignItems:"center",gap:10}}>
         <div style={{flex:1}}><Bar value={(count/maxQ)*100} color={C.blue}/></div>
         <span style={{fontSize:13,color:C.sub,fontWeight:600}}>{count+1}/{maxQ}</span>
-        <span style={{fontSize:13,color:C.red,fontWeight:700}}>{"♥".repeat(Math.max(0,hearts))}{"♡".repeat(Math.max(0,3-hearts))}</span>
         <span style={{fontSize:13,color:C.orange,fontWeight:700}}>+{xpSession}</span>
       </div>
       <Card>
@@ -3984,8 +3926,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
         </div>
         {wrong && (
           <div style={{marginTop:14,animation:"fadeSlideIn 0.3s ease"}}>
-            <ExampleBlock word={w}/>
-            <p style={{fontSize:13,color:C.sub,margin:"0 0 12px",lineHeight:1.5}}>{w.definition}</p>
+            <LearningFeedback word={w} chosen={quiz.options.find(o=>o.id===selected)}/>
             <Btn label="J'ai compris" variant="primary" full onClick={()=>moveNext(count+1)}/>
           </div>
         )}
