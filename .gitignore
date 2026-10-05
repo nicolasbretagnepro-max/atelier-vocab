@@ -3,3 +3,5 @@ tests/verification.png
 tests/babel.min.cjs
 .superpowers/
 data/audit-report.json
+data/corpus-local.json
+tests/implement-*.py

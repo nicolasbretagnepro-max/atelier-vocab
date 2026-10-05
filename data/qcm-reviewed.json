@@ -1,0 +1,742 @@
+{
+  "version": 1,
+  "reviewedAt": "2026-10-05",
+  "note": "35 définitions contrôlées. Choix volontairement éloignés : biosphère, vie érémitique, héritage ancestral, trouble de la volonté. Validation limitée à ces paires et à ces définitions exactes. Aucun QCM contextuel validé dans ce lot.",
+  "entries": [
+    {
+      "word": "Se rebiffer",
+      "kind": "vocab",
+      "qcm_definition": "Résister vivement, se révolter.",
+      "qcm_full_definition": "Réagir contre une contrainte, une injustice ou une pression en refusant de se laisser faire. Le mot suggère un sursaut de résistance, parfois brusque ou agacé.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Se rengorger",
+      "kind": "vocab",
+      "qcm_definition": "Prendre un air fier et satisfait.",
+      "qcm_full_definition": "Afficher ostensiblement sa satisfaction ou son orgueil, souvent après un compliment ou un succès. Le mot évoque une attitude de vanité visible, presque théâtrale.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "À l'aune de",
+      "kind": "vocab",
+      "qcm_definition": "En prenant pour mesure ou critère.",
+      "qcm_full_definition": "S'emploie pour juger, évaluer ou interpréter quelque chose à partir d'un critère précis. L'image vient de l'aune, ancienne mesure de longueur.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "À l'orée",
+      "kind": "vocab",
+      "qcm_definition": "Au bord d'un lieu, surtout d'un bois.",
+      "qcm_full_definition": "Locution figée signifiant « au bord d'un lieu, surtout d'un bois ». Elle s'emploie comme un bloc, sans analyser séparément chacun de ses mots.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "A posteriori",
+      "kind": "vocab",
+      "qcm_definition": "Après coup, à partir des faits.",
+      "qcm_full_definition": "Se dit d'un jugement formulé après l'expérience, l'observation ou l'examen des faits. Il s'oppose à ce qui est affirmé avant vérification concrète.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "A priori",
+      "kind": "vocab",
+      "qcm_definition": "Avant examen, sans vérification par l'expérience.",
+      "qcm_full_definition": "Se dit d'une idée, d'un jugement ou d'une hypothèse formulés avant l'observation des faits. Le mot peut marquer une supposition provisoire plutôt qu'une certitude.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Abduction",
+      "kind": "vocab",
+      "qcm_definition": "Raisonnement vers l'explication la plus plausible.",
+      "qcm_full_definition": "Mode de raisonnement qui consiste à partir d'indices ou de faits observés pour retenir l'hypothèse qui les explique le mieux, sans certitude absolue.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Abîme",
+      "kind": "vocab",
+      "qcm_definition": "Gouffre profond ou écart immense.",
+      "qcm_full_definition": "Désigne un gouffre très profond, au sens propre. Au figuré, le mot marque un écart immense entre deux personnes, deux idées, deux situations ou deux niveaux.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Abjurer",
+      "kind": "vocab",
+      "qcm_definition": "Renoncer solennellement à une religion, une opinion.",
+      "qcm_full_definition": "Renoncer publiquement et solennellement à une croyance, une religion, une doctrine ou une opinion. Le mot implique une rupture forte, souvent sous pression ou dans un contexte grave.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Abnégation",
+      "kind": "vocab",
+      "qcm_definition": "Renoncement volontaire à son intérêt personnel.",
+      "qcm_full_definition": "Disposition à faire passer une cause, un devoir ou autrui avant soi-même, jusqu'à accepter un sacrifice personnel.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Aboulie",
+      "kind": "vocab",
+      "qcm_definition": "Affaiblissement pathologique de la volonté.",
+      "qcm_full_definition": "Trouble ou état marqué par une grande difficulté à vouloir, décider ou passer à l'action, même pour des gestes ordinaires.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Abraser",
+      "kind": "vocab",
+      "qcm_definition": "User ou polir par frottement.",
+      "qcm_full_definition": "Enlever progressivement de la matière à une surface par frottement, jusqu'à l'user, la lisser ou la rendre plus uniforme.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Abscons",
+      "kind": "vocab",
+      "qcm_definition": "Très difficile à comprendre.",
+      "qcm_full_definition": "Qualifie un propos, un texte ou un raisonnement obscur parce qu'il est trop compliqué, mal formulé ou volontairement hermétique.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Absoudre",
+      "kind": "vocab",
+      "qcm_definition": "Pardonner ou déclarer non coupable.",
+      "qcm_full_definition": "Lever une faute, une culpabilité ou une condamnation, soit par pardon moral, soit par décision religieuse ou juridique.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Absous",
+      "kind": "vocab",
+      "qcm_definition": "Pardonné ou déclaré non coupable.",
+      "qcm_full_definition": "Qualifie une personne libérée d'une faute, d'une accusation ou d'une culpabilité, soit par pardon moral, soit par décision religieuse ou juridique.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Abyssal",
+      "kind": "vocab",
+      "qcm_definition": "Extrêmement profond ou considérable.",
+      "qcm_full_definition": "Du vocabulaire océanographique (fosses abyssales) à l'hyperbole courante. Au figuré, marque une démesure qui donne le vertige, presque toujours en mauvaise part : un déficit abyssal, une ignorance abyssale.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Abysses",
+      "kind": "vocab",
+      "qcm_definition": "Grandes profondeurs marines ou gouffres infernaux.",
+      "qcm_full_definition": "Désigne les très grandes profondeurs marines, sombres et difficiles d'accès. Le mot peut aussi évoquer, de façon imagée, un gouffre inquiétant ou une chute vers l'inconnu.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Acerbe",
+      "kind": "vocab",
+      "qcm_definition": "Mordant, dur et blessant.",
+      "qcm_full_definition": "Qualifie une parole, une critique ou un ton dont la dureté attaque vivement. Le mot suppose une âpreté qui peut humilier ou blesser.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Achalandé",
+      "kind": "vocab",
+      "qcm_definition": "Fréquenté par de nombreux clients.",
+      "qcm_full_definition": "Qualifie surtout un commerce, un marché ou un lieu qui attire une clientèle nombreuse. Dans l'usage courant, il peut aussi signifier bien fourni, même si ce sens est discuté.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Aconit",
+      "kind": "vocab",
+      "qcm_definition": "Plante très toxique de la famille des renonculacées.",
+      "qcm_full_definition": "Plante très toxique, parfois appelée « casque de Jupiter », connue pour contenir des alcaloïdes dangereux et pour son usage fréquent dans l'imaginaire du poison.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Acrimonie",
+      "kind": "vocab",
+      "qcm_definition": "Aigreur agressive dans les propos ou l'attitude.",
+      "qcm_full_definition": "Disposition hostile et mordante qui rend les paroles, les gestes ou les échanges inutilement durs et blessants.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Ad hoc",
+      "kind": "vocab",
+      "qcm_definition": "Créé ou choisi pour un besoin précis.",
+      "qcm_full_definition": "Qualifie une solution, une procédure ou un dispositif spécialement adapté à une situation donnée, sans vocation forcément générale ou permanente.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Ad ignorantiam",
+      "kind": "vocab",
+      "qcm_definition": "Argument fondé sur l'absence de preuve contraire.",
+      "qcm_full_definition": "Sophisme qui consiste à présenter une affirmation comme vraie parce qu'elle n'a pas été réfutée, ou comme fausse parce qu'elle n'a pas été prouvée.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Ad misericordiam",
+      "kind": "vocab",
+      "qcm_definition": "Appel à la pitié pour convaincre.",
+      "qcm_full_definition": "Procédé argumentatif qui cherche à obtenir l'adhésion en suscitant la compassion plutôt qu'en apportant des preuves sur le fond.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Ad populum",
+      "kind": "vocab",
+      "qcm_definition": "Appel à l'opinion majoritaire supposée.",
+      "qcm_full_definition": "Sophisme qui prétend justifier une idée par le fait qu'elle serait partagée par beaucoup de personnes, comme si la popularité suffisait à établir la vérité.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Ad verecundiam",
+      "kind": "vocab",
+      "qcm_definition": "Appel abusif à l'autorité.",
+      "qcm_full_definition": "Raisonnement qui invoque le prestige d'une autorité à la place d'arguments ou de preuves, surtout lorsque cette autorité sort de son domaine de compétence.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Ad vitam aeternam",
+      "kind": "vocab",
+      "qcm_definition": "Pour toujours, indéfiniment.",
+      "qcm_full_definition": "Locution employée pour évoquer une durée sans limite prévisible. Elle peut avoir une nuance sérieuse, ironique ou exagérée selon le contexte.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Adage",
+      "kind": "vocab",
+      "qcm_definition": "Formule brève exprimant une vérité générale.",
+      "qcm_full_definition": "Formule traditionnelle et concise qui exprime une vérité générale, une règle de conduite ou une observation issue de l'expérience commune.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Adamantin",
+      "kind": "vocab",
+      "qcm_definition": "Dur ou éclatant comme le diamant.",
+      "qcm_full_definition": "Mot rare et littéraire, du grec 'adamas' (diamant, indomptable). Évoque autant l'éclat que la dureté inaltérable, au propre comme au figuré (une volonté adamantine).",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Adipeux",
+      "kind": "vocab",
+      "qcm_definition": "Relatif à la graisse.",
+      "qcm_full_definition": "Terme surtout médical et anatomique (tissu adipeux). Plus technique et neutre que 'gras'. Employé hors de ce cadre, il prend vite une nuance péjorative.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Adjuger",
+      "kind": "vocab",
+      "qcm_definition": "Attribuer par décision (justice, adjudication); accorder.",
+      "qcm_full_definition": "Attribuer officiellement quelque chose à quelqu'un, notamment à l'issue d'une vente aux enchères ou d'une décision d'autorité. Le mot suppose une décision qui tranche entre plusieurs possibilités.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Adjuvant",
+      "kind": "vocab",
+      "qcm_definition": "Élément ou substance ajouté pour renforcer l'action d'un autre.",
+      "qcm_full_definition": "Élément ajouté à un autre pour renforcer son action. Le terme s'emploie notamment en médecine, en pharmacie, en agriculture ou dans des domaines techniques.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Biosphère",
+      "kind": "vocab",
+      "qcm_definition": "Enveloppe de la Terre où la vie est présente.",
+      "qcm_full_definition": "Partie de la Terre où la vie existe : sols, océans, basse atmosphère, êtres vivants et milieux qui les abritent.",
+      "qcm_distractors": [
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        },
+        {
+          "word": "Aboulie",
+          "definition": "Affaiblissement pathologique de la volonté."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Anachorète",
+      "kind": "vocab",
+      "qcm_definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde.",
+      "qcm_full_definition": "Personne, le plus souvent religieuse, qui choisit une vie solitaire et retirée du monde. Le mot évoque l'isolement volontaire, l'ascèse et la rupture avec la vie sociale.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Atavisme",
+          "definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+        },
+        {
+          "word": "Aboulie",
+          "definition": "Affaiblissement pathologique de la volonté."
+        }
+      ],
+      "qcm_context_distractors": []
+    },
+    {
+      "word": "Atavisme",
+      "kind": "vocab",
+      "qcm_definition": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels.",
+      "qcm_full_definition": "Réapparition supposée d'un trait ancien hérité d'ancêtres lointains. Au figuré, le mot désigne une tendance profonde transmise par l'histoire familiale ou collective.",
+      "qcm_distractors": [
+        {
+          "word": "Biosphère",
+          "definition": "Enveloppe de la Terre où la vie est présente."
+        },
+        {
+          "word": "Anachorète",
+          "definition": "Religieux ou ermite qui mène une vie solitaire, retirée du monde."
+        },
+        {
+          "word": "Aboulie",
+          "definition": "Affaiblissement pathologique de la volonté."
+        }
+      ],
+      "qcm_context_distractors": []
+    }
+  ]
+}

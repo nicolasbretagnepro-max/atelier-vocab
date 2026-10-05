@@ -2,7 +2,7 @@
 // Version mise à jour pour forcer le renouvellement du cache
 // et éviter les anciennes réponses contenant les pseudo-exemples.
 
-const CACHE_NAME = "atelier-vocab-v6-srs";
+const CACHE_NAME = "atelier-vocab-v7-learning";
 
 const ASSETS = [
   "./",
@@ -10,6 +10,7 @@ const ASSETS = [
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
+  "./data/qcm-reviewed.json",
   "https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"
@@ -18,9 +19,9 @@ const ASSETS = [
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(ASSETS).catch(err => {
-        console.warn("Certains assets non mis en cache :", err);
-      });
+      return Promise.all(ASSETS.map(asset=>cache.add(asset).catch(err=>{
+        console.warn("Asset non mis en cache :",asset,err);
+      })));
     })
   );
   self.skipWaiting();

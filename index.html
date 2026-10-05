@@ -591,12 +591,23 @@ clozeType: examples[0]?.clozeType || "",
   };
 }
 
-function buildWords(rawWords, kind = "vocab") {
+function getQcmReviewRecord(word,reviewData) {
+  if(reviewData?.version!==1||!Array.isArray(reviewData.entries))return null;
+  return reviewData.entries.find(r=>r&&norm(r.word)===norm(word.word)&&(r.kind||"vocab")===word.kind
+    &&r.qcm_definition===(word.compact||word.definition)
+    &&r.qcm_full_definition===word.definition)||null;
+}
+function loadQcmReviewCache() {
+  try {const data=JSON.parse(localStorage.getItem("av-qcm-review-v1"));return data?.version===1&&Array.isArray(data.entries)?data:null;}catch{return null;}
+}
+function buildWords(rawWords, kind = "vocab", reviewData = null) {
   const seen = new Map();
   return rawWords
     .filter(w => w && typeof w.word === "string" && w.word.trim())
     .map(w => {
-      const built = buildWord(w, kind);
+      let built = buildWord(w, kind);
+      const review=getQcmReviewRecord(built,reviewData);
+      if(review)built={...built,qcmDefinition:review.qcm_definition,qcmDistractors:review.qcm_distractors||[],qcmContextDistractors:review.qcm_context_distractors||[]};
       const n = seen.get(built.id) || 0;
       seen.set(built.id, n + 1);
       return n === 0 ? built : { ...built, id: `${built.id}-${n + 1}` };
@@ -1377,14 +1388,7 @@ function gradeWord(state, id, rating, mode = "recog", customXp) {
   const scheduled = scheduleReview(previous, rating);
   for (const key of ["easeFactor", "intervalDays", "repetitions", "next", "lastScheduledDay", "relearning"]) x[key] = scheduled[key];
 
-  const today = new Date().toDateString();
   const meta = { ...DEFAULT_META, ...(ns.meta || {}) };
-  if (meta.lastDay !== today) {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    meta.streak = meta.lastDay === yesterday.toDateString() ? (meta.streak || 0) + 1 : 1;
-    meta.lastDay = today;
-  }
   const _xpD = (typeof customXp === "number") ? customXp : (rating === "again" ? 0 : 10); meta.xp = (meta.xp || 0) + _xpD;
   ns.meta = recordDailyPractice(meta,id);
   recordActivity(rating, mode, customXp);
@@ -1501,9 +1505,11 @@ function buildDailySession(state, words) {
 
 function validClozePrompt(word) {
   if(!word.hasRealExample)return null;
-  const prompt=getExampleText(word,true);
-  if(!/(________|\[…\])/.test(prompt)||textContainsAnswer(prompt,word))return null;
-  return prompt;
+  for(let i=0;i<Math.max(1,word.examples?.length||0);i++) {
+    const prompt=getExampleByIndex(word,i,true);
+    if(/(________|\[…\])/.test(prompt)&&!textContainsAnswer(prompt,word))return prompt;
+  }
+  return null;
 }
 function chooseLearningFormat(word,progress,words) {
   if(!progress.seen||progress.relearning)return "flashcard";
@@ -2404,12 +2410,6 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
 
   const answerIndex = answerPosition(questionIndex);
   const mode = ["definition", "example", "term"][questionIndex % 3];
-  const options = useMemo(
-    ()=>placeAnswerAt(word, mode === "example"
-      ? smartDistractorsContext(word, words, 3, getReviewExamplePrompt(word))
-      : smartDistractors(word, words, 3), answerIndex),
-    [word.id, words, answerIndex, mode]
-  );
   const prompt = useMemo(() => (
     mode === "definition"
       ? (word.compact || word.definition)
@@ -2417,6 +2417,12 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
         ? getReviewExamplePrompt(word)
         : word.word
   ), [mode, word.id]);
+  const options = useMemo(
+    ()=>placeAnswerAt(word, mode === "example"
+      ? smartDistractorsContext(word, words, 3, prompt)
+      : smartDistractors(word, words, 3), answerIndex),
+    [word.id, words, answerIndex, mode, prompt]
+  );
   const label = mode === "definition" ? "Définition → mot" : mode === "example" ? "Exemple masqué → mot" : "Mot → définition";
   const helper = mode === "term" ? "Quelle définition correspond à ce mot ?" : "Quel mot correspond à cet indice ?";
   const renderOption = (o) => mode === "term" ? o.compact : o.word;
@@ -2474,10 +2480,11 @@ function StepContext({word,words,onAnswer,exampleIndex=0,answerIndex=0}) {
     if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
 
-  // Utilise smartDistractorsContext pour prioriser la même nature grammaticale
+  const prompt=useMemo(()=>getExampleByIndex(word,exampleIndex,true),[word.id,exampleIndex]);
+  // Validate the exact displayed sentence.
   const pool = useMemo(
-    ()=>smartDistractorsContext(word, words, 3),
-    [word.id, words]
+    ()=>smartDistractorsContext(word, words, 3, prompt),
+    [word.id, words, prompt]
   );
   const options = useMemo(()=>placeAnswerAt(word, pool, answerIndex),[word,pool,answerIndex]);
 
@@ -2501,7 +2508,7 @@ function StepContext({word,words,onAnswer,exampleIndex=0,answerIndex=0}) {
     <div>
       <p style={{fontSize:12,color:C.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Complète la phrase</p>
       {/* Phrase à trou avec l'exemple à l'index choisi */}
-      <ExampleBlock word={word} showLabel={false} fontSize={16} cloze exampleIndex={exampleIndex} />
+      <p style={{fontSize:16,fontStyle:"italic",lineHeight:1.6}}>{prompt}</p>
       <div className="choice-grid">
         {options.map(o=>{
           let bg=C.solid,border=C.border,color=C.blue;
@@ -2691,8 +2698,8 @@ function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
         {selected && (
           <div style={{marginTop:14,animation:"fadeSlideIn 0.25s ease"}}>
             <p style={{fontSize:13,color:wrong?C.red:C.green,fontWeight:800,margin:"0 0 8px"}}>{wrong ? "À corriger" : "Correct"}</p>
-            <p style={{fontSize:14,color:C.text,lineHeight:1.55,margin:"0 0 8px"}}><strong>{current.word}</strong> — {current.compact}</p>
-            <ConfusionBlock word={current} words={words}/>
+            <LearningFeedback word={current} chosen={q.options.find(o=>o.id===selected)}/>
+            
             <Btn label="Continuer" variant="primary" full onClick={continueNext}/>
           </div>
         )}
@@ -2797,6 +2804,12 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
   const current = sources[idx];
   const questionMode = steps[step] === "Définitions" ? "definition" : "identify";
   const q = useMemo(()=>current ? buildFigureQuestion(current, figures, questionMode) : null, [current, figures, questionMode]);
+  useEffect(()=>{
+    if(current||done)return;
+    const next=steps.findIndex((name,i)=>i>step&&(name==="Découverte"?session.discover:name==="Boss"?session.boss:session.review).length);
+    if(next>=0){setStep(next);setIdx(0);}
+    else if(log.length)setDone(true);
+  },[current,done,step,session,log.length]);
 
   const restart = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -2812,7 +2825,7 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
     const xp = ok ? calcXP(state, current, xpMode) : 0;
     const ns = gradeWord(state, current.id, ok ? "good" : "again", steps[step] === "Découverte" ? "discover" : mode, xp);
     setState(ns);
-    if (ok) setXpSession(x=>x+xp);;
+    if (ok) setXpSession(x=>x+xp);
     setLog(l=>[...l,{figure:current,ok,step:steps[step]}]);
     const m = checkMilestones(ns, figures);
     if (m) onMilestone(m);
@@ -2909,9 +2922,8 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
             {selected && (
               <div style={{marginTop:14,animation:"fadeSlideIn 0.25s ease"}}>
                 <p style={{fontSize:13,color:wrong?C.red:C.green,fontWeight:850,margin:"0 0 8px"}}>{wrong ? "À corriger" : "Correct"}</p>
-                <p style={{fontSize:15,color:C.text,lineHeight:1.55,margin:"0 0 8px"}}><strong>{current.word}</strong> — {current.compact}</p>
-                <FigureExampleBlock figure={current}/>
-                {wrong && <Btn label="J'ai compris" variant="primary" full onClick={()=>advance(false, questionMode === "definition" ? "recog" : "prod")}/>}
+                <LearningFeedback word={current} chosen={q.options.find(o=>o.id===selected)}/>
+            {wrong && <Btn label="J'ai compris" variant="primary" full onClick={()=>advance(false, questionMode === "definition" ? "recog" : "prod")}/>}
               </div>
             )}
           </>
@@ -3041,9 +3053,7 @@ function FigurePractice({figures,state,setState,onMilestone,mode="identify",onBa
         {selected && (
           <div style={{marginTop:14,animation:"fadeSlideIn 0.25s ease"}}>
             <p style={{fontSize:13,color:wrong?C.red:C.green,fontWeight:850,margin:"0 0 8px"}}>{wrong ? "À corriger" : "Correct"}</p>
-            <p style={{fontSize:15,color:C.text,lineHeight:1.55,margin:"0 0 8px"}}><strong>{current.word}</strong> — {current.compact}</p>
-            <p style={{fontSize:13,color:C.sub,lineHeight:1.55,margin:"0 0 10px"}}>{current.definition}</p>
-            <FigureExampleBlock figure={current}/>
+            <LearningFeedback word={current} chosen={q.options.find(o=>o.id===selected)}/>
             {wrong && <Btn label="Continuer" variant="primary" full onClick={()=>moveNext(count+1)}/>}
           </div>
         )}
@@ -3434,7 +3444,6 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
       effectiveTotal = retry.list.length;
       if (retry.inserted) setPool(retry.list);
     }
-    if (!ok && newHearts <= 0) return;
     timerRef.current = setTimeout(() => { if (idx + 1 >= effectiveTotal) setDone(true); else setIdx(i => i + 1); }, ok ? 600 : 0);
   }, [current, state, setState, streak, idx, total, words, onMilestone, log, pool]);
 
@@ -3961,6 +3970,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
 
 function ShortExercise({word,progress,words,onAnswer}) {
   const [format]=useState(()=>chooseLearningFormat(word,progress,words));
+  const [clozePrompt]=useState(()=>validClozePrompt(word));
   const [shown,setShown]=useState(false);
   const [input,setInput]=useState("");
   const [result,setResult]=useState(null);
@@ -3974,7 +3984,7 @@ function ShortExercise({word,progress,words,onAnswer}) {
   if(format==="qcm")return <StepChoice word={word} words={words} mode="term" onAnswer={ok=>onAnswer(ok?"good":"again","recog")}/>;
   if(format==="typing")return <StepProd word={word} inputVal={input} setInputVal={setInput} hideExample onAnswer={ok=>onAnswer(ok?"good":"again","prod")}/>;
   const submit=()=>{if(result)return;setResult(answerMatches(input,word)?"ok":"wrong");};
-  return <div><p>Complète la phrase</p><p style={{fontSize:18,lineHeight:1.6}}>{validClozePrompt(word)}</p>
+  return <div><p>Complète la phrase</p><p style={{fontSize:18,lineHeight:1.6}}>{clozePrompt}</p>
     <input aria-label="Mot manquant" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} disabled={!!result} autoFocus style={{width:"100%",padding:12,fontSize:16,marginBottom:12}}/>
     {!result?<><Btn label="Valider" disabled={!input.trim()} onClick={submit}/><Btn label="Passer" onClick={()=>setResult("wrong")}/></>:
       <><LearningFeedback word={word}/><Btn label={result==="ok"?"Correct · suite":"J'ai compris"} onClick={()=>onAnswer(result==="ok"?"good":"again","context")}/></>}
@@ -4019,6 +4029,16 @@ function ShortSession({words,state,setState,onBack}) {
 
 function App() {
   const now = useLocalNow();
+  const [reviewData,setReviewData]=useState(loadQcmReviewCache);
+  useEffect(()=>{
+    let active=true;
+    fetch("./data/qcm-reviewed.json").then(r=>{if(!r.ok)throw new Error("Review data unavailable");return r.json();}).then(data=>{
+      if(data?.version!==1||!Array.isArray(data.entries))return;
+      if(active)setReviewData(data);
+      try{localStorage.setItem("av-qcm-review-v1",JSON.stringify(data));}catch{}
+    }).catch(()=>{});
+    return ()=>{active=false;};
+  },[]);
   const initialStoredWords = useMemo(()=>loadCustomWords(),[]);
   const initialStoredFigures = useMemo(()=>loadCustomFigures(),[]);
   const initialExtraSources = useMemo(()=>loadExtraSources(),[]);
@@ -4042,19 +4062,19 @@ function App() {
   const [fetchStatus,setFetchStatus] = useState(()=>initialStoredWords || !VOCAB_URL ? null : "loading");
   const [figuresStatus,setFiguresStatus] = useState(()=>initialStoredFigures || !FIGURES_URL ? null : "loading");
 
-  const mainWords = useMemo(()=>buildWords(rawWords,"vocab"),[rawWords]);
+  const mainWords = useMemo(()=>buildWords(rawWords,"vocab",reviewData),[rawWords,reviewData]);
   const extraWordGroups = useMemo(()=>extraSources.filter(s=>s.enabled !== false).map(src => ({
     sourceId: src.id,
     sourceLabel: src.label,
-    items: buildWords(extraWordsBySource[src.id] || [], "vocab")
-  })), [extraSources, extraWordsBySource]);
+    items: buildWords(extraWordsBySource[src.id] || [], "vocab",reviewData)
+  })), [extraSources, extraWordsBySource,reviewData]);
   const mergedVocabulary = useMemo(()=>mergeWordsPriority([
     { sourceId:"vocab-general", sourceLabel:"Vocabulaire principal", items: mainWords },
     ...extraWordGroups
   ]), [mainWords, extraWordGroups]);
   const words = mergedVocabulary.items;
   const duplicateWords = mergedVocabulary.skipped;
-  const figures = useMemo(()=>buildWords(rawFigures,"figure"),[rawFigures]);
+  const figures = useMemo(()=>buildWords(rawFigures,"figure",reviewData),[rawFigures,reviewData]);
   const allItems = useMemo(()=>[...words, ...figures],[words,figures]);
   const total = words.length;
   const mastered = words.filter(w=>wordStatus(state,w)==="Maîtrisé").length;

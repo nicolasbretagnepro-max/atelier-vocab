@@ -7,9 +7,13 @@ module.exports = function app(start='2026-10-05T10:00:00Z') {
   let clock = Date.parse(start);
   const storage=new Map();
   class Clock extends Date {constructor(...args){super(...(args.length?args:[clock]));} static now(){return clock;}}
-  const React={createElement:(type,props,...children)=>({type,props:{...props,children}})};
-  const context=vm.createContext({React,ReactDOM:{createRoot:()=>({render:()=>{}})},document:{getElementById:()=>({})},Date:Clock,console,
+  let cursor=0;const slots=[];const timers=[];
+  const React={createElement:(type,props,...children)=>({type,props:{...props,children}}),
+    useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},
+    useRef:init=>{const i=cursor++;if(!(i in slots))slots[i]={current:init};return slots[i];},
+    useMemo:fn=>fn(),useCallback:fn=>fn,useEffect:()=>{}};
+  const context=vm.createContext({React,ReactDOM:{createRoot:()=>({render:()=>{}})},navigator:{},setTimeout:fn=>timers.push(fn),clearTimeout:()=>{},document:{getElementById:()=>({})},Date:Clock,console,
     localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});
   vm.runInContext(code,context);
-  return {run:s=>vm.runInContext(s,context),advance:ms=>clock+=ms,storage};
+  return {run:s=>vm.runInContext(s,context),render:s=>{cursor=0;return vm.runInContext(s,context);},timers,slots,advance:ms=>clock+=ms,storage};
 };

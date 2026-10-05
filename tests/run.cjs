@@ -1,0 +1,8 @@
+require('./learning.test.cjs');
+require('./engagement.test.cjs');
+require('./feedback.test.cjs');
+require('./short-session.test.cjs');
+require('./qcm-review-data.test.cjs');
+require('./component.test.cjs');
+require('./sw.test.cjs');
+require('./compile.cjs');
