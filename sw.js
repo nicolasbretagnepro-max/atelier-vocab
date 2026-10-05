@@ -2,7 +2,7 @@
 // Version mise à jour pour forcer le renouvellement du cache
 // et éviter les anciennes réponses contenant les pseudo-exemples.
 
-const CACHE_NAME = "atelier-vocab-v8-crossword";
+const CACHE_NAME = "atelier-vocab-v9-release";
 
 const ASSETS = [
   "./",
@@ -23,12 +23,10 @@ const ASSETS = [
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      return Promise.all(ASSETS.map(asset=>cache.add(asset).catch(err=>{
-        console.warn("Asset non mis en cache :",asset,err);
-      })));
-    })
+      // Keep the previous worker/cache active if any boot dependency fails.
+      return Promise.all(ASSETS.map(asset=>cache.add(asset)));
+    }).then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", event => {
@@ -36,7 +34,7 @@ self.addEventListener("activate", event => {
     caches.keys().then(keys =>
       Promise.all(
         keys
-          .filter(key => key !== CACHE_NAME)
+          .filter(key => key.startsWith("atelier-vocab-") && key !== CACHE_NAME)
           .map(key => caches.delete(key))
       )
     )

@@ -1,5 +1,13 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const app=require('./app-helper.cjs');
 function find(tree,predicate){if(!tree||typeof tree!=='object')return; if(predicate(tree))return tree;for(const c of [tree.props?.children||[]].flat(9)){const r=find(c,predicate);if(r)return r;}}
+test('short-session QCM varies the correct position and keeps it stable while answering',()=>{
+ const a=app();a.run('var ws=buildWords(SEED_WORDS);var w=ws.find(w=>w.word==="Anaphore");Math.random=()=>0.75');
+ const expression='ShortExercise({word:w,progress:{seen:1,repetitions:0},words:ws,onAnswer:()=>{}})';
+ const question=a.render(expression);assert.equal(question.type.name,'StepChoice');assert.equal(question.props.answerIndex,3);
+ a.run('Math.random=()=>0');assert.equal(a.render(expression).props.answerIndex,3);
+ const b=app();b.run('var ws=buildWords(SEED_WORDS);var w=ws.find(w=>w.word==="Anaphore");Math.random=()=>0.25');
+ assert.equal(b.render(expression).props.answerIndex,1);
+});
 test('wrong review answer schedules the next question',()=>{
  const a=app();a.run(`var ws=buildWords(SEED_WORDS).slice(0,2);var s={progress:{},meta:{}};`);
  const expr=`QuizSession({words:ws,state:s,setState:next=>s=next,onMilestone:()=>{},onBack:()=>{},title:'test',color:C.blue})`;

@@ -11,4 +11,4 @@ const harness=`function VerificationHarness() {
   </div>;
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<VerificationHarness/>);`;
-fs.writeFileSync('tests/ui-fixture.html',html.replace('ReactDOM.createRoot(document.getElementById("root")).render(<App/>);',harness));
+fs.writeFileSync('tests/ui-fixture.html',html.replace('<head>','<head><base href="../">').replace('ReactDOM.createRoot(document.getElementById("root")).render(<App/>);',harness));

@@ -3992,6 +3992,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
 
 function ShortExercise({word,progress,words,onAnswer}) {
   const [format]=useState(()=>chooseLearningFormat(word,progress,words));
+  const [answerIndex]=useState(()=>Math.floor(Math.random()*4));
   const [clozePrompt]=useState(()=>validClozePrompt(word));
   const [shown,setShown]=useState(false);
   const [input,setInput]=useState("");
@@ -4003,7 +4004,7 @@ function ShortExercise({word,progress,words,onAnswer}) {
       <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{[["again","À revoir"],["hard","Difficile"],["good","Retrouvé"],["easy","Facile"]].map(([r,label])=><Btn key={r} label={label} onClick={()=>onAnswer(r,"recog")}/>)}</div>
     </>}
   </div>;
-  if(format==="qcm")return <StepChoice word={word} words={words} mode="term" onAnswer={ok=>onAnswer(ok?"good":"again","recog")}/>;
+  if(format==="qcm")return <StepChoice word={word} words={words} mode="term" answerIndex={answerIndex} onAnswer={ok=>onAnswer(ok?"good":"again","recog")}/>;
   if(format==="typing")return <StepProd word={word} inputVal={input} setInputVal={setInput} hideExample onAnswer={ok=>onAnswer(ok?"good":"again","prod")}/>;
   const submit=()=>{if(result)return;setResult(answerMatches(input,word)?"ok":"wrong");};
   return <div><p>Complète la phrase</p><p style={{fontSize:18,lineHeight:1.6}}>{clozePrompt}</p>
