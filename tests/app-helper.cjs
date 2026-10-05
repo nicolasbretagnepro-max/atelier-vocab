@@ -12,8 +12,9 @@ module.exports = function app(start='2026-10-05T10:00:00Z') {
     useState:init=>{const i=cursor++;if(!(i in slots))slots[i]=typeof init==='function'?init():init;return [slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v];},
     useRef:init=>{const i=cursor++;if(!(i in slots))slots[i]={current:init};return slots[i];},
     useMemo:fn=>fn(),useCallback:fn=>fn,useEffect:()=>{}};
-  const context=vm.createContext({React,ReactDOM:{createRoot:()=>({render:()=>{}})},navigator:{},setTimeout:fn=>timers.push(fn),clearTimeout:()=>{},document:{getElementById:()=>({})},Date:Clock,console,
+  const context=vm.createContext({AtelierCrossword:require('../crossword-engine.js'),window:{innerWidth:393,innerHeight:852},React,ReactDOM:{createRoot:()=>({render:()=>{}})},navigator:{},setTimeout:fn=>timers.push(fn),clearTimeout:()=>{},document:{getElementById:()=>({})},Date:Clock,console,
     localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});
+  vm.runInContext(Babel.transform(fs.readFileSync('crossword-ui.jsx','utf8'),{presets:['react']}).code,context);
   vm.runInContext(code,context);
   return {run:s=>vm.runInContext(s,context),render:s=>{cursor=0;return vm.runInContext(s,context);},timers,slots,advance:ms=>clock+=ms,storage};
 };

@@ -1,5 +1,5 @@
 /* React component loaded before the main application. No profile writes here. */
-function CrosswordGame({puzzle,open=true,onEvaluate,onClose}) {
+function CrosswordGame({puzzle,open=true,onEvaluate,onClose,onNewGame}) {
   const cw=AtelierCrossword;
   const [game,setGame]=React.useState(cw.newGame);
   const gameRef=React.useRef(game);
@@ -87,7 +87,22 @@ function CrosswordGame({puzzle,open=true,onEvaluate,onClose}) {
     <article className="cw-clue" id="cw-clue"><div className="cw-clue-meta">{active.number}. {active.dir==="H"?"Horizontal":"Vertical"} · {active.answer.length} lettres{game.results[activeId]?.helped?" · Révélé":""}</div><p>{active.clue}</p>
       <div className="cw-message" role="status">{message||(complete?"Grille terminée. Les progrès des mots révisés ont été enregistrés.":"Sans accents, espaces ni traits d’union.")}</div>
     </article>
-    <footer className="cw-actions"><button onClick={()=>verify()} disabled={game.results[activeId]?.done}>Vérifier</button><button onClick={nextWord} disabled={complete}>Mot suivant</button><button onClick={()=>verify(true)} disabled={game.results[activeId]?.done}>Révéler</button></footer>
+    <footer className="cw-actions"><button onClick={complete?onNewGame:()=>verify()} disabled={complete?!onNewGame:game.results[activeId]?.done}>{complete?"Nouvelle grille":"Vérifier"}</button><button onClick={nextWord} disabled={complete}>Mot suivant</button><button onClick={()=>verify(true)} disabled={game.results[activeId]?.done}>Révéler</button></footer>
     <button className="cw-hide-keyboard" onClick={()=>document.activeElement?.blur?.()}>Masquer le clavier</button>
   </section>;
+}
+
+function CrosswordLauncher({status,reason,available,onClose,onRetry,onReview}) {
+  const panel=React.useRef(null);
+  React.useEffect(()=>{const previous=document.activeElement;const overflow=document.body.style.overflow;document.body.style.overflow="hidden";panel.current?.querySelector("button")?.focus({preventScroll:true});return()=>{document.body.style.overflow=overflow;previous?.focus?.({preventScroll:true});};},[]);
+  const loading=status==="loading";
+  const text=reason==="insufficient-pool"?"Pour construire une grille pédagogique, il faut des mots à revoir et quelques mots maîtrisés de onze lettres maximum.":reason==="no-intersections"?"Ces mots ne forment pas encore une grille compacte avec suffisamment d’intersections.":reason==="search-limit"?"La recherche a atteint sa limite. Une révision classique reste disponible.":"Le jeu n’a pas pu se charger. Réessaie lorsque ses fichiers sont disponibles.";
+  return <section className="cw-launcher" ref={panel} role="dialog" aria-modal="true" aria-labelledby="cw-launch-title" onKeyDown={e=>{
+    if(e.key==="Escape")onClose();
+    if(e.key==="Tab"){const buttons=[...panel.current.querySelectorAll("button")];const first=buttons[0],last=buttons[buttons.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}
+  }}><div><button onClick={onClose}>Retour à l’accueil</button><h2 id="cw-launch-title">{loading?"Préparation de la grille…":"Pas de grille disponible"}</h2>
+    <p role="status">{loading?"Nous cherchons les intersections entre tes mots à revoir et tes mots maîtrisés.":text}</p>
+    {!loading&&available&&<p>{available.due} mots à revoir compatibles · {available.known} mots maîtrisés compatibles.</p>}
+    {!loading&&<div className="cw-launch-actions"><button onClick={onReview}>Faire une révision</button><button onClick={onRetry}>Réessayer</button></div>}
+  </div></section>;
 }

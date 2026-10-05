@@ -5,4 +5,6 @@ require('./short-session.test.cjs');
 require('./qcm-review-data.test.cjs');
 require('./component.test.cjs');
 require('./sw.test.cjs');
+require('./crossword.test.cjs');
+require('./crossword-integration.test.cjs');
 require('./compile.cjs');

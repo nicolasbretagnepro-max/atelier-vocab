@@ -11,3 +11,4 @@ Prévol : moteur → Worker et composant, grille {entries,cells,rows,cols} ; com
 Base du nouveau travail : 17dbe24 (bilan des lots précédents).
 Lot 1 : moteur indépendant, sélection 70/30 arrondie, grille connexe 11×11 maximum et recherche bornée. Cinq tests rouges puis verts ; grille de test produite en moins de 50 ms sur le runtime local (pas une mesure iPhone).
 Lot 2 : transitions pures pour frappe, collage, effacement, intersections verrouillées et note unique ; composant et CSS mobiles séparés. Neuf tests moteur passent, JSX du composant compilé. Contrôle navigateur prévu au lot 4.
+Lot 3 : brique sur accueil, Worker annulable, génération avec état attente/indisponible, fermeture/reprise et contrôle des notes via le SRS existant. Mots futurs, appuis et indices obsolètes exclus des notes. Cache v8 incluant les quatre assets du jeu. Suite complète : 46 tests passent et JSX compile.
