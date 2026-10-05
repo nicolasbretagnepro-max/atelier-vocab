@@ -1543,6 +1543,27 @@ function validClozePrompt(word) {
   }
   return null;
 }
+function contextAnswer(word,index=0) {
+  if(!word.hasRealExample)return null;
+  const prompt=getExampleByIndex(word,index,true),full=getExampleByIndex(word,index,false);
+  const parts=prompt.split(/(?:_+|\[…\]|\[\.\.\.\])/);
+  if(parts.length!==2||textContainsAnswer(prompt,word))return null;
+  const match=full.match(new RegExp(`^${escapeRegExp(parts[0])}(.+?)${escapeRegExp(parts[1])}$`,"i"));
+  if(!match||!match[1].trim()||match[1].length>70)return null;
+  const answer=match[1].trim();
+  if(!acceptedAnswers(word).some(a=>norm(answer).startsWith(a.slice(0,Math.min(3,a.length)))))return null;
+  return {prompt,answer,full};
+}
+function guidedAnswerMatches(input,word,context=null) {
+  return answerMatches(input,word)||!!(context&&norm(input)===norm(context.answer));
+}
+function recallPattern(answer,level) {
+  const chars=[...String(answer)];const indices=chars.map((c,i)=>/\p{L}/u.test(c)?i:-1).filter(i=>i>=0);
+  const first=level<=1?Math.min(2,Math.max(1,indices.length-2)):level===2?1:0;
+  const last=level<=1&&indices.length>=5?2:0;
+  const visible=new Set([...indices.slice(0,first),...(last?indices.slice(-last):[])]);
+  return chars.map((c,i)=>/\p{L}/u.test(c)&&!visible.has(i)?"•":c).join("");
+}
 function chooseLearningFormat(word,progress,words) {
   if(!progress.seen||progress.relearning)return "flashcard";
   if((progress.repetitions||0)===0)return smartDistractors(word,words,2).length>=2?"qcm":"typing";
@@ -2159,7 +2180,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     else { setStep(s => s + 1); setIdx(0); }
   }, [done, sources.length, step, finishRoutine]);
 
-  const advance = useCallback((ok, mode="recog") => {
+  const advance = useCallback((ok, mode="recog", evidence=null) => {
     if (!current || feedback || advancingRef.current) return;
     advancingRef.current = true;
     const newStreak = ok ? sessionStreak + 1 : 0;
@@ -2167,15 +2188,15 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     if (ok) {
       _dailyXp = calcXP(state, current, step === 0 ? "discover" : mode, newStreak);
     }
-    const ns = gradeWord(state, current.id, ok ? "good" : "again", step === 0 ? "discover" : mode, ok ? _dailyXp : 0);
+    const ns = gradeWord(state, current.id, evidence?.neutral ? "good" : ok ? "good" : "again", evidence?.neutral?"discover":step === 0 ? "discover" : mode, evidence?.neutral?0:ok ? _dailyXp : 0, evidence?.neutral?{kind:"discover",assisted:true}:evidence);
     setState(ns);
     setSessionStreak(newStreak);
     if (ok) { haptic("correct"); setXpToday(x => x + _dailyXp); } else { haptic("wrong");  }
-    setLog(l=>[...l,{word:current,ok}]);
+    setLog(l=>[...l,{word:current,ok,assisted:!!evidence?.assisted,neutral:!!evidence?.neutral,kind:evidence?.kind||"discover"}]);
     setFeedback(ok?"correct":"wrong");
     let effectiveLength = sources.length;
     let effectiveQueues=stepQueues||buildDailyQueues(session);
-    if (!ok) {
+    if (!ok&&!evidence?.neutral) {
       const retry = insertDailyRetry(effectiveQueues,step,idx,current,retryRef);
       effectiveQueues=retry.queues;
       effectiveLength = effectiveQueues[step].length;
@@ -2277,7 +2298,6 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
-      {step===0 && idx===0 && motDuJour && <MotDuJour word={motDuJour} state={state}/>} 
 
       <div style={{display:"flex",gap:8,alignItems:"center"}}>
         <div style={{flex:1,display:"flex",gap:4}}>
@@ -2292,10 +2312,12 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
 
       <div className={`question-card ${feedback==="correct"?"feedback-correct":feedback==="wrong"?"feedback-wrong":""}`} style={{background:cardBg,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",transition:"background 0.4s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
         {step===0 && <StepDiscover key={`discover-${current.id}-${idx}`} word={current} words={words} shown={shown} setShown={setShown} onNext={()=>advance(true)} />}
-        {step===1 && <StepChoice key={`association-${current.id}-${idx}`} word={current} words={words} mode="termToDefinition" answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={(ok,responseMode)=>advance(ok,responseMode||"recog")} />}
-        {step===2 && <StepContext key={`context-${current.id}-${idx}`} word={current} words={words} exampleIndex={idx % 2} answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={(ok,responseMode)=>advance(ok,responseMode||"context")} />}
-        {step===3 && <StepProd key={`production-${current.id}-${idx}`} word={current} inputVal={inputVal} setInputVal={setInputVal} exampleIndex={idx % 2 === 0 ? 1 : 0} onAnswer={ok=>advance(ok,"prod")} />}
-        {step===4 && <StepChoice key={`boss-${current.id}-${idx}`} word={current} words={words} mode="mixed" answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={(ok,responseMode)=>advance(ok,responseMode||"recog")} />}
+        {step===1 && (smartDistractors(current,words,2).length>=2
+          ? <StepChoice key={`association-${current.id}-${idx}`} word={current} words={words} mode="termToDefinition" answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={ok=>advance(ok,"recog",{kind:"meaning",assisted:true})}/>
+          : <GuidedRecall key={`association-${current.id}-${idx}`} word={current} level={1} kind="meaning" onAnswer={r=>advance(r.ok,"guided",r)}/>)}
+        {step===2 && <GuidedRecall key={`context-${current.id}-${idx}`} word={current} level={session.levels[current.id]} context exampleIndex={idx%2} onAnswer={r=>advance(r.ok,"context",r)}/>}
+        {step===3 && <GuidedRecall key={`production-${current.id}-${idx}`} word={current} level={session.levels[current.id]} onAnswer={r=>advance(r.ok,r.assisted?"guided":"prod",r)}/>}
+        {step===4 && <GuidedRecall key={`boss-${current.id}-${idx}`} word={current} level={session.levels[current.id]} onAnswer={r=>advance(r.ok,r.assisted?"guided":"prod",r)}/>}
       </div>
     </div>
   );
@@ -2322,31 +2344,54 @@ function StepDiscover({word,words,shown,setShown,onNext}) {
         <Pill label={word.level} color={C.sub}/>
       </div>
       <WordTitle>{word.word}</WordTitle>
-      {!shown ? (
-        <>
-          <ExampleBlock word={word}/>
-          <Btn label="Voir la définition" variant="primary" full onClick={()=>setShown(true)}/>
-        </>
-      ) : (
         <>
           <p style={{fontSize:18,color:C.text,fontWeight:700,marginBottom:6}}>{word.compact}</p>
           <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:12}}>{word.definition}</p>
           <ExampleBlock word={word}/>
           <ConfusionBlock word={word} words={words} compact />
-          <Btn label="J'ai compris" variant="success" full onClick={onNext}/>
+          <Btn label="J'ai compris · continuer" variant="success" full onClick={onNext}/>
         </>
-      )}
     </div>
   );
 }
 
-function SafeRecallFallback({word, onAnswer}) {
-  const [inputVal,setInputVal] = useState("");
+function GuidedRecall({word,level=1,context=false,exampleIndex=0,kind="recall",onAnswer}) {
+  const [value,setValue]=useState("");
+  const [hinted,setHinted]=useState(false);
+  const [result,setResult]=useState(null);
+  const source=context?contextAnswer(word,exampleIndex):null;
+  const expected=source?.answer||word.word;
+  const guided=context?Math.min(2,level):level;
+  const effective=hinted?Math.min(1,guided):guided;
+  const assisted=guided<3||hinted||context;
+  const submit=()=>{if(result||!value.trim())return;const ok=guidedAnswerMatches(value,word,source);setResult({ok,assisted,kind:context?"context":kind});haptic(ok?"correct":"wrong");};
   return <div>
-    <p style={{fontSize:13,color:C.sub,marginBottom:12}}>Retrouve le mot à partir de sa définition.</p>
-    <StepProd word={word} hideExample
-      inputVal={inputVal} setInputVal={setInputVal} onAnswer={ok=>onAnswer(ok,"prod")}/>
+    <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"0 0 12px"}}>{context?"Retrouve le mot étudié dans cette phrase. Le sens et les lettres te guident.":guided<3?"Complète le mot étudié. Tu peux t’aider des lettres.":"Retrouve le mot étudié à partir de son sens. Un indice reste disponible."}</p>
+    <p style={{fontSize:18,fontWeight:700,lineHeight:1.5,margin:"0 0 12px"}}>{word.definition||word.compact}</p>
+    {source&&<p style={{fontSize:18,lineHeight:1.65,padding:14,borderRadius:14,background:`${C.blue}08`}}>{source.prompt}</p>}
+    <p aria-label="Lettres du mot" style={{fontSize:24,fontWeight:800,letterSpacing:2,overflowWrap:"anywhere",margin:"12px 0"}}>{recallPattern(expected,effective)}</p>
+    {source&&<p style={{fontSize:13,color:C.sub}}>Le mot de base ou sa forme dans la phrase sont acceptés.</p>}
+    <input aria-label="Ta réponse" value={value} onChange={e=>setValue(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.nativeEvent?.isComposing)submit();}} disabled={!!result}
+      autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} placeholder="Écris le mot…"
+      style={{width:"100%",boxSizing:"border-box",padding:"13px 14px",fontSize:18,border:`1.5px solid ${C.border}`,borderRadius:13,marginBottom:12,background:C.solid,color:C.text}}/>
+    {!result?<>
+      <Btn label="Valider" variant="primary" full onClick={submit} disabled={!value.trim()}/>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:10}}>
+        <Btn label="Indice" small variant="ghost" onClick={()=>setHinted(true)} disabled={hinted}/>
+        <Btn label="Revoir le mot" small variant="ghost" onClick={()=>setResult({ok:true,assisted:true,neutral:true,kind:context?"context":kind})}/>
+        {guided>=3&&<Btn label="Autre réponse possible" small variant="ghost" onClick={()=>setResult({ok:true,assisted:true,neutral:true,kind})}/>}
+      </div>
+    </>:<div aria-live="polite">
+      <p style={{fontSize:16,fontWeight:800,color:result.neutral?C.blue:result.ok?C.green:C.orange}}>{result.neutral?"Reprenons le mot ensemble.":result.ok?result.assisted?"Bien retrouvé avec de l’aide ✓":"Retrouvé sans aide ✓":"Ce mot mérite une nouvelle rencontre."}</p>
+      {source&&<p style={{fontSize:17,lineHeight:1.6}}>{source.full}</p>}
+      <LearningFeedback word={word}/>
+      <Btn label="Continuer" variant="primary" full onClick={()=>onAnswer(result)}/>
+    </div>}
   </div>;
+}
+
+function SafeRecallFallback({word, onAnswer}) {
+  return <GuidedRecall word={word} level={1} onAnswer={r=>onAnswer(r.ok,"guided")}/>;
 }
 function StepChoice({word,words,mode,onAnswer,answerIndex=0}) {
   const [selected,setSelected] = useState(null);

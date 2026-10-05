@@ -58,7 +58,8 @@
     });
     const newPerDay=Math.max(1,Math.min(3,Math.round(Number(options.newPerDay)||2)));
     const hash=w=>[...`${day}:${w.id}`].reduce((h,c)=>(Math.imul(h,31)+c.charCodeAt(0))>>>0,0);
-    const discover=list.filter(w=>!p(w).seen).sort((a,b)=>hash(a)-hash(b)).slice(0,Math.min(newPerDay,Math.max(0,10-active.length)));
+    const introducedToday=list.filter(w=>p(w).seen&&normalize(p(w),day).startedDay===day).length;
+    const discover=list.filter(w=>!p(w).seen).sort((a,b)=>hash(a)-hash(b)).slice(0,Math.min(Math.max(0,newPerDay-introducedToday),Math.max(0,10-active.length)));
     const due=list.filter(w=>p(w).seen&&normalize(p(w),day).phase==='consolidated'&&(!Number.isFinite(Date.parse(p(w).next))||Date.parse(p(w).next)<=now))
       .sort((a,b)=>(Date.parse(p(a).next)||0)-(Date.parse(p(b).next)||0)).slice(0,4);
     return {discover,active:active.slice(0,10),due,waiting:Math.max(0,active.length-10),newLimit:newPerDay};

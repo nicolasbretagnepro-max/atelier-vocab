@@ -36,3 +36,8 @@ test('a tiny corpus and an unreviewed imported word can still enter the routine'
  assert.equal(a.run('session.boss.length'),1);
  assert.equal(a.run('session.production.length'),0);
 });
+test('leaving and reopening the routine cannot introduce more new words that day',()=>{
+ const a=app();a.run(`var ws=buildWords(SEED_WORDS);var s={progress:{},meta:{}};var first=buildDailySession(s,ws);first.discover.forEach(w=>s=gradeWord(s,w.id,'good','discover',0));var again=buildDailySession(s,ws);`);
+ assert.equal(a.run('again.discover.length'),0);
+ a.advance(86400000);assert.equal(a.run('buildDailySession(s,ws).discover.length'),2);
+});
