@@ -1499,6 +1499,16 @@ function buildDailySession(state, words) {
   return { discover, review, association, context, production, boss, newLimit };
 }
 
+function buildShortSession(state,words,now=new Date()) {
+  const unique=[...new Map(words.map(w=>[w.id,w])).values()];
+  const due=unique.filter(w=>isDue(state,w,now)).sort((a,b)=>new Date(readP(state,a.id).next||0)-new Date(readP(state,b.id).next||0));
+  return [...due.slice(0,5),...unique.filter(w=>!readP(state,w.id).seen).slice(0,Math.min(2,Math.max(0,5-due.length)))];
+}
+function getNextDueAt(state,words) {
+  const dates=words.filter(w=>readP(state,w.id).seen).map(w=>Date.parse(readP(state,w.id).next)).filter(Number.isFinite);
+  return dates.length?new Date(Math.min(...dates)).toISOString():null;
+}
+
 function learningFeedbackContent(word,chosen=null) {
   return {definition:word.definition||word.compact||"", example:word.hasRealExample?getExampleText(word):"",
     memoryTip:word.memoryTip||"", etymology:word.etymology||"",
@@ -1945,7 +1955,7 @@ function DailyGoal({meta,goal=5,now=new Date()}) {
   </Card>;
 }
 
-function Dashboard({words,figures,state,now=new Date(),onStartDaily,onStartReview,onStartFragile,onStartDue,onStartQuiz,onStartNuance,onStartFigures}) {
+function Dashboard({words,figures,state,now=new Date(),onStartShort,onStartDaily,onStartReview,onStartFragile,onStartDue,onStartQuiz,onStartNuance,onStartFigures}) {
   const total = words.length;
   const figuresTotal = figures.length;
   const figuresSeen = figures.filter(w=>readP(state,w.id).seen>0).length;
@@ -1962,6 +1972,7 @@ function Dashboard({words,figures,state,now=new Date(),onStartDaily,onStartRevie
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.25s ease"}}>
       <DailyGoal meta={state.meta} now={now}/>
+      <Btn label="Cinq mots aujourd'hui · séance courte" variant="primary" full onClick={onStartShort}/>
       <Card style={{background:`linear-gradient(135deg, ${C.blue}12 0%, ${C.purple}09 100%)`}}>
         <p style={{fontSize:11,fontWeight:800,color:C.blue,textTransform:"uppercase",letterSpacing:1,margin:"0 0 6px"}}>Aujourd'hui</p>
         <h2 style={{fontSize:24,fontWeight:850,color:C.text,letterSpacing:-0.8,margin:"0 0 8px"}}>{recommended}</h2>
@@ -3935,6 +3946,43 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   );
 }
 
+function ShortSession({words,state,setState,onBack,onPractice}) {
+  const [queue,setQueue]=useState(()=>buildShortSession(state,words));
+  const [index,setIndex]=useState(0);
+  const [input,setInput]=useState("");
+  const [discovered,setDiscovered]=useState(false);
+  const answered=useRef(false);
+  const retries=useRef({});
+  const [finished,setFinished]=useState([]);
+  const initialCount=useRef(queue.length);
+  const word=queue[index];
+  const answer=(rating,mode="prod")=>{
+    if(answered.current||!word)return;
+    answered.current=true;
+    const next=gradeWord(state,word.id,rating,mode);
+    setState(next);
+    setFinished(ids=>[...new Set([...ids,word.id])]);
+    if(rating==="again")setQueue(q=>insertRetryItem(q,index,word,retries,"short").list);
+    setInput("");setDiscovered(false);setIndex(i=>i+1);
+  };
+  useEffect(()=>{answered.current=false;},[index]);
+  if(!word)return <Card>
+    <h2>{initialCount.current?"Séance terminée":"Tout est à jour"}</h2>
+    <p>{finished.length} mot{finished.length>1?"s":""} travaillé{finished.length>1?"s":""}.</p>
+    {!initialCount.current&&<p>Prochaine révision : {getNextDueAt(state,words)?new Date(getNextDueAt(state,words)).toLocaleString("fr-FR"):"aucune prévue"}.</p>}
+    {!initialCount.current&&<Btn label="Entraînement libre" onClick={onPractice}/>}
+    <Btn label="Retour à l'accueil" onClick={onBack}/>
+  </Card>;
+  return <Card>
+    <Btn label="Retour" variant="ghost" onClick={onBack}/>
+    <h2>Séance courte</h2>
+    <p>{finished.length}/{initialCount.current} mots travaillés · les erreurs font partie de l'apprentissage</p>
+    <progress aria-label="Progression de la séance" value={finished.length} max={initialCount.current} style={{width:"100%"}}/>
+    {!readP(state,word.id).seen&&!discovered?<div><LearningFeedback word={word}/><Btn label="Je suis prêt à essayer" onClick={()=>setDiscovered(true)}/></div>:
+      <StepProd key={index+word.id} word={word} inputVal={input} setInputVal={setInput} hideExample onAnswer={ok=>answer(ok?"good":"again")}/>}
+  </Card>;
+}
+
 function App() {
   const now = useLocalNow();
   const initialStoredWords = useMemo(()=>loadCustomWords(),[]);
@@ -4273,7 +4321,8 @@ function App() {
           <>
             <TabBar active={tab} onSelect={selectTab} dueCount={dueCount}/>
 
-            {tab==="home"    && <Dashboard words={words} figures={figures} state={state} now={now} onStartDaily={startDaily} onStartReview={()=>startReview("smart")} onStartFragile={()=>startReview("fragile")} onStartDue={()=>startReview("due")} onStartQuiz={()=>startQuiz("quick")} onStartNuance={()=>startQuiz("nuance")} onStartFigures={startFigures}/>} 
+            {tab==="home"    && <Dashboard onStartShort={()=>setTab("short")} words={words} figures={figures} state={state} now={now} onStartDaily={startDaily} onStartReview={()=>startReview("smart")} onStartFragile={()=>startReview("fragile")} onStartDue={()=>startReview("due")} onStartQuiz={()=>startQuiz("quick")} onStartNuance={()=>startQuiz("nuance")} onStartFigures={startFigures}/>} 
+            {tab==="short" && <ShortSession words={words} state={state} setState={setState} onBack={()=>setTab("home")} onPractice={()=>startReview("all")}/>}
             {tab==="daily"   && <DailyTab   words={words} state={state} setState={setState} onMilestone={setMilestone} onGoReview={()=>startReview("fragile")} onGoQuiz={()=>startQuiz("quick")} onGoNuance={()=>startQuiz("nuance")}/>} 
             {tab==="learn"   && <LearnTabNew words={words} state={state} setState={setState} onMilestone={setMilestone} initialMode={learnMode} onStartNuance={()=>startQuiz("nuance")}/>} 
             {tab==="quiz"    && <QuizTabNew  key={"quiz-"+quizMode} words={words} state={state} setState={setState} onMilestone={setMilestone} mode={quizMode} onModeChange={setQuizMode}/>} 
