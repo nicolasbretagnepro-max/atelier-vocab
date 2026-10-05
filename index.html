@@ -74,6 +74,7 @@
 <div id="root"></div>
 
 <link rel="stylesheet" href="./crossword.css" />
+<script src="./learning-engine.js"></script>
 <script src="./crossword-engine.js"></script>
 <script type="text/babel" src="./crossword-ui.jsx"></script>
 <script type="text/babel">
@@ -800,7 +801,7 @@ const STORE_SOURCE_CACHE = "atelier_vocab_source_cache";
 const STORE_MILESTONE = "atelier_vocab_milestone";
 const STORE_DAILY     = "atelier_vocab_daily_done";
 const STORE_ACTIVITY  = "atelier_vocab_activity";
-const PROFILE_SCHEMA_VERSION = 3;
+const PROFILE_SCHEMA_VERSION = 4;
 
 const LEGACY_PROGRESS_KEYS = [
   "atelier_vocab_progress_v4",
@@ -871,6 +872,7 @@ function migrateProgressEntry(raw) {
   x.relearning = !!x.relearning;
   x.lapsed = !!x.lapsed;
   x.needsRebuild = !!x.needsRebuild;
+  x.learning = AtelierLearning.normalize(x,localDateKey());
   return x;
 }
 
@@ -1328,10 +1330,14 @@ function wordStatus(state, w) {
   return "En cours";
 }
 
-function gradeWord(state, id, rating, mode = "recog", customXp) {
+function gradeWord(state, id, rating, mode = "recog", customXp, evidence = null) {
   const ns = { ...state, progress:{ ...(state.progress || {}) } };
   const x = migrateProgressEntry(readP(ns, id));
   const previous = { ...x };
+  const event=evidence||{kind:mode==="discover"?"discover":mode==="context"?"context":
+    ["prod","recall","guided"].includes(mode)?"recall":"meaning",assisted:mode==="guided"};
+  if(event.assisted&&["prod","recall"].includes(mode))mode="guided";
+  x.learning=AtelierLearning.record(previous,{...event,ok:rating!=="again"},localDateKey());
   ns.progress[id] = x;
 
   x.seen = (x.seen || 0) + 1;
@@ -1388,8 +1394,12 @@ function gradeWord(state, id, rating, mode = "recog", customXp) {
     }
   }
 
-  const scheduled = scheduleReview(previous, rating);
+  const justConsolidated=previous.learning.phase!=="consolidated"&&x.learning.phase==="consolidated";
+  const scheduled = justConsolidated ? scheduleReview({...previous,next:null,repetitions:0,intervalDays:0,lastScheduledDay:null},rating)
+    : evidence&&rating!=="again"&&(event.assisted||x.learning.phase==="active") ? previous
+    : scheduleReview(previous, rating);
   for (const key of ["easeFactor", "intervalDays", "repetitions", "next", "lastScheduledDay", "relearning"]) x[key] = scheduled[key];
+  if(!x.next)x.next=addDays(1);
 
   const meta = { ...DEFAULT_META, ...(ns.meta || {}) };
   const _xpD = (typeof customXp === "number") ? customXp : (rating === "again" ? 0 : 10); meta.xp = (meta.xp || 0) + _xpD;

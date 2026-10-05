@@ -8,7 +8,7 @@ function app() {
   let clock = Date.parse('2026-10-05T10:00:00Z');
   const storage = new Map();
   class Clock extends Date { constructor(...args) { super(...(args.length ? args : [clock])); } static now() {return clock;} }
-  const context = vm.createContext({React:{}, Date:Clock, console,
+  const context = vm.createContext({AtelierLearning:require('../learning-engine.js'),React:{}, Date:Clock, console,
     localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}});
   vm.runInContext(source, context);
   return {run: code=>vm.runInContext(code, context), advance:ms=>clock+=ms};

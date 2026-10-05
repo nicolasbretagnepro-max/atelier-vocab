@@ -1,4 +1,5 @@
 require('./learning.test.cjs');
+require('./acquisition.test.cjs');
 require('./engagement.test.cjs');
 require('./feedback.test.cjs');
 require('./short-session.test.cjs');
