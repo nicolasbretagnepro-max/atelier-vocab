@@ -117,7 +117,10 @@
   function input(game,puzzle,id,k,text,paste=false){
     const entry=puzzle.entries.find(e=>e.id===id),locked=lockedKeys(game,puzzle);
     if(!entry||!entry.keys.includes(k)||locked.has(k))return {game,focus:null};
-    const raw=letters(text),chars=paste?raw:raw.slice(-1),index=entry.keys.indexOf(k);
+    // Native inputs can contain the old letter followed by a new grapheme.
+    // Normalize the last grapheme only after extraction: œ must expand to OE.
+    const graphemes=String(text||'').normalize('NFC').match(/\P{M}\p{M}*/gu)||[];
+    const chars=letters(paste?text:graphemes.at(-1)||''),index=entry.keys.indexOf(k);
     const values={...game.values},results={...game.results},changed=[];
     if(!chars){values[k]='';changed.push(k);}
     for(let i=0;i<chars.length&&index+i<entry.keys.length;i++){
@@ -141,11 +144,11 @@
     const typed=entry.keys.map(k=>game.values[k]||'').join('');
     if(!reveal&&typed.length!==entry.answer.length)return {game,evaluation:null,message:'Complète le mot avant de le vérifier.'};
     const correct=typed===entry.answer,locked=lockedKeys(game,puzzle);
-    const supplied=!reveal&&correct&&entry.keys.every(k=>locked.has(k));
+    const supplied=correct&&entry.keys.every(k=>locked.has(k));
     const evaluation=entry.role==='due'&&!previous.evaluated&&!supplied?{id:entry.id,role:entry.role,rating:reveal||!correct?'again':'good',mode:'context'}:null;
     const values={...game.values};if(reveal)entry.keys.forEach((k,i)=>values[k]=entry.answer[i]);
     const result={...previous,done:reveal||correct,wrong:!reveal&&!correct,helped:reveal,supplied,evaluated:previous.evaluated||!!evaluation};
-    const message=reveal?`Réponse : ${entry.term}. À revoir.`:supplied?'Mot complété grâce aux intersections.':correct?'Correct ! Passe au mot suivant.':'À revoir : vérifie les lettres et les intersections.';
+    const message=supplied?'Mot complété grâce aux intersections.':reveal?`Réponse : ${entry.term}. À revoir.`:correct?'Correct ! Passe au mot suivant.':'À revoir : vérifie les lettres et les intersections.';
     return {game:{values,results:{...game.results,[id]:result}},evaluation,message};
   }
   return {letters,key,selectCandidates,place,createPuzzle,newGame,lockedKeys,input,erase,check};

@@ -5,3 +5,6 @@ tests/babel.min.cjs
 data/audit-report.json
 data/corpus-local.json
 tests/implement-*.py
+crossword-fixture.html
+tests/crossword-mobile.png
+tests/crossword-short.png

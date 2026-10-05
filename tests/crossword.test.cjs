@@ -66,4 +66,11 @@ test('fully supplied word is solved without a recalled-success grade',()=>{
  const p={entries:[{id:'a',role:'known',answer:'ABC',keys:['0:0','0:1','0:2']},{id:'b',role:'due',answer:'ABC',keys:['0:0','0:1','0:2']} ]};
  const s={values:{'0:0':'A','0:1':'B','0:2':'C'},results:{a:{done:true}}};
  const result=cw.check(s,p,'b');assert.equal(result.evaluation,null);assert.equal(result.game.results.b.supplied,true);
+ const revealed=cw.check(s,p,'b',true);assert.equal(revealed.evaluation,null);assert.equal(revealed.game.results.b.supplied,true);
+});
+test('typing a French ligature expands both letters and advances two cells',()=>{
+ const p={entries:[{id:'a',answer:'COEUR',keys:['0:0','0:1','0:2','0:3','0:4'],role:'due'}]};
+ for(const text of ['œ','Cœ']){const result=cw.input(cw.newGame(),p,'a','0:1',text);
+ assert.equal(result.game.values['0:1'],'O');assert.equal(result.game.values['0:2'],'E');assert.equal(result.focus,'0:3');}
+ const result=cw.input(cw.newGame(),p,'a','0:1','æ');assert.equal(result.game.values['0:1'],'A');assert.equal(result.game.values['0:2'],'E');
 });

@@ -29,32 +29,32 @@
 
 Files : crossword-engine.js, tests/crossword.test.cjs.
 
-- [ ] Écrire puis exécuter les tests rouges : normalisation, pools/quotas, grille connexe et compacte, placements illégaux, budget.
-- [ ] Implémenter sélection, recherche bornée et modèle de grille.
-- [ ] Tester ; enregistrer le lot.
+- [x] Écrire puis exécuter les tests rouges : normalisation, pools/quotas, grille connexe et compacte, placements illégaux, budget.
+- [x] Implémenter sélection, recherche bornée et modèle de grille.
+- [x] Tester ; enregistrer le lot.
 
 ## Lot 2 — Saisie et interface mobile
 
 Files : crossword-engine.js (état de jeu), crossword-ui.jsx, crossword.css, tests/crossword.test.cjs, tests/compile.cjs.
 
-- [ ] Tests rouges : saisie, retour arrière, collage, intersections, vérification unique, révélation, mots entièrement fournis.
-- [ ] Implémenter transitions pures et composant : focus, sélection, carte, validation, fermeture/reprise et bilan.
-- [ ] Compiler et vérifier les transitions ; enregistrer le lot.
+- [x] Tests rouges : saisie, retour arrière, collage, intersections, vérification unique, révélation, mots entièrement fournis.
+- [x] Implémenter transitions pures et composant : focus, sélection, carte, validation, fermeture/reprise et bilan.
+- [x] Compiler et vérifier les transitions ; enregistrer le lot.
 
 ## Lot 3 — Accueil, Worker, progression et PWA
 
 Files : index.html, crossword-worker.js, sw.js, tests/app-helper.cjs, tests/crossword-integration.test.cjs, tests/sw.test.cjs.
 
-- [ ] Tests rouges de raccordement : sélection selon progression réelle, ancien profil, mots futurs exclus, SRS/XP, Worker et cache.
-- [ ] Adapter les données, charger le moteur/composant, ajouter la carte d'accueil, génération asynchrone, erreurs et annulation.
-- [ ] Évaluer via le moteur existant, uniquement pour les mots dus encore admissibles ; ne pas reprendre une réussite déjà notée.
-- [ ] Renouveler le cache et exécuter les tests ; enregistrer le lot.
+- [x] Tests rouges de raccordement : sélection selon progression réelle, ancien profil, mots futurs exclus, SRS/XP, Worker et cache.
+- [x] Adapter les données, charger le moteur/composant, ajouter la carte d'accueil, génération asynchrone, erreurs et annulation.
+- [x] Évaluer via le moteur existant, uniquement pour les mots dus encore admissibles ; ne pas reprendre une réussite déjà notée.
+- [x] Renouveler le cache et exécuter les tests ; enregistrer le lot.
 
 ## Lot 4 — Validation et livraison
 
 Files : tests/make-crossword-fixture.cjs, docs/livraison-mots-croises.md, journal.
 
-- [ ] Suite complète et compilation.
-- [ ] Scénarios navigateur : mobile, sélection/entrée, erreur/correction, reprise, absence de grille, viewport réduit.
-- [ ] Revue indépendante du nouveau travail ; corriger les défauts importants avec régressions.
-- [ ] Bilan, instructions et patch ; conserver la branche locale sans publier.
+- [x] Suite complète et compilation.
+- [x] Scénarios navigateur : mobile, sélection/entrée, erreur/correction, reprise, absence de grille, viewport réduit.
+- [x] Revue indépendante du nouveau travail ; corriger les défauts importants avec régressions.
+- [x] Bilan, instructions et patch ; conserver la branche locale sans publier.

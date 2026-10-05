@@ -26,6 +26,14 @@ function CrosswordGame({puzzle,open=true,onEvaluate,onClose,onNewGame}) {
     return ()=>{window.removeEventListener("resize",read);vv?.removeEventListener("resize",read);vv?.removeEventListener("scroll",read);document.body.style.overflow=overflow;previousFocus?.focus?.({preventScroll:true});};
   },[open]);
 
+  // iOS opens its keyboard after focus. Keep the focused cell inside the
+  // board's own scroll area once the visual viewport has shrunk.
+  React.useEffect(()=>{
+    if(!open)return;
+    const el=inputs.current[focused.current];
+    if(el&&document.activeElement===el)el.scrollIntoView({block:"nearest",inline:"nearest"});
+  },[open,viewport.height,viewport.width]);
+
   const active=puzzle.entries.find(e=>e.id===activeId);
   const activeKeys=new Set(active.keys);
   const locked=cw.lockedKeys(game,puzzle);
