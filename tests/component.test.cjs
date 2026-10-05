@@ -1,5 +1,22 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const app=require('./app-helper.cjs');
 function find(tree,predicate){if(!tree||typeof tree!=='object')return; if(predicate(tree))return tree;for(const c of [tree.props?.children||[]].flat(9)){const r=find(c,predicate);if(r)return r;}}
+test('the primary daily action opens the full discovery-to-Boss routine',()=>{
+ const a=app();a.run(`var ws=buildWords(SEED_WORDS);var s={progress:{},meta:{}};var destination=null;`);
+ const tree=a.render(`Dashboard({words:ws,figures:[],state:s,onStartDaily:()=>destination='daily',onStartShort:()=>destination='short'})`);
+ const primary=find(tree,t=>t.type?.name==='Btn');assert.ok(primary);
+ primary.props.onClick();assert.equal(a.run('destination'),'daily');
+});
+test('the full daily routine reaches the Boss after discovery and learning steps',()=>{
+ const a=app();a.run(`var ws=buildWords(SEED_WORDS).filter(w=>w.word==='Anaphore');var s={progress:{},meta:{}};`);
+ const expr=`DailyTab({words:ws,state:s,setState:next=>s=typeof next==='function'?next(s):next,onMilestone:()=>{}})`;
+ for(const name of ['StepDiscover','StepChoice','StepContext','StepProd']){
+  const question=find(a.render(expr),t=>t.type?.name===name);assert.ok(question,`Expected ${name}`);
+  if(name==='StepDiscover')question.props.onNext();else question.props.onAnswer(true);
+  const timer=a.timers.shift();assert.equal(typeof timer,'function');timer();
+ }
+ const boss=find(a.render(expr),t=>t.type?.name==='StepChoice');assert.ok(boss);
+ assert.equal(boss.props.mode,'mixed');assert.match(boss.props.key,/^boss-/);
+});
 test('short-session QCM varies the correct position and keeps it stable while answering',()=>{
  const a=app();a.run('var ws=buildWords(SEED_WORDS);var w=ws.find(w=>w.word==="Anaphore");Math.random=()=>0.75');
  const expression='ShortExercise({word:w,progress:{seen:1,repetitions:0},words:ws,onAnswer:()=>{}})';

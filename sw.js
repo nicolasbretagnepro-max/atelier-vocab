@@ -2,7 +2,7 @@
 // Version mise à jour pour forcer le renouvellement du cache
 // et éviter les anciennes réponses contenant les pseudo-exemples.
 
-const CACHE_NAME = "atelier-vocab-v9-release";
+const CACHE_NAME = "atelier-vocab-v10-routine";
 
 const ASSETS = [
   "./",
