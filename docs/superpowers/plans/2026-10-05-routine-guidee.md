@@ -32,9 +32,9 @@
 
 **Interfaces:** `AtelierLearning.normalize(progress, day)`, `record(progress,{kind,ok,assisted},day)`, `level(progress,day)` ; `gradeWord(...,customXp,evidence)` conserve la compatibilité des cinq arguments existants.
 
-- [ ] Tests RED : mêmes jours ne suffisent pas ; aide jamais autonome ; deux jours autonomes + sens/contexte consolident ; oubli réactive ; profile round-trip conserve les preuves et dates SM-2.
-- [ ] Implémenter le moteur et son intégration aux migrations/grading ; modes anciens conservés.
-- [ ] Vérifier tests ciblés puis `node tests/run.cjs` ; commit du lot.
+- [x] Tests RED : mêmes jours ne suffisent pas ; aide jamais autonome ; deux jours autonomes + sens/contexte consolident ; oubli réactive ; profile round-trip conserve les preuves et dates SM-2.
+- [x] Implémenter le moteur et son intégration aux migrations/grading ; modes anciens conservés.
+- [x] Vérifier tests ciblés puis `node tests/run.cjs` ; commit du lot.
 
 ### Lot 2 : composition de la routine
 
@@ -42,9 +42,9 @@
 
 **Interfaces:** `selectDaily(words,state,options,day,now)` → `{discover,active,due,waiting}` ; `buildDailySession` → cinq files de mots et métadonnées de charge.
 
-- [ ] Tests RED : deux nouveautés par défaut ; retour quotidien malgré date SM-2 future des actifs ; chaque actif servi ; anciens profils bornés avec rotation ; futurs consolidés exclus ; corpus réduit ; nouveau mot sans QCM ; maximum 24 questions.
-- [ ] Composer les cinq files avec des difficultés propres à chaque mot ; plafonner Boss à trois et les retours à deux dans toute la routine.
-- [ ] Vérifier suite complète ; commit du lot.
+- [x] Tests RED : deux nouveautés par défaut ; retour quotidien malgré date SM-2 future des actifs ; chaque actif servi ; anciens profils bornés avec rotation ; futurs consolidés exclus ; corpus réduit ; nouveau mot sans QCM ; maximum 24 questions.
+- [x] Composer les cinq files avec des difficultés propres à chaque mot ; plafonner Boss à trois et les retours à deux dans toute la routine.
+- [x] Vérifier suite complète ; commit du lot.
 
 ### Lot 3 : apprentissage guidé et contexte juste
 
@@ -52,9 +52,9 @@
 
 **Interfaces:** `GuidedRecall({word,level,context,exampleIndex,onAnswer})` → réponse `{kind,ok,assisted}` ; `contextAnswer(word,index)` → `{prompt,answer}` ou null.
 
-- [ ] Tests RED : découverte révèle immédiatement le sens ; fallback aidé ; Exulter accepte exultent et exulter ; trou mal aligné exclu ; indice ne valide pas un rappel autonome ; correction attend un clic ; parcours complet atteint Boss sans QCM disponible.
-- [ ] Adapter DailyTab et le fallback commun ; conserver les filtres de distracteurs validés.
-- [ ] Vérifier suite et parcours mobile ; commit du lot.
+- [x] Tests RED : découverte révèle immédiatement le sens ; fallback aidé ; Exulter accepte exultent et exulter ; trou mal aligné exclu ; indice ne valide pas un rappel autonome ; correction attend un clic ; parcours complet atteint Boss sans QCM disponible.
+- [x] Adapter DailyTab et le fallback commun ; conserver les filtres de distracteurs validés.
+- [x] Vérifier suite et parcours mobile ; commit du lot.
 
 ### Lot 4 : réglages et bilan utiles
 
@@ -62,9 +62,9 @@
 
 **Interfaces:** préférences `learningSettings.newPerDay` stockées dans le profil ; Dashboard/DailyTab consomment le réglage.
 
-- [ ] Tests RED : réglage import/export ; limites 1–3 ; bilan distingue aide/rappel et indique les mots qui reviennent demain ; modes complémentaires restent accessibles.
-- [ ] Ajouter réglage accueil, compteur global et bilan ; réduire le bruit en début de routine.
-- [ ] Vérifier suite et lisibilité 393×852 ; commit du lot.
+- [x] Tests RED : réglage import/export ; limites 1–3 ; bilan distingue aide/rappel et indique les mots qui reviennent demain ; modes complémentaires restent accessibles.
+- [x] Ajouter réglage accueil, compteur global et bilan ; réduire le bruit en début de routine.
+- [x] Vérifier suite et lisibilité 393×852 ; commit du lot.
 
 ### Lot 5 : mots croisés, revue et livraison
 
@@ -72,7 +72,7 @@
 
 **Interfaces:** candidats rôles due/known/practice, quota préféré avec repli flexible ; grille découverte neutre si nécessaire.
 
-- [ ] Tests RED : grille sans maîtrisés ; supports actifs/récents ; grille découverte sur corpus initial ; aide sans preuve autonome ; corpus impossible expliqué ; assets PWA complets.
-- [ ] Implémenter les replis et ajuster les libellés ; versionner le cache.
-- [ ] Suite complète, compilation, parcours réel mobile novice et utilisateur avancé ; revue indépendante de toute la branche, corriger les constats importants.
+- [x] Tests RED : grille sans maîtrisés ; supports actifs/récents ; grille découverte sur corpus initial ; aide sans preuve autonome ; corpus impossible expliqué ; assets PWA complets.
+- [x] Implémenter les replis et ajuster les libellés ; versionner le cache.
+- [x] Suite complète, compilation, parcours réel mobile novice et utilisateur avancé ; revue indépendante de toute la branche, corriger les constats importants.
 - [ ] Commits, intégration sans écraser les changements distants et publication sous l'autorisation déjà donnée ; vérifier les fichiers publics.

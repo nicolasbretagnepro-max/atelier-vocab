@@ -21,3 +21,8 @@ test('the short session teaches an unseen word instead of asking to recall its u
  const tree=a.render('ShortExercise({word:w,progress:{seen:0},words:[w],onAnswer:()=>{}})');
  assert.equal(tree.type.name,'StepDiscover');
 });
+test('a consolidated due word in a short session has a path to independent recall',()=>{
+ const a=app();a.run(`var w=buildWord({word:'Exulter',definition:'Manifester une joie intense',example_1:'Ils exultent de joie.',example_cloze_1:'Ils […] de joie.'});var p={...EMPTY_PROGRESS,seen:8,repetitions:2,intervalDays:6,next:addDays(-1),learning:{phase:'consolidated'}};`);
+ const tree=a.render('ShortExercise({word:w,progress:p,words:[w],onAnswer:()=>{}})');
+ assert.equal(tree.type.name,'GuidedRecall');assert.equal(tree.props.context,false);
+});

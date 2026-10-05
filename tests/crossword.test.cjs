@@ -9,8 +9,9 @@ test('French letters, duplicate answers, long words and invalid candidates',()=>
  assert.equal(s.pool.filter(w=>w.answer==='ABNEGATION').length,1);
  assert.ok(s.pool.every(w=>w.answer.length<=11));
 });
-test('missing known or due pool returns an explicit reason',()=>{
- assert.equal(cw.createPuzzle(items.filter(w=>w.role==='due')).reason,'insufficient-pool');
+test('a grid is still available without strictly mastered supporting words',()=>{
+ assert.ok(cw.createPuzzle(items.filter(w=>w.role==='due')).puzzle);
+ assert.ok(cw.createPuzzle(items.map(w=>({...w,role:'practice',unseen:true}))).puzzle);
  assert.equal(cw.createPuzzle([]).reason,'insufficient-pool');
 });
 test('generated grid has 5–7 unique connected words, proper quotas and matching intersections',()=>{
@@ -38,6 +39,16 @@ test('incompatible corpus and computation budget never publish a partial grid',(
  assert.equal(cw.createPuzzle(items,{maxAttempts:0}).puzzle,null);
 });
 module.exports={items};
+test('unintersectable due words do not block a valid support-only grid',()=>{
+ const known=items.map(w=>({...w,role:'practice'}));
+ const due=['XXX','YYY','ZZZ','XXYY','ZZXX'].map((term,i)=>({id:'due'+i,term,clue:'Un autre sens '+i,role:'due'}));
+ assert.ok(cw.createPuzzle([...due,...known]).puzzle);
+});
+test('the search reserves enough budget to reach a support grid after hard quota attempts',()=>{
+ const known=items.map(w=>({...w,role:'practice'}));
+ const due=['XXXX','XXYXX','XYXXY','XXYYY','YXXX','XYYX','YXYXX','YYXXY','XYXYX','XYYYX','YYXXX','YXXYY'].map((term,i)=>({id:'due'+i,term,clue:'Un sens distinct '+i,role:'due'}));
+ assert.ok(cw.createPuzzle([...due,...known]).puzzle);
+});
 test('typing advances within the word, paste and deletion preserve shared locked letters',()=>{
  const p=cw.createPuzzle(items).puzzle;let s=cw.newGame();const e=p.entries[0];
  let change=cw.input(s,p,e.id,e.keys[0],'é');assert.equal(change.game.values[e.keys[0]],'E');assert.equal(change.focus,e.keys[1]);

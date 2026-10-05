@@ -41,3 +41,20 @@ test('context question rejects choices reviewed only for a different sentence',(
  const tree=a.render(`StepContext({word:ws[0],words:ws,exampleIndex:1,onAnswer:()=>{}})`);
  assert.equal(tree.type.name,'SafeRecallFallback');
 });
+test('the quiz fallback preserves assisted mode and cannot credit autonomous recall',()=>{
+ const a=app();a.run(`var ws=buildWords([{word:'Exulter',definition:'Manifester une joie intense'}]);var s={progress:{},meta:{}};`);
+ const expr=`QuizTabNew({words:ws,state:s,setState:n=>s=n,onMilestone:()=>{}})`;
+ const start=find(a.render(expr),t=>t.type?.name==='Btn'&&t.props.variant==='primary');
+ assert.ok(start);start.props.onClick();
+ const question=find(a.render(expr),t=>t.type?.name==='SafeRecallFallback');assert.ok(question);
+ question.props.onAnswer(true,'guided');
+ assert.equal(a.run('s.progress[ws[0].id].prod'),0);
+ assert.equal(a.run('Object.keys(s.progress[ws[0].id].learning.independentDays).length'),0);
+});
+test('the figure practice fallback also preserves the assisted answer mode',()=>{
+ const a=app();a.run(`var ws=buildWords([{word:'Anaphore',definition:'Répétition d’un mot en début de phrase',example_1:'Moi, je lis. Moi, je comprends.'}],'figure');var s={progress:{},meta:{}};`);
+ const expr=`FigurePractice({figures:ws,state:s,setState:n=>s=n,onMilestone:()=>{},mode:'identify',onBack:()=>{}})`;
+ const start=find(a.render(expr),t=>t.type?.name==='Btn'&&t.props.variant==='primary');assert.ok(start);start.props.onClick();
+ const question=find(a.render(expr),t=>t.type?.name==='SafeRecallFallback');assert.ok(question);question.props.onAnswer(true,'guided');
+ assert.equal(a.run('s.progress[ws[0].id].prod'),0);
+});

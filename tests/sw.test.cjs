@@ -9,10 +9,10 @@ function worker(fail=false){
 test('PWA caches every required asset and serves navigation and data offline',async()=>{
  const w=worker();let wait;w.handlers.install({waitUntil:p=>wait=p});await wait;
  assert.ok(w.added.includes('./data/qcm-reviewed.json'));assert.ok(w.entries.has('./index.html'));
- for(const asset of ['crossword-engine.js','crossword-worker.js','crossword-ui.jsx','crossword.css'])assert.ok(w.entries.has('./'+asset));
+ for(const asset of ['learning-engine.js','crossword-engine.js','crossword-worker.js','crossword-ui.jsx','crossword.css'])assert.ok(w.entries.has('./'+asset));
  assert.ok(w.added.some(u=>u.includes('react-dom')));assert.equal(w.skipped,1);
  w.handlers.activate({waitUntil:p=>wait=p});await wait;
- assert.deepEqual(w.deleted,['atelier-vocab-v7-learning','atelier-vocab-v8-crossword','atelier-vocab-v9-release']);
+ assert.deepEqual(w.deleted,['atelier-vocab-v7-learning','atelier-vocab-v8-crossword','atelier-vocab-v9-release','atelier-vocab-v10-routine']);
  let response;w.handlers.fetch({request:{url:'./index.html',mode:'navigate'},respondWith:p=>response=p});assert.equal((await response).url,'./index.html');
  w.handlers.fetch({request:{url:'./data/qcm-reviewed.json',mode:'cors'},respondWith:p=>response=p});assert.equal((await response).url,'./data/qcm-reviewed.json');
 });

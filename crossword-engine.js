@@ -7,13 +7,13 @@
   const key=(r,c)=>`${r}:${c}`;
   const letters=text=>String(text||'').toUpperCase().replace(/Œ/g,'OE').replace(/Æ/g,'AE').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z]/g,'');
   const phrase=text=>String(text||'').toUpperCase().replace(/Œ/g,'OE').replace(/Æ/g,'AE').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z]+/g,' ').trim();
-  function selectCandidates(items,count=7,size=11,now=Date.now()){
+  function selectCandidates(items,count=7,size=11,now=Date.now(),flexible=false){
     count=Math.max(5,Math.min(8,Number.isFinite(count)?Math.round(count):7));
-    const dueQuota=Math.round(count*.7),knownQuota=count-dueQuota;
+    let dueQuota=Math.round(count*.7),knownQuota=count-dueQuota;
     const unique=new Set(),ids=new Set();
     const eligible=[];
     for(const source of items||[]){
-      if(!source||!source.id||!['due','known'].includes(source.role))continue;
+      if(!source||!source.id||!['due','known','practice'].includes(source.role))continue;
       const answer=letters(source.term),clue=String(source.clue||'').trim();
       const termPhrase=phrase(source.term);
       if(answer.length<3||answer.length>size||!clue||unique.has(answer)||ids.has(source.id))continue;
@@ -25,11 +25,12 @@
       eligible.push({...source,answer,clue,priority:(source.fragile?1000:0)+(100-rate)*2+overdue});
     }
     const due=eligible.filter(w=>w.role==='due').sort((a,b)=>b.priority-a.priority||String(a.id).localeCompare(String(b.id)));
-    const known=eligible.filter(w=>w.role==='known').sort((a,b)=>(b.rate||0)-(a.rate||0)||String(a.id).localeCompare(String(b.id)));
+    const known=eligible.filter(w=>w.role!=='due').sort((a,b)=>Number(b.role==='known')-Number(a.role==='known')||Number(!!a.unseen)-Number(!!b.unseen)||(b.rate||0)-(a.rate||0)||String(a.id).localeCompare(String(b.id)));
     const available={due:due.length,known:known.length};
+    if(flexible&&eligible.length>=count){dueQuota=Math.min(due.length,Math.max(dueQuota,count-known.length));knownQuota=count-dueQuota;}
     if(due.length<dueQuota||known.length<knownQuota)return {reason:'insufficient-pool',available,count,dueQuota,knownQuota,pool:[],selected:[]};
-    const pool=[...due.slice(0,16).map((w,rank)=>({...w,rank})),...known.slice(0,8).map((w,rank)=>({...w,rank}))];
-    return {count,dueQuota,knownQuota,pool,available,selected:[...pool.filter(w=>w.role==='due').slice(0,dueQuota),...pool.filter(w=>w.role==='known').slice(0,knownQuota)]};
+    const pool=[...due.slice(0,16).map((w,rank)=>({...w,rank})),...known.slice(0,12).map((w,rank)=>({...w,rank}))];
+    return {count,dueQuota,knownQuota,pool,available,selected:[...pool.filter(w=>w.role==='due').slice(0,dueQuota),...pool.filter(w=>w.role!=='due').slice(0,knownQuota)]};
   }
   function place(model,item,r,c,dir,size=11){
     const dr=dir==='V'?1:0,dc=dir==='H'?1:0,len=item.answer.length;
@@ -70,7 +71,7 @@
   function search(selection,size,width,budget){
     const empty={cells:new Map(),entries:[],score:0,area:0};let beam=[];
     const attempt=(...args)=>{if(budget.remaining<=0)return null;budget.remaining--;return place(...args);};
-    for(const item of selection.pool.filter(w=>w.role==='due').slice(0,6))for(const dir of ['H','V']){
+    for(const item of selection.pool.filter(w=>selection.dueQuota?w.role==='due':w.role!=='due').slice(0,6))for(const dir of ['H','V']){
       const start=Math.floor((size-item.answer.length)/2),middle=Math.floor(size/2);
       const p=attempt(empty,item,dir==='H'?middle:start,dir==='H'?start:middle,dir,size);if(p)beam.push(p);
     }
@@ -87,7 +88,7 @@
               const rr=r-(dir==='V'?i:0),cc=c-(dir==='H'?i:0),sig=key(rr,cc)+dir;
               if(tried.has(sig))continue;tried.add(sig);
               const p=attempt(model,item,rr,cc,dir,size);
-              if(p){const signature=JSON.stringify(p.entries.map(e=>[e.id,e.r,e.c,e.dir]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));const old=next.get(signature);if(!old||p.score>old.score)next.set(signature,p);}
+              if(p){if(p.entries.length===selection.count)return finish(p);const signature=JSON.stringify(p.entries.map(e=>[e.id,e.r,e.c,e.dir]).sort((a,b)=>String(a[0]).localeCompare(String(b[0]))));const old=next.get(signature);if(!old||p.score>old.score)next.set(signature,p);}
               if(budget.remaining<=0)return null;
             }
           }
@@ -102,15 +103,25 @@
     const count=Math.max(5,Math.min(8,Number.isFinite(options.count)?Math.round(options.count):7));
     const size=Math.max(5,Math.min(11,Number.isFinite(options.size)?Math.round(options.size):11));
     const width=Math.max(1,Math.min(24,options.beamWidth||16));
-    const budget={remaining:Number.isFinite(options.maxAttempts)?Math.max(0,Math.min(60000,options.maxAttempts)):40000};
-    let last=null,hadPool=false;
-    for(let n=count;n>=5;n--){
-      last=selectCandidates(items,n,size,options.now||Date.now());if(last.reason)continue;hadPool=true;
-      const puzzle=search(last,size,width,budget);
-      if(puzzle)return {puzzle,reason:null,attempts:(options.maxAttempts??40000)-budget.remaining};
-      if(budget.remaining<=0)return {puzzle:null,reason:'search-limit',available:last.available};
+    const limit=Number.isFinite(options.maxAttempts)?Math.max(0,Math.min(60000,options.maxAttempts)):40000;
+    let remaining=limit;
+    let last=null,hadPool=false,limited=false;
+    for(const flexible of [false,true,'support-only','due-only']){
+     let phaseRemaining=Math.min(remaining,Math.ceil(limit/4));
+     // Find a readable five-word grid before spending the budget on larger ones.
+     // Each phase keeps its own allowance so hard quotas cannot starve fallbacks.
+     const counts=Array.from({length:count-4},(_,i)=>5+i);
+     for(const n of counts){
+      const pool=flexible==='support-only'?items.filter(w=>w.role!=='due'):flexible==='due-only'?items.filter(w=>w.role==='due'):items;
+      last=selectCandidates(pool,n,size,options.now||Date.now(),!!flexible);if(last.reason)continue;hadPool=true;
+      const budget={remaining:Math.min(phaseRemaining,7500)},allocated=budget.remaining;
+      const puzzle=search(last,size,width,budget);const used=allocated-budget.remaining;remaining-=used;phaseRemaining-=used;
+      if(puzzle){puzzle.discovery=puzzle.entries.some(e=>e.unseen);return {puzzle,reason:null,attempts:limit-remaining};}
+      if(budget.remaining<=0)limited=true;
+      if(phaseRemaining<=0)break;
+     }
     }
-    return {puzzle:null,reason:hadPool?'no-intersections':'insufficient-pool',available:last?.available||{due:0,known:0}};
+    return {puzzle:null,reason:hadPool?limited?'search-limit':'no-intersections':'insufficient-pool',available:last?.available||{due:0,known:0}};
   }
   const newGame=()=>({values:{},results:{}});
   const lockedKeys=(game,puzzle)=>new Set(puzzle.entries.filter(e=>game.results[e.id]?.done).flatMap(e=>e.keys));

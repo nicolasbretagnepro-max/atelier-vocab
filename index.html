@@ -872,7 +872,7 @@ function migrateProgressEntry(raw) {
   x.relearning = !!x.relearning;
   x.lapsed = !!x.lapsed;
   x.needsRebuild = !!x.needsRebuild;
-  x.learning = AtelierLearning.normalize(x,localDateKey());
+  x.learning = AtelierLearning.normalize({...x,intervalDays:raw?.intervalDays,repetitions:raw?.repetitions},localDateKey());
   return x;
 }
 
@@ -1530,8 +1530,8 @@ function buildCrosswordCandidates(state,words) {
     const clue=String(w.compact||w.definition||"").trim();
     if(w.kind==="figure"||!clue||textContainsAnswer(clue,w))return [];
     const p=readP(state,w.id);
-    const role=isDue(state,w)?"due":wordStatus(state,w)==="Maîtrisé"?"known":null;
-    return role?[{id:w.id,term:w.word,clue,role,rate:getRate(state,w),next:p.next,fragile:!!(p.relearning||p.lapsed||p.needsRebuild)}]:[];
+    const role=isDue(state,w)?"due":wordStatus(state,w)==="Maîtrisé"?"known":"practice";
+    return [{id:w.id,term:w.word,clue,definition:w.definition||clue,example:w.hasRealExample?getExampleByIndex(w,0):"",role,unseen:!p.seen,rate:getRate(state,w),next:p.next,fragile:!!(p.relearning||p.lapsed||p.needsRebuild)}];
   });
 }
 function recordCrosswordResult(state,words,puzzle,result,graded) {
@@ -1540,7 +1540,7 @@ function recordCrosswordResult(state,words,puzzle,result,graded) {
   if(!entry||entry.role!=="due"||!word||!isDue(state,word))return state;
   if(AtelierCrossword.letters(word.word)!==entry.answer||String(word.compact||word.definition||"").trim()!==entry.clue)return state;
   graded.add(result.id);
-  return gradeWord(state,word.id,result.rating,"context");
+  return gradeWord(state,word.id,result.rating,"context",undefined,{kind:"context",assisted:true});
 }
 
 function validClozePrompt(word) {
@@ -1559,7 +1559,10 @@ function contextAnswer(word,index=0) {
   const match=full.match(new RegExp(`^${escapeRegExp(parts[0])}(.+?)${escapeRegExp(parts[1])}$`,"i"));
   if(!match||!match[1].trim()||match[1].length>70)return null;
   const answer=match[1].trim();
-  if(!acceptedAnswers(word).some(a=>norm(answer).startsWith(a.slice(0,Math.min(3,a.length)))))return null;
+  // Reviewed forms whose stem differs from the lemma; still require exact source alignment.
+  // Seoir: https://www.dictionnaire-academie.fr/article/A9S1259
+  const irregular={seoir:["sied","sierait"]};
+  if(!acceptedAnswers(word).some(a=>norm(answer).startsWith(a.slice(0,Math.min(3,a.length)))||irregular[a]?.includes(norm(answer))))return null;
   return {prompt,answer,full};
 }
 function guidedAnswerMatches(input,word,context=null) {
@@ -2072,7 +2075,7 @@ function Dashboard({words,figures,state,settings=loadProfile().learningSettings,
         <p style={{fontSize:14,color:C.sub,lineHeight:1.5,margin:"10px 0 0"}}>{planned.active.length} mots en apprentissage · {planned.discover.length} nouveautés · {planned.due.length} anciennes révisions. Les nouveautés ralentissent quand les dix places sont occupées.</p>
         {planned.waiting>0&&<p style={{fontSize:13,color:C.sub}}>{planned.waiting} autres mots en cours seront repris à tour de rôle pour garder une séance courte.</p>}
       </Card>
-      <Card style={{background:`${C.indigo}08`}}><h3 style={{fontSize:18,margin:"0 0 6px"}}>🧩 Mots croisés</h3><p style={{fontSize:14,color:C.sub,lineHeight:1.5,margin:"0 0 12px"}}>Une petite grille pour retrouver tes mots à revoir, avec quelques mots maîtrisés comme appui.</p><Btn label="Jouer aux mots croisés" full onClick={onStartCrossword}/></Card>
+      <Card style={{background:`${C.indigo}08`}}><h3 style={{fontSize:18,margin:"0 0 6px"}}>🧩 Mots croisés</h3><p style={{fontSize:14,color:C.sub,lineHeight:1.5,margin:"0 0 12px"}}>Retrouve tes mots dans une petite grille. Une découverte guidée est proposée si les mots sont nouveaux.</p><Btn label="Jouer aux mots croisés" full onClick={onStartCrossword}/></Card>
       <Card style={{background:`linear-gradient(135deg, ${C.blue}12 0%, ${C.purple}09 100%)`}}>
         <p style={{fontSize:11,fontWeight:800,color:C.blue,textTransform:"uppercase",letterSpacing:1,margin:"0 0 6px"}}>Aujourd'hui</p>
         <h2 style={{fontSize:24,fontWeight:850,color:C.text,letterSpacing:-0.8,margin:"0 0 8px"}}>{recommended}</h2>
@@ -2210,9 +2213,9 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
   const advance = useCallback((ok, mode="recog", evidence=null) => {
     if (!current || feedback || advancingRef.current) return;
     advancingRef.current = true;
-    const newStreak = ok ? sessionStreak + 1 : 0;
+    const newStreak = evidence?.neutral?sessionStreak:ok ? sessionStreak + 1 : 0;
     let _dailyXp = 0;
-    if (ok) {
+    if (ok&&!evidence?.neutral) {
       _dailyXp = calcXP(state, current, step === 0 ? "discover" : mode, newStreak);
     }
     const ns = gradeWord(state, current.id, evidence?.neutral ? "good" : ok ? "good" : "again", evidence?.neutral?"discover":step === 0 ? "discover" : mode, evidence?.neutral?0:ok ? _dailyXp : 0, evidence?.neutral?{kind:"discover",assisted:true}:evidence);
@@ -2342,14 +2345,14 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
       </div>
       <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>{STEPS[step]} · {idx+1} / {sources.length}</div>
       <progress aria-label="Progression de la routine" value={log.length} max={session.questionCount+(retryRef.current.total||0)} style={{width:"100%",accentColor:C.blue}}/>
-      <p style={{fontSize:13,color:C.sub,margin:0}}>{log.length+1}/{session.questionCount+(retryRef.current.total||0)} rencontres · les aides diminuent au fil des jours</p>
+      <p style={{fontSize:13,color:C.sub,margin:0}}>{Math.min(log.length+1,session.questionCount+(retryRef.current.total||0))}/{session.questionCount+(retryRef.current.total||0)} rencontres · les aides diminuent au fil des jours</p>
 
       <div className={`question-card ${feedback==="correct"?"feedback-correct":feedback==="wrong"?"feedback-wrong":""}`} style={{background:cardBg,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",transition:"background 0.4s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
         {step===0 && <StepDiscover key={`discover-${current.id}-${idx}`} word={current} words={words} shown={shown} setShown={setShown} onNext={()=>advance(true)} />}
         {step===1 && (smartDistractors(current,words,2).length>=2
           ? <StepChoice key={`association-${current.id}-${idx}`} word={current} words={words} mode="termToDefinition" answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={ok=>advance(ok,"recog",{kind:"meaning",assisted:true})}/>
           : <GuidedRecall key={`association-${current.id}-${idx}`} word={current} level={1} kind="meaning" onAnswer={r=>advance(r.ok,"guided",r)}/>)}
-        {step===2 && <GuidedRecall key={`context-${current.id}-${idx}`} word={current} level={session.levels[current.id]} context exampleIndex={idx%2} onAnswer={r=>advance(r.ok,"context",r)}/>}
+        {step===2 && <GuidedRecall key={`context-${current.id}-${idx}`} word={current} level={session.levels[current.id]} context exampleIndex={idx%2} onAnswer={r=>advance(r.ok,r.kind==="context"?"context":r.assisted?"guided":"prod",r)}/>}
         {step===3 && <GuidedRecall key={`production-${current.id}-${idx}`} word={current} level={session.levels[current.id]} onAnswer={r=>advance(r.ok,r.assisted?"guided":"prod",r)}/>}
         {step===4 && <GuidedRecall key={`boss-${current.id}-${idx}`} word={current} level={session.levels[current.id]} onAnswer={r=>advance(r.ok,r.assisted?"guided":"prod",r)}/>}
       </div>
@@ -2381,8 +2384,8 @@ function StepDiscover({word,words,shown,setShown,onNext}) {
         <>
           <p style={{fontSize:18,color:C.text,fontWeight:700,marginBottom:6}}>{word.compact}</p>
           <p style={{fontSize:14,color:C.sub,lineHeight:1.65,marginBottom:12}}>{word.definition}</p>
-          <ExampleBlock word={word}/>
-          <ConfusionBlock word={word} words={words} compact />
+          <ExampleBlock word={word} exampleIndex={0}/>
+          {normalizeConfusions(word.confusions).length>0&&<ConfusionBlock word={word} words={words} compact />}
           <Btn label="J'ai compris · continuer" variant="success" full onClick={onNext}/>
         </>
     </div>
@@ -2393,14 +2396,14 @@ function GuidedRecall({word,level=1,context=false,exampleIndex=0,kind="recall",o
   const [value,setValue]=useState("");
   const [hinted,setHinted]=useState(false);
   const [result,setResult]=useState(null);
-  const source=context?contextAnswer(word,exampleIndex):null;
+  const source=context?(contextAnswer(word,exampleIndex)||word.examples.map((_,i)=>contextAnswer(word,i)).find(Boolean)||null):null;
   const expected=source?.answer||word.word;
   const guided=context?Math.min(2,level):level;
   const effective=hinted?Math.min(1,guided):guided;
   const assisted=guided<3||hinted||context;
-  const submit=()=>{if(result||!value.trim())return;const ok=guidedAnswerMatches(value,word,source);setResult({ok,assisted,kind:context?"context":kind});haptic(ok?"correct":"wrong");};
+  const submit=()=>{if(result||!value.trim())return;const ok=guidedAnswerMatches(value,word,source);setResult({ok,assisted,kind:source?"context":kind});haptic(ok?"correct":"wrong");};
   return <div>
-    <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"0 0 12px"}}>{context?"Retrouve le mot étudié dans cette phrase. Le sens et les lettres te guident.":guided<3?"Complète le mot étudié. Tu peux t’aider des lettres.":"Retrouve le mot étudié à partir de son sens. Un indice reste disponible."}</p>
+    <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"0 0 12px"}}>{source?"Retrouve le mot étudié dans cette phrase. Le sens et les lettres te guident.":guided<3?"Complète le mot étudié. Tu peux t’aider des lettres.":"Retrouve le mot étudié à partir de son sens. Un indice reste disponible."}</p>
     <p style={{fontSize:18,fontWeight:700,lineHeight:1.5,margin:"0 0 12px"}}>{word.definition||word.compact}</p>
     {source&&<p style={{fontSize:18,lineHeight:1.65,padding:14,borderRadius:14,background:`${C.blue}08`}}>{source.prompt}</p>}
     <p aria-label="Lettres du mot" style={{fontSize:24,fontWeight:800,letterSpacing:2,overflowWrap:"anywhere",margin:"12px 0"}}>{recallPattern(expected,effective)}</p>
@@ -2425,7 +2428,7 @@ function GuidedRecall({word,level=1,context=false,exampleIndex=0,kind="recall",o
 }
 
 function SafeRecallFallback({word, onAnswer}) {
-  return <GuidedRecall word={word} level={1} onAnswer={r=>onAnswer(r.ok,"guided")}/>;
+  return <GuidedRecall word={word} level={1} onAnswer={r=>onAnswer(r.ok,r.neutral?"discover":"guided",r)}/>;
 }
 function StepChoice({word,words,mode,onAnswer,answerIndex=0}) {
   const [selected,setSelected] = useState(null);
@@ -2748,12 +2751,12 @@ function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
     else setCurrent(nextWord);
   };
 
-  const answer = (o) => {
+  const answer = (o,responseMode="nuance") => {
     if (selected || !current) return;
     setSelected(o.id);
     askedRef.current.add(current.id);
     const ok = o.id === current.id;
-    const ns = gradeWord(stateRef.current, current.id, ok ? "good" : "again", "nuance");
+    const ns = gradeWord(stateRef.current, current.id, ok ? "good" : "again", responseMode);
     stateRef.current = ns;
     setState(ns);
     const m = checkMilestones(ns, words);
@@ -2777,7 +2780,7 @@ function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
 
   const wrong = selected && selected !== current.id;
   if (q.options.length < 3) return <Card><SafeRecallFallback key={current.id} word={current}
-    onAnswer={ok=>{answer({id:ok?current.id:"__wrong__"});continueNext();}}/></Card>;
+    onAnswer={(ok,responseMode)=>{answer({id:ok?current.id:"__wrong__"},responseMode||"guided");continueNext();}}/></Card>;
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12,animation:"fadeSlideIn 0.25s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -2987,7 +2990,7 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
 
   if (current && q && steps[step] !== "Découverte" && q.options.length < 3)
     return <Card><SafeRecallFallback key={current.id + ":" + step} word={current}
-      onAnswer={ok=>advance(ok, "prod")}/></Card>;
+      onAnswer={(ok,responseMode)=>advance(ok,responseMode||"guided")}/></Card>;
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -3080,12 +3083,12 @@ function FigurePractice({figures,state,setState,onMilestone,mode="identify",onBa
     }
   };
 
-  const answer = (o) => {
+  const answer = (o,responseMode=null) => {
     if (selected || !current) return;
     setSelected(o.id);
     askedRef.current.add(current.id);
     const ok = o.id === current.id;
-    const ns = gradeWord(stateRef.current, current.id, ok ? "good" : "again", mode === "definition" ? "recog" : "prod");
+    const ns = gradeWord(stateRef.current, current.id, ok ? "good" : "again", responseMode||(mode === "definition" ? "recog" : "prod"));
     stateRef.current = ns;
     setState(ns);
     const m = checkMilestones(ns, figures);
@@ -3132,7 +3135,7 @@ function FigurePractice({figures,state,setState,onMilestone,mode="identify",onBa
   const wrong = selected && selected !== current.id;
 
   if (current && q && q.options.length < 3) return <Card><SafeRecallFallback key={current.id} word={current}
-    onAnswer={ok=>{answer({id:ok?current.id:"__wrong__"});if(!ok)moveNext(count+1);}}/></Card>;
+    onAnswer={(ok,responseMode)=>{answer({id:ok?current.id:"__wrong__"},responseMode||"guided");if(!ok)moveNext(count+1);}}/></Card>;
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -4044,7 +4047,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
     <p style={{color:C.sub,marginBottom:8}}>Question {count+1}/{maxQ} · +{xpSession} XP</p>
     <Bar value={(count/maxQ)*100} color={C.blue}/>
     <SafeRecallFallback key={w.id} word={w}
-    onAnswer={ok=>{handleAnswer({id:ok?w.id:"__wrong__"},"prod");if(!ok)moveNext(count+1);}}/></Card>;
+    onAnswer={(ok,responseMode)=>{handleAnswer({id:ok?w.id:"__wrong__"},responseMode||"guided");if(!ok)moveNext(count+1);}}/></Card>;
   const wrong = selected && selected !== w.id;
 
   return (
@@ -4091,7 +4094,7 @@ function ShortExercise({word,progress,words,onAnswer}) {
     </>}
   </div>;
   if(format==="qcm")return <StepChoice word={word} words={words} mode="term" answerIndex={answerIndex} onAnswer={(ok,mode)=>onAnswer(ok?"good":"again",mode||"recog")}/>;
-  return <GuidedRecall word={word} level={AtelierLearning.level(progress,localDateKey())} context={format==="cloze"} onAnswer={r=>onAnswer(r.neutral?"good":r.ok?"good":"again",r.neutral?"discover":format==="cloze"?"context":r.assisted?"guided":"prod",r.neutral?{kind:"discover",assisted:true}:r)}/>;
+  return <GuidedRecall word={word} level={AtelierLearning.level(progress,localDateKey())} context={format==="cloze"&&AtelierLearning.normalize(progress,localDateKey()).phase!=="consolidated"} onAnswer={r=>onAnswer(r.neutral?"good":r.ok?"good":"again",r.neutral?"discover":r.kind==="context"?"context":r.assisted?"guided":"prod",r.neutral?{kind:"discover",assisted:true}:r)}/>;
 }
 
 function ShortSession({words,state,setState,onBack}) {

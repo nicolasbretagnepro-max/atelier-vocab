@@ -39,4 +39,8 @@ test('profile save and reload preserve learning evidence and old due dates',()=>
  assert.equal(a.run('s.progress.a.learning.phase'),'consolidated');
  assert.equal(a.run('Object.keys(s.progress.a.learning.contextDays).length'),1);
 });
+test('an old next-only profile remains consolidated after normalization and save',()=>{
+ const a=app();a.run(`var w={id:'a'};var s={progress:{a:{seen:10,correct:7,next:addDays(30)}},meta:{}};saveProgress(s);s=loadProgress();`);
+ assert.equal(a.run('buildDailySession(s,[w]).review.length'),0);
+});
 
