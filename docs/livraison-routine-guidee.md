@@ -26,12 +26,12 @@ La source principale reste le **JSON GitHub Gist configuré dans l’application
 
 ## Vérification avant publication
 
-- **82 tests passent**, compilation de tout le JSX comprise : preuves sur plusieurs jours, profils historiques/import/export, quotas, reprise d’une séance, guidage, conjugaisons, Boss, autres modes, intersections et service worker hors ligne.
+- **83 tests passent**, compilation de tout le JSX comprise : preuves sur plusieurs jours, profils historiques/import/export, quotas, reprise d’une séance, guidage, conjugaisons, Boss, autres modes, intersections et service worker hors ligne.
 - Corpus local issu de la source réelle : **772 mots**, chacun possède au moins un contexte alignable ; un profil vierge produit une grille découverte de **cinq mots, 10 × 8 cases**.
 - Navigateur au format **393 × 852** : découverte → association → « exultent » en contexte → Boss → bilan mentionnant Exulter demain ; grille découverte d’un profil vierge et passage automatique à la case suivante.
 - Champs de routine à **18 px**, cases de grille à **20 px**, sans débordement horizontal dans les vues contrôlées. Le clavier Safari sur un iPhone physique reste à confirmer sur l’appareil.
 - Revue indépendante suivie de correctifs et de tests de régression : aides des modes complémentaires, migration d’anciens profils, faux contexte, budgets du générateur et rappel autonome en séance courte.
 
-Le cache PWA devient `atelier-vocab-v11-guided-learning` et inclut `learning-engine.js`. La publication doit conserver ces fichiers ensemble ; la vérification publique compare neuf assets aux octets du commit déployé.
+Le cache PWA devient `atelier-vocab-v12-guided-learning` et inclut `learning-engine.js`. Les cinq URLs de modules et de style sont versionnées de façon identique dans la page, le worker et le précache, pour empêcher une ancienne interface de répondre à une nouvelle page lors de la première réouverture. La publication doit conserver ces fichiers ensemble ; la vérification publique compare neuf assets aux octets du commit déployé.
 
 Pour exécuter les contrôles : `node tests/run.cjs` depuis le dépôt, après `tests/bootstrap.ps1` si le compilateur de tests n’est pas encore présent.

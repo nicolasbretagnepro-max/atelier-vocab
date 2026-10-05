@@ -2,7 +2,7 @@
 // Version mise à jour pour forcer le renouvellement du cache
 // et éviter les anciennes réponses contenant les pseudo-exemples.
 
-const CACHE_NAME = "atelier-vocab-v11-guided-learning";
+const CACHE_NAME = "atelier-vocab-v12-guided-learning";
 
 const ASSETS = [
   "./",
@@ -11,11 +11,11 @@ const ASSETS = [
   "./icon-192.png",
   "./icon-512.png",
   "./data/qcm-reviewed.json",
-  "./learning-engine.js",
-  "./crossword-engine.js",
-  "./crossword-worker.js",
-  "./crossword-ui.jsx",
-  "./crossword.css",
+  "./learning-engine.js?v=12",
+  "./crossword-engine.js?v=12",
+  "./crossword-worker.js?v=12",
+  "./crossword-ui.jsx?v=12",
+  "./crossword.css?v=12",
   "https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"

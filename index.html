@@ -73,10 +73,10 @@
 <body>
 <div id="root"></div>
 
-<link rel="stylesheet" href="./crossword.css" />
-<script src="./learning-engine.js"></script>
-<script src="./crossword-engine.js"></script>
-<script type="text/babel" src="./crossword-ui.jsx"></script>
+<link rel="stylesheet" href="./crossword.css?v=12" />
+<script src="./learning-engine.js?v=12"></script>
+<script src="./crossword-engine.js?v=12"></script>
+<script type="text/babel" src="./crossword-ui.jsx?v=12"></script>
 <script type="text/babel">
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -4200,7 +4200,7 @@ function App() {
     stopCrosswordWorker();const id=++crosswordRequest.current;
     crosswordGraded.current=new Set();setCrosswordOpen(true);setCrossword({status:"loading"});
     try{
-      const worker=new Worker("./crossword-worker.js");crosswordWorker.current=worker;
+      const worker=new Worker("./crossword-worker.js?v=12");crosswordWorker.current=worker;
       worker.onmessage=event=>{
         if(event.data.id!==crosswordRequest.current||crosswordWorker.current!==worker)return;
         const result=event.data.result;stopCrosswordWorker();
