@@ -35,3 +35,7 @@ La source principale reste le **JSON GitHub Gist configuré dans l’application
 Le cache PWA devient `atelier-vocab-v12-guided-learning` et inclut `learning-engine.js`. Les cinq URLs de modules et de style sont versionnées de façon identique dans la page, le worker et le précache, pour empêcher une ancienne interface de répondre à une nouvelle page lors de la première réouverture. La publication doit conserver ces fichiers ensemble ; la vérification publique compare neuf assets aux octets du commit déployé.
 
 Pour exécuter les contrôles : `node tests/run.cjs` depuis le dépôt, après `tests/bootstrap.ps1` si le compilateur de tests n’est pas encore présent.
+
+## Publication vérifiée
+
+Les cinq lots sont intégrés à `main`. Le code final `f3761fb` a été déployé avec succès par GitHub Pages (exécution 37333619723). Les neuf assets publics, y compris leurs URLs versionnées, sont identiques aux fichiers de ce commit. Le site charge 772 mots et 94 figures depuis ses sources configurées.

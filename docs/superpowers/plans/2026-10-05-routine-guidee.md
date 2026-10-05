@@ -75,4 +75,4 @@
 - [x] Tests RED : grille sans maîtrisés ; supports actifs/récents ; grille découverte sur corpus initial ; aide sans preuve autonome ; corpus impossible expliqué ; assets PWA complets.
 - [x] Implémenter les replis et ajuster les libellés ; versionner le cache.
 - [x] Suite complète, compilation, parcours réel mobile novice et utilisateur avancé ; revue indépendante de toute la branche, corriger les constats importants.
-- [ ] Commits, intégration sans écraser les changements distants et publication sous l'autorisation déjà donnée ; vérifier les fichiers publics.
+- [x] Commits, intégration sans écraser les changements distants et publication sous l'autorisation déjà donnée ; vérifier les fichiers publics.
