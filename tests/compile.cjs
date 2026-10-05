@@ -1,0 +1,9 @@
+const fs = require('node:fs');
+const Babel = require('./babel.min.cjs');
+const source = fs.readFileSync('index.html','utf8').split('<script type="text/babel">')[1].split('</script>')[0];
+const compiled = Babel.transform(source, {presets:['react'],filename:'index.jsx'}).code;
+new Function(compiled);
+console.log('JSX compilation OK');
+const examples = Babel.transform(fs.readFileSync('engagement-examples.jsx','utf8'), {presets:['react'],filename:'engagement-examples.jsx'}).code;
+new Function(examples);
+console.log('Engagement examples JSX compilation OK');

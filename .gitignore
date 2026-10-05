@@ -1,0 +1,5 @@
+tests/ui-fixture.html
+tests/verification.png
+tests/babel.min.cjs
+.superpowers/
+data/audit-report.json

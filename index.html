@@ -167,7 +167,7 @@ function shuffle(a) {
 
 function placeAnswerAt(answer, distractors, index) {
   const options = (distractors || []).slice(0, 3);
-  const safeIndex = Math.max(0, Math.min(3, index || 0));
+  const safeIndex = Math.max(0, Math.min(options.length, index || 0));
   options.splice(safeIndex, 0, answer);
   return options;
 }
@@ -278,7 +278,7 @@ const DEFINITION_STOPWORDS = new Set([
 ]);
 
 function definitionTokens(word) {
-  const text = norm([word?.compact, word?.definition].join(" "));
+  const text = norm(word?.compact || word?.definition || "");
   return text
     .split(" ")
     .map(t => t.trim())
@@ -288,7 +288,9 @@ function definitionTokens(word) {
 function definitionSimilarity(a, b) {
   const aTokens = definitionTokens(a);
   const bTokens = definitionTokens(b);
-  if (aTokens.length < 2 || bTokens.length < 2) return 0;
+  const da = norm(a?.compact || a?.definition), db = norm(b?.compact || b?.definition);
+  if (da && da === db) return 1;
+  if (!aTokens.length || !bTokens.length) return 0;
   const aSet = new Set(aTokens);
   const bSet = new Set(bTokens);
   let common = 0;
@@ -415,44 +417,48 @@ function uniqueWordOptions(items) {
   });
 }
 
-function smartDistractors(answer, words, limit = 3) {
-  const pool = (words || []).filter(w => w && w.id !== answer.id);
-  const nearbyIds = new Map(getNearbyWords(answer, words || [], 12).map(w => [w.id, w.nearbyScore || 0]));
-  const safePool = pool.filter(w => !isAmbiguousDistractor(answer, w));
-  const scored = safePool.map(w => ({ w, score:(nearbyIds.get(w.id) || 0) + Math.random() * 4 }));
-  const strong = scored
-    .filter(x => x.score >= 22)
-    .sort((a,b)=>b.score-a.score)
-    .map(x=>x.w);
-  const fallback = shuffle(safePool);
-  const relaxedFallback = shuffle(pool);
-  return uniqueWordOptions([...strong, ...fallback, ...relaxedFallback]).slice(0, limit);
+// QCM are published only from editorially reviewed pairs. Similarity is an
+// additional guard, not a semantic guarantee. No unfiltered fallback.
+const REVIEWED_ANCHORS = ["Biosphère", "Anaphore", "Abnégation", "Anachorète", "Aboulie", "Atavisme"];
+function seedReviewedDistractors(answer, words) {
+  const seed = [...SEED_WORDS, ...SEED_FIGURES].find(w => norm(w.word) === norm(answer.word));
+  const unchanged = (item, reference) => reference
+    && String(item.compact).trim() === String(reference.definition_compacte || reference.definition_courte || reference.definition).trim()
+    && String(item.definition).trim() === String(reference.definition).trim();
+  if (!unchanged(answer, seed)) return [];
+  const labels = answer.kind === "figure" ? SEED_FIGURES.map(w=>w.word) : REVIEWED_ANCHORS;
+  return words.filter(w => labels.includes(w.word)
+    && unchanged(w, [...SEED_WORDS,...SEED_FIGURES].find(seed=>norm(seed.word)===norm(w.word))));
 }
-
-// Variante de smartDistractors pour StepContext : priorité forte à la même nature
-// grammaticale, pour que les choix soient syntaxiquement plausibles dans la phrase.
-function smartDistractorsContext(answer, words, limit = 3) {
-  const pool = (words || []).filter(w => w && w.id !== answer.id);
-  const nearbyIds = new Map(getNearbyWords(answer, words || [], 12).map(w => [w.id, w.nearbyScore || 0]));
-  const answerNorm = natureFamily(answer.nature);
-  const safePool = pool.filter(w => !isAmbiguousDistractor(answer, w));
-  const scored = safePool.map(w => {
-    const sameNatureExact = w.nature && answer.nature && w.nature === answer.nature;
-    const sameNatureFamily = natureFamily(w.nature) === answerNorm;
-    let score = 0;
-    score += nearbyIds.get(w.id) || 0;
-    if (sameNatureExact) score += 60;  // bonus fort : même nature exacte
-    else if (sameNatureFamily) score += 40;  // bonus moyen : même famille grammaticale
-    score += Math.random() * 4;
-    return { w, score };
-  });
-  const strong = scored
-    .filter(x => x.score >= 25)
-    .sort((a,b) => b.score - a.score)
-    .map(x => x.w);
-  const fallback = shuffle(safePool);
-  const relaxedFallback = shuffle(pool);
-  return uniqueWordOptions([...strong, ...fallback, ...relaxedFallback]).slice(0, limit);
+function selectReviewedDistractors(answer, words, limit = 3, contextPrompt = null) {
+  const entries = contextPrompt == null ? answer.qcmDistractors || answer.qcm_distractors || []
+    : answer.qcmContextDistractors || answer.qcm_context_distractors || [];
+  const validAnswer = !!(answer.qcmDefinition || answer.qcm_definition)
+    && String(answer.qcmDefinition || answer.qcm_definition).trim() === String(answer.compact || answer.definition).trim();
+  const reviewed = validAnswer && Array.isArray(entries) ? entries.flatMap(entry => {
+    if (!entry || typeof entry !== "object") return [];
+    if (contextPrompt != null && entry.prompt !== contextPrompt) return [];
+    return words.filter(w => norm(w.word) === norm(entry.word)
+      && String(w.compact || w.definition).trim() === String(entry.definition || "").trim());
+  }) : [];
+  const seed = contextPrompt == null ? seedReviewedDistractors(answer, words) : [];
+  const pool = shuffle(uniqueWordOptions([...reviewed, ...seed]));
+  const result = [];
+  for (const w of pool) {
+    if (w.id === answer.id || norm(w.word) === norm(answer.word)) continue;
+    if (!norm(w.compact || w.definition)) continue;
+    if (isAmbiguousDistractor(answer, w)) continue;
+    if (result.some(other => norm(other.word) === norm(w.word) || isAmbiguousDistractor(other,w))) continue;
+    result.push(w);
+    if (result.length >= limit) break;
+  }
+  return result.slice(0,Math.max(0,limit));
+}
+function smartDistractors(answer, words, limit = 3) {
+  return selectReviewedDistractors(answer, words || [], limit);
+}
+function smartDistractorsContext(answer, words, limit = 3, prompt = blankSentence(answer)) {
+  return selectReviewedDistractors(answer, words || [], limit, prompt);
 }
 
 function inferFigureFamily(w) {
@@ -524,6 +530,9 @@ exampleType: examples[0]?.type || "",
 clozeType: examples[0]?.clozeType || "",
     
     confusions: normalizeConfusions(w.confusions || w.mots_proches || w.motsProches || w.near || []),
+    qcmDefinition: String(w.qcm_definition || w.qcmDefinition || ""),
+    qcmDistractors: w.qcm_distractors || w.qcmDistractors || [],
+    qcmContextDistractors: w.qcm_context_distractors || w.qcmContextDistractors || [],
     memoryTip: String(w.memory_tip || w.mnemonic || w.astuce || ""),
     etymology: String(w.etymology || w.etymologie || ""),
     register: String(w.register || w.registre || ""),
@@ -728,7 +737,7 @@ const STORE_SOURCE_CACHE = "atelier_vocab_source_cache";
 const STORE_MILESTONE = "atelier_vocab_milestone";
 const STORE_DAILY     = "atelier_vocab_daily_done";
 const STORE_ACTIVITY  = "atelier_vocab_activity";
-const PROFILE_SCHEMA_VERSION = 2;
+const PROFILE_SCHEMA_VERSION = 3;
 
 const LEGACY_PROGRESS_KEYS = [
   "atelier_vocab_progress_v4",
@@ -746,7 +755,8 @@ const EMPTY_PROGRESS = Object.freeze({
   seen:0, correct:0, wrong:0, mastery:0, recog:0, prod:0, streak:0, next:null,
   context:0, recall:0, recallStreak:0, firstCorrectDay:null, lastCorrectDay:null,
   firstRecallDay:null, lastRecallDay:null, lastWrongDay:null, correctDays:null,
-  recallDays:null, lapsed:false, needsRebuild:false
+  recallDays:null, lapsed:false, needsRebuild:false,
+  easeFactor:2.5, intervalDays:0, repetitions:0, lastScheduledDay:null, relearning:false
 });
 const DEFAULT_META = Object.freeze({ xp:0, streak:0, lastDay:null });
 
@@ -785,6 +795,17 @@ function migrateProgressEntry(raw) {
   x.lastRecallDay = typeof x.lastRecallDay === "string" ? x.lastRecallDay : null;
   x.lastWrongDay = typeof x.lastWrongDay === "string" ? x.lastWrongDay : null;
   x.next = x.next || null;
+  // Preserve legacy due dates; conservatively infer a starting interval.
+  const legacyIntervals = [1, 1, 2, 4, 7, 14, 30];
+  const finite = (value, fallback) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+  x.intervalDays = Math.max(0, finite(x.intervalDays, 0));
+  if (!raw || raw.intervalDays == null) x.intervalDays = x.seen ? legacyIntervals[Math.floor(x.mastery)] : 0;
+  x.easeFactor = Math.max(1.3, finite(x.easeFactor, 2.5));
+  x.repetitions = Math.max(0, Math.floor(finite(x.repetitions, 0)));
+  if (!raw || raw.repetitions == null) x.repetitions = x.intervalDays > 1 ? 2 : 0;
+  if (x.repetitions > 0) x.intervalDays = Math.max(1,x.intervalDays);
+  x.lastScheduledDay = typeof x.lastScheduledDay === "string" ? x.lastScheduledDay : null;
+  x.relearning = !!x.relearning;
   x.lapsed = !!x.lapsed;
   x.needsRebuild = !!x.needsRebuild;
   return x;
@@ -916,6 +937,9 @@ example_cloze_2: w.example_cloze_2 || w.examples?.[1]?.cloze || "",
     example_cloze_type: w.example_cloze_type || "",
     cloze: w.cloze || w.example_cloze || w.phrase_trouee || "",
     confusions: w.confusions || w.mots_proches || w.motsProches || [],
+    qcm_definition: w.qcm_definition || w.qcmDefinition || "",
+    qcm_distractors: w.qcm_distractors || w.qcmDistractors || [],
+    qcm_context_distractors: w.qcm_context_distractors || w.qcmContextDistractors || [],
     memory_tip: w.memory_tip || w.mnemonic || w.astuce || "",
     etymology: w.etymology || w.etymologie || "",
     register: w.register || w.registre || "",
@@ -1150,9 +1174,42 @@ function readP(state, id) {
   return (state && state.progress && state.progress[id]) || EMPTY_PROGRESS;
 }
 
-function isDue(state, w) {
+function isDue(state, w, now = new Date()) {
   const x = readP(state, w.id);
-  return !!(x.next && new Date(x.next) <= new Date());
+  if (!x.seen) return false;
+  const due = Date.parse(x.next);
+  return !Number.isFinite(due) || due <= now.getTime();
+}
+
+// SM-2 adaptation: four ratings, twenty-minute relearning, no inflation from
+// early practice or several routine formats on the same day.
+function scheduleReview(progress, rating, now = new Date()) {
+  if (!["again", "hard", "good", "easy"].includes(rating)) throw new Error("Unknown rating");
+  const x = migrateProgressEntry(progress);
+  const day = localDateKey(now);
+  if (rating === "again") {
+    if (!x.relearning) x.easeFactor = Math.max(1.3, x.easeFactor - 0.32);
+    x.repetitions = 0;
+    x.intervalDays = 0;
+    x.relearning = true;
+    x.next = new Date(now.getTime() + 20 * 60000).toISOString();
+    return x;
+  }
+  const due = Date.parse(x.next);
+  const eligible = !Number.isFinite(due) || due <= now.getTime();
+  if (!eligible || (x.lastScheduledDay === day && !x.relearning)) return x;
+  const q = {hard:3, good:4, easy:5}[rating];
+  const previousEase = x.easeFactor;
+  x.intervalDays = x.repetitions === 0 ? 1
+    : x.repetitions === 1 ? 6 : Math.ceil(x.intervalDays * previousEase);
+  x.easeFactor = Math.max(1.3, previousEase + 0.1 - (5-q) * (0.08 + (5-q) * 0.02));
+  x.repetitions += 1;
+  x.relearning = false;
+  x.lastScheduledDay = day;
+  const next = new Date(now);
+  next.setDate(next.getDate() + x.intervalDays);
+  x.next = next.toISOString();
+  return x;
 }
 
 function getRate(state, w) {
@@ -1201,7 +1258,7 @@ function isMasteredProgress(state, w) {
 function wordStatus(state, w) {
   const x = readP(state, w.id);
   if (!x.seen) return "Nouveau";
-  if (x.lapsed || x.needsRebuild) return "Fragile";
+  if (x.relearning || x.lapsed || x.needsRebuild) return "Fragile";
   if ((x.wrong || 0) >= 2 && getRate(state, w) < 70) return "Fragile";
   if (isDue(state, w)) return "À revoir";
   if (isMasteredProgress(state, w)) return "Maîtrisé";
@@ -1210,10 +1267,20 @@ function wordStatus(state, w) {
 
 function gradeWord(state, id, rating, mode = "recog", customXp) {
   const ns = { ...state, progress:{ ...(state.progress || {}) } };
-  const x = { ...EMPTY_PROGRESS, ...readP(ns, id) };
+  const x = migrateProgressEntry(readP(ns, id));
+  const previous = { ...x };
   ns.progress[id] = x;
 
   x.seen = (x.seen || 0) + 1;
+  if (mode === "discover") {
+    if (!x.next) x.next = addDays(1);
+    const meta = { ...DEFAULT_META, ...(ns.meta || {}) };
+    meta.xp += typeof customXp === "number" ? customXp : 0;
+    ns.meta = meta;
+    recordActivity(rating, mode, customXp);
+    saveProgress(ns);
+    return ns;
+  }
   const wasMastered = (x.mastery || 0) >= 5.5 && (x.prod || 0) >= 3 && getRate(ns, { id }) >= 85;
 
   if (rating === "again") {
@@ -1222,7 +1289,7 @@ function gradeWord(state, id, rating, mode = "recog", customXp) {
     x.mastery = Math.max(0, (x.mastery || 0) - loss);
     x.streak = 0;
     if (mode === "prod" || mode === "recall") x.recallStreak = 0;
-    x.next = addMin(20);
+    // Scheduling is handled once below, independently of mastery counters.
     x.lastWrongDay = localDateKey();
     if (wasMastered) {
       x.lapsed = true;
@@ -1253,10 +1320,13 @@ function gradeWord(state, id, rating, mode = "recog", customXp) {
     if (rating === "good") x.mastery = Math.min(6, (x.mastery || 0) + 1);
     if (rating === "easy") x.mastery = Math.min(6, (x.mastery || 0) + 2);
 
-    const masteryFloor = Math.floor(x.mastery || 0);
-    const map = [1, 1, 2, 4, 7, 14, 30];
-    x.next = addDays(rating === "hard" ? 1 : map[masteryFloor] || 14);
+    if (mode === "prod" || mode === "recall") {
+      if ((x.recallStreak || 0) >= 2) { x.lapsed = false; x.needsRebuild = false; }
+    }
   }
+
+  const scheduled = scheduleReview(previous, rating);
+  for (const key of ["easeFactor", "intervalDays", "repetitions", "next", "lastScheduledDay", "relearning"]) x[key] = scheduled[key];
 
   const today = new Date().toDateString();
   const meta = { ...DEFAULT_META, ...(ns.meta || {}) };
@@ -1274,28 +1344,22 @@ function gradeWord(state, id, rating, mode = "recog", customXp) {
 }
 
 function candidates(state, words, mode = "smart", n = 20, excludeIds = new Set()) {
-  const usable = words.filter(w => !excludeIds.has(w.id));
-  if (!usable.length) return [];
-
-  if (mode === "new") {
-    const unseen = usable.filter(w => readP(state, w.id).seen === 0);
-    return shuffle(unseen.length ? unseen : usable).slice(0, n);
+  const usable = uniqueById(words).filter(w => !excludeIds.has(w.id));
+  const unseen = shuffle(usable.filter(w => !readP(state, w.id).seen));
+  if (mode === "new") return unseen.slice(0, n);
+  const due = usable.filter(w => isDue(state, w)).sort((a,b) => {
+    const ap = readP(state,a.id), bp = readP(state,b.id);
+    const ad = Date.parse(ap.next), bd = Date.parse(bp.next);
+    // Oldest due first; recent failures only break ties.
+    return (Number.isFinite(ad) ? ad : 0) - (Number.isFinite(bd) ? bd : 0)
+      || Number(!!bp.relearning) - Number(!!ap.relearning);
+  });
+  if (mode === "due") return due.slice(0,n);
+  if (mode === "practice") {
+    const picked = new Set([...due,...unseen].map(w=>w.id));
+    return [...due,...unseen,...shuffle(usable.filter(w=>!picked.has(w.id)))].slice(0,n);
   }
-
-  return usable.map(w => {
-    const x = readP(state, w.id);
-    let s = 0;
-    if (!x.seen) s += 900;
-    if (isDue(state, w)) s += 800;
-    if (x.needsRebuild || x.lapsed) s += 650;
-    if (x.wrong) s += x.wrong * 90;
-    if ((x.recall || 0) < 3 && x.seen > 0) s += (3 - (x.recall || 0)) * 70;
-    if ((x.context || 0) < 2 && x.seen > 0) s += (2 - (x.context || 0)) * 25;
-    if (mode === "production" && (x.prod || 0) < 2) s += 200;
-    s -= (x.mastery || 0) * 35;
-    s += Math.random() * 40;
-    return { w, s };
-  }).sort((a, b) => b.s - a.s).slice(0, n).map(o => o.w);
+  return [...due, ...unseen].slice(0, n);
 }
 
 function learningLoad(state, words) {
@@ -1312,7 +1376,7 @@ function learningLoad(state, words) {
 
 function dailyNewWordLimit(state, words) {
   const load = learningLoad(state, words);
-  const pressure = load.fragile + load.due + load.rebuild + Math.floor(load.unconsolidated / 4);
+  const pressure = load.due;
   if (pressure >= 12) return 0;
   if (pressure >= 6) return 2;
   if (pressure >= 3) return 3;
@@ -1370,12 +1434,13 @@ function buildDailySession(state, words) {
   const discover = shuffle(candidates(state, words, "new", newLimit));
   const discoverIds = new Set(discover.map(w => w.id));
   const reviewCount = Math.min(10, Math.max(8, 8 + (5 - newLimit)));
-  let review = candidates(state, words, "smart", reviewCount, discoverIds);
+  let review = uniqueById([...candidates(state, words, "due", reviewCount, discoverIds), ...discover]).slice(0,reviewCount);
 
   // Si le vocabulaire est très court, exclure les mots de découverte peut vider
   // les étapes Association/Contexte/Production. Dans ce cas, on réutilise le
   // même petit corpus plutôt que de bloquer la routine.
-  if (!review.length && words.length) review = candidates(state, words, "smart", Math.min(reviewCount, words.length));
+  // Newly discovered words may be practised today; future scheduled words may not.
+  if (!review.length) review = [...discover];
 
   const association = shuffle(review);
   const context = shuffleAwayFrom(review, association);
@@ -1955,6 +2020,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
   const current = sources[idx];
 
   const finishRoutine = useCallback(() => {
+    if (!session.discover.length && !session.review.length) { setDone(true); return; }
     if (!completionBonusRef.current) {
       completionBonusRef.current = true;
       setState(prev => awardXpBonus(prev, ROUTINE_COMPLETION_BONUS, "daily-complete"));
@@ -1962,7 +2028,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     }
     saveDailyDone();
     setDone(true);
-  }, [setState]);
+  }, [setState, session]);
 
   useEffect(() => {
     if (done || sources.length > 0) return;
@@ -1978,7 +2044,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     if (ok) {
       _dailyXp = calcXP(state, current, step === 0 ? "discover" : mode, newStreak);
     }
-    const ns = gradeWord(state, current.id, ok ? "good" : "again", mode, ok ? _dailyXp : 0);
+    const ns = gradeWord(state, current.id, ok ? "good" : "again", step === 0 ? "discover" : mode, ok ? _dailyXp : 0);
     setState(ns);
     setSessionStreak(newStreak);
     if (ok) { haptic("correct"); setXpToday(x => x + _dailyXp); } else { haptic("wrong"); setHearts(h => h - 1); }
@@ -2010,6 +2076,10 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     }, 600);
   }, [current, feedback, state, setState, words, onMilestone, idx, sources.length, step, sessionStreak, finishRoutine]);
 
+  if (!session.discover.length && !session.review.length) return <Card>
+    <h2 style={{color:C.text,marginBottom:8}}>Toutes les révisions sont à jour</h2>
+    <p style={{color:C.sub}}>Reviens à la prochaine échéance, ou choisis un entraînement libre.</p>
+  </Card>;
   if (done && log.length === 0) {
     return (
       <Card style={{textAlign:"center",padding:"40px 24px"}}>
@@ -2111,10 +2181,10 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
 
       <div className={`question-card ${feedback==="correct"?"feedback-correct":feedback==="wrong"?"feedback-wrong":""}`} style={{background:cardBg,backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:22,padding:"26px 22px",transition:"background 0.4s ease",boxShadow:"0 4px 24px rgba(0,0,0,0.07)"}}>
         {step===0 && <StepDiscover key={`discover-${current.id}-${idx}`} word={current} words={words} shown={shown} setShown={setShown} onNext={()=>advance(true)} />}
-        {step===1 && <StepChoice key={`association-${current.id}-${idx}`} word={current} words={words} mode="termToDefinition" answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={ok=>advance(ok,"recog")} />}
-        {step===2 && <StepContext key={`context-${current.id}-${idx}`} word={current} words={words} exampleIndex={idx % 2} answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={ok=>advance(ok,"context")} />}
+        {step===1 && <StepChoice key={`association-${current.id}-${idx}`} word={current} words={words} mode="termToDefinition" answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={(ok,responseMode)=>advance(ok,responseMode||"recog")} />}
+        {step===2 && <StepContext key={`context-${current.id}-${idx}`} word={current} words={words} exampleIndex={idx % 2} answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={(ok,responseMode)=>advance(ok,responseMode||"context")} />}
         {step===3 && <StepProd key={`production-${current.id}-${idx}`} word={current} inputVal={inputVal} setInputVal={setInputVal} exampleIndex={idx % 2 === 0 ? 1 : 0} onAnswer={ok=>advance(ok,"prod")} />}
-        {step===4 && <StepChoice key={`boss-${current.id}-${idx}`} word={current} words={words} mode="mixed" answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={ok=>advance(ok,"recog")} />}
+        {step===4 && <StepChoice key={`boss-${current.id}-${idx}`} word={current} words={words} mode="mixed" answerIndex={getRoutineAnswerIndex(step, idx)} onAnswer={(ok,responseMode)=>advance(ok,responseMode||"recog")} />}
       </div>
     </div>
   );
@@ -2147,6 +2217,14 @@ function StepDiscover({word,words,shown,setShown,onNext}) {
   );
 }
 
+function SafeRecallFallback({word, onAnswer}) {
+  const [inputVal,setInputVal] = useState("");
+  return <div>
+    <p style={{fontSize:13,color:C.sub,marginBottom:12}}>Retrouve le mot à partir de sa définition.</p>
+    <StepProd word={word} hideExample
+      inputVal={inputVal} setInputVal={setInputVal} onAnswer={ok=>onAnswer(ok,"prod")}/>
+  </div>;
+}
 function StepChoice({word,words,mode,onAnswer,answerIndex=0}) {
   const [selected,setSelected] = useState(null);
   const timerRef = useRef(null);
@@ -2186,6 +2264,8 @@ function StepChoice({word,words,mode,onAnswer,answerIndex=0}) {
   };
 
   const wrong = selected && selected !== word.id;
+
+  if (options.length < 3) return <SafeRecallFallback key={word.id} word={word} onAnswer={onAnswer}/>;
 
   return (
     <div>
@@ -2241,8 +2321,10 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
   const answerIndex = answerPosition(questionIndex);
   const mode = ["definition", "example", "term"][questionIndex % 3];
   const options = useMemo(
-    ()=>placeAnswerAt(word, smartDistractors(word, words, 3), answerIndex),
-    [word.id, words, answerIndex]
+    ()=>placeAnswerAt(word, mode === "example"
+      ? smartDistractorsContext(word, words, 3, getReviewExamplePrompt(word))
+      : smartDistractors(word, words, 3), answerIndex),
+    [word.id, words, answerIndex, mode]
   );
   const prompt = useMemo(() => (
     mode === "definition"
@@ -2264,6 +2346,8 @@ function ReviewQuizChoice({word, words, questionIndex=0, onAnswer}) {
   };
 
   const wrong = selected && selected !== word.id;
+
+  if (options.length < 3) return <SafeRecallFallback key={word.id} word={word} onAnswer={onAnswer}/>;
 
   return (
     <div>
@@ -2332,6 +2416,8 @@ function StepContext({word,words,onAnswer,exampleIndex=0,answerIndex=0}) {
 
   const wrong = selected && selected !== word.id;
 
+  if (options.length < 3) return <SafeRecallFallback key={word.id} word={word} onAnswer={onAnswer}/>;
+
   return (
     <div>
       <p style={{fontSize:12,color:C.sub,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8,marginBottom:12}}>Complète la phrase</p>
@@ -2374,7 +2460,7 @@ function StepContext({word,words,onAnswer,exampleIndex=0,answerIndex=0}) {
   );
 }
 
-function StepProd({word,inputVal,setInputVal,onAnswer,exampleIndex=1}) {
+function StepProd({word,inputVal,setInputVal,onAnswer,exampleIndex=1,hideExample=false}) {
   const [result,setResult] = useState(null);
   const timerRef = useRef(null);
 
@@ -2406,7 +2492,7 @@ function StepProd({word,inputVal,setInputVal,onAnswer,exampleIndex=1}) {
         <p style={{fontSize:15,color:C.text,margin:0,lineHeight:1.5}}>{word.compact}</p>
       </div>
       {/* Utilise l'exemple alternatif (index 1 par défaut) pour ne pas répéter l'exemple de l'étape Contexte */}
-      <ExampleBlock word={word} showLabel={false} fontSize={13} cloze exampleIndex={exampleIndex} />
+      {!hideExample && <ExampleBlock word={word} showLabel={false} fontSize={13} cloze exampleIndex={exampleIndex} />}
       <input value={inputVal} onChange={e=>setInputVal(e.target.value)}
         onKeyDown={e=>e.key==="Enter"&&submit()}
         placeholder="Écris le mot…" autoFocus disabled={!!result}
@@ -2416,6 +2502,7 @@ function StepProd({word,inputVal,setInputVal,onAnswer,exampleIndex=1}) {
         <div style={{padding:"12px 14px",borderRadius:14,background:`${C.red}08`,border:`1px solid ${C.red}25`,marginBottom:12,animation:"fadeSlideIn 0.25s ease"}}>
           <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:0}}>Réponse attendue : <strong style={{color:C.text}}>{word.word}</strong></p>
           <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:"6px 0 0"}}>{word.definition}</p>
+          {hideExample && <ExampleBlock word={word} showLabel fontSize={13}/>}
         </div>
       )}
 
@@ -2443,27 +2530,8 @@ function StepProd({word,inputVal,setInputVal,onAnswer,exampleIndex=1}) {
 const QUIZ_SIZES = [5,10,15,20];
 
 function buildNuanceQuestion(word, words) {
-  const explicit = getConfusionItems(word, words, 5).map(item => {
-    const existing = words.find(w => norm(w.word) === norm(item.word));
-    if (existing) return existing;
-    return {
-      id:`virtual-${norm(item.word)}`,
-      word:item.word,
-      compact:item.difference || item.compact || item.definition || "Terme à comparer",
-      definition:item.definition || item.compact || item.difference || "",
-      theme:word.theme,
-      nature:word.nature
-    };
-  });
-  const close = uniqueWordOptions([...explicit, ...getNearbyWords(word, words, 8)]);
-  const fillers = words.filter(w => w.id !== word.id && !close.some(c => norm(c.word) === norm(w.word)) && (w.theme === word.theme || natureFamily(w.nature) === natureFamily(word.nature))).slice(0, 6);
-  const options = uniqueById([word, ...close, ...shuffle(fillers)]).slice(0, 4);
-  while (options.length < Math.min(4, words.length)) {
-    const candidate = shuffle(words.filter(w => w.id !== word.id && !options.some(o => o.id === w.id)))[0];
-    if (!candidate) break;
-    options.push(candidate);
-  }
-  return { prompt: getExampleText(word, true), answer: word, options: shuffle(options) };
+  const prompt = getExampleText(word, true);
+  return { prompt, answer: word, options: shuffle([word, ...smartDistractorsContext(word, words, 3, prompt)]) };
 }
 
 function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
@@ -2478,21 +2546,23 @@ function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
   useEffect(() => { stateRef.current = state; }, [state]);
 
   const getNext = useCallback(() => {
-    const base = candidates(stateRef.current, words, "smart", words.length, askedRef.current);
-    return base.find(w => getNearbyWords(w, words, 3).length > 0) || base[0] || words[0];
+    const base = candidates(stateRef.current, words, "practice", words.length, askedRef.current);
+    return base.find(w => getNearbyWords(w, words, 3).length > 0) || base[0] || null;
   }, [words]);
 
   useEffect(()=>{ setCurrent(getNext()); setSelected(null); }, [getNext]);
 
   const q = useMemo(()=>current ? buildNuanceQuestion(current, words) : null, [current, words]);
-  const maxQ = 8;
+  const [maxQ, setMaxQ] = useState(8);
 
   const continueNext = () => {
     const next = count + 1;
     if (next >= maxQ) { setDone(true); return; }
     setCount(next);
     setSelected(null);
-    setCurrent(getNext());
+    const nextWord = getNext();
+    if (!nextWord) { setMaxQ(next); setDone(true); }
+    else setCurrent(nextWord);
   };
 
   const answer = (o) => {
@@ -2523,6 +2593,8 @@ function NuanceQuiz({words,state,setState,onMilestone,onBackToQuick}) {
   );
 
   const wrong = selected && selected !== current.id;
+  if (q.options.length < 3) return <Card><SafeRecallFallback key={current.id} word={current}
+    onAnswer={ok=>{answer({id:ok?current.id:"__wrong__"});continueNext();}}/></Card>;
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12,animation:"fadeSlideIn 0.25s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -2595,7 +2667,8 @@ function FigureDetail({figure, figures, state, onBack}) {
 }
 
 function buildFigureQuestion(figure, figures, mode) {
-  const pool = smartDistractors(figure, figures, 3);
+  const pool = mode === "definition" ? smartDistractors(figure, figures, 3)
+    : smartDistractorsContext(figure, figures, 3, figure.example);
   const options = shuffle([figure, ...pool]);
   if (mode === "definition") {
     return {
@@ -2621,9 +2694,9 @@ function buildFigureRoutine(state, figures, variant = "full") {
   const reviewCount = variant === "short" ? 5 : 6;
   const discover = candidates(state, figures, "new", discoverCount);
   const discoverIds = new Set(discover.map(f => f.id));
-  let review = candidates(state, figures, "smart", reviewCount, discoverIds);
-  if (review.length < reviewCount) review = uniqueById([...review, ...shuffle(figures).slice(0, reviewCount)]);
-  return { discover, review, boss: candidates(state, figures, "smart", reviewCount) };
+  let review = uniqueById([...candidates(state, figures, "due", reviewCount, discoverIds), ...discover]).slice(0,reviewCount);
+  if (!review.length) review = [...discover];
+  return { discover, review, boss: uniqueById([...review,...discover]).slice(0,reviewCount) };
 }
 
 function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"}) {
@@ -2669,7 +2742,7 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
     advancingRef.current = true;
     const xpMode = steps[step] === "Découverte" ? "discover" : steps[step] === "Boss" ? "prod" : mode;
     const xp = ok ? calcXP(state, current, xpMode) : 0;
-    const ns = gradeWord(state, current.id, ok ? "good" : "again", mode, xp);
+    const ns = gradeWord(state, current.id, ok ? "good" : "again", steps[step] === "Découverte" ? "discover" : mode, xp);
     setState(ns);
     if (ok) setXpSession(x=>x+xp); else setHearts(h=>h-1);
     setLog(l=>[...l,{figure:current,ok,step:steps[step]}]);
@@ -2735,6 +2808,9 @@ function FigureRoutine({figures,state,setState,onMilestone,onBack,variant="full"
   const isDiscover = steps[step] === "Découverte";
   const wrong = selected && selected !== current.id;
 
+  if (current && q && steps[step] !== "Découverte" && q.options.length < 3)
+    return <Card><SafeRecallFallback key={current.id + ":" + step} word={current}
+      onAnswer={ok=>advance(ok, "prod")}/></Card>;
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -2805,15 +2881,16 @@ function FigurePractice({figures,state,setState,onMilestone,mode="identify",onBa
   useEffect(()=>()=>{ if(timerRef.current) clearTimeout(timerRef.current); },[]);
 
   const getNext = useCallback(() => {
-    const next = candidates(stateRef.current, figures, "smart", 1, askedRef.current)[0];
-    if (next) return next;
-    askedRef.current = new Set();
-    return candidates(stateRef.current, figures, "smart", 1)[0];
+    const next = candidates(stateRef.current, figures, "practice", 1, askedRef.current)[0];
+    return next || null;
   }, [figures]);
 
   const start = () => {
     askedRef.current = new Set();
     setCount(0); setScore(0); setDone(false); setSelected(null);
+    const eligible = candidates(stateRef.current, figures, "practice", figures.length).length;
+    if (!eligible) return;
+    setMaxQ(Math.min(maxQ, eligible));
     setCurrent(getNext());
     setStarted(true);
   };
@@ -2821,7 +2898,11 @@ function FigurePractice({figures,state,setState,onMilestone,mode="identify",onBa
   const moveNext = (nextCount) => {
     setCount(nextCount);
     if (nextCount >= maxQ) { setDone(true); setStarted(false); }
-    else { setSelected(null); setCurrent(getNext()); }
+    else {
+      const next = getNext();
+      if (!next) { setMaxQ(nextCount); setDone(true); setStarted(false); }
+      else { setSelected(null); setCurrent(next); }
+    }
   };
 
   const answer = (o) => {
@@ -2875,6 +2956,8 @@ function FigurePractice({figures,state,setState,onMilestone,mode="identify",onBa
   if (!current || !q) return <div style={{color:C.sub,textAlign:"center",padding:48}}>Chargement…</div>;
   const wrong = selected && selected !== current.id;
 
+  if (current && q && q.options.length < 3) return <Card><SafeRecallFallback key={current.id} word={current}
+    onAnswer={ok=>{answer({id:ok?current.id:"__wrong__"});if(!ok)moveNext(count+1);}}/></Card>;
   return (
     <div style={{display:"flex",flexDirection:"column",gap:12}}>
       <div style={{display:"flex",alignItems:"center",gap:12}}>
@@ -3232,10 +3315,10 @@ function haptic(type) {
 
 // ─── QUIZ SESSION (cœurs + XP) ────────────────────────────────────────────────
 function QuizSession({words, state, setState, onMilestone, onBack, title, color, filterFn}) {
-  const SIZES = [5,10,15,20];
+  const SIZES = [1,5,10,15,20];
   const availableWords = useMemo(() => {
     const base = filterFn ? words.filter(filterFn) : words;
-    return base.length ? base : words;
+    return base;
   }, [words, state, filterFn]);
   const availableCount = availableWords.length;
   const enabledSizes = SIZES.filter(n => availableCount >= n);
@@ -3279,14 +3362,14 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
     if (m) onMilestone(m);
     setBonusAwarded(true);
   }, [perfectSession, bonusAwarded, state, setState, words, onMilestone]);
-  const advance = useCallback((ok) => {
+  const advance = useCallback((ok, responseMode="recog") => {
     if (!current) return;
     haptic(ok ? "correct" : "wrong");
     const newStreak = ok ? streak + 1 : 0;
     let xp = 0;
     if (ok) { xp = calcXP(state, current, "recog"); xp += calcStreakBonus(streak, newStreak); }
     const newHearts = ok ? hearts : hearts - 1;
-    const ns = gradeWord(state, current.id, ok ? "good" : "again", "recog", xp);
+    const ns = gradeWord(state, current.id, ok ? "good" : "again", responseMode, xp);
     setState(ns); setStreak(newStreak);
     if (!ok) setHearts(newHearts);
     setXpSession(x => x + xp);
@@ -3327,9 +3410,9 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
         })}
       </div>
       <p style={{fontSize:13,color:C.sub,lineHeight:1.5,margin:0}}>
-        {availableCount >= 5 ? `${availableCount} mots disponibles pour ce quiz.` : `Il faut au moins 5 mots disponibles. Actuellement : ${availableCount}.`}
+        {availableCount ? `${availableCount} mots disponibles pour ce quiz.` : "Toutes les révisions sont à jour."}
       </p>
-      <Btn label={`Démarrer — ${maxQ} mots`} variant="primary" onClick={startSession} disabled={availableCount < 5}/>
+      <Btn label={`Démarrer — ${Math.min(maxQ,availableCount)} mots`} variant="primary" onClick={startSession} disabled={availableCount < 1}/>
     </Card>
   );
 
@@ -3371,7 +3454,7 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
         <span style={{fontSize:14,color:C.orange,fontWeight:700}}>+{xpSession}</span>
       </div>
       <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>{title} · {idx+1}/{total}</div>
-      <ReviewQuizChoice key={"qs-"+current.id+"-"+idx} word={current} words={words} questionIndex={idx} onAnswer={(ok)=>advance(ok)}/>
+      <ReviewQuizChoice key={"qs-"+current.id+"-"+idx} word={current} words={words} questionIndex={idx} onAnswer={advance}/>
     </div>
   );
 }
@@ -3646,7 +3729,7 @@ function FlashcardSession({words, state, setState, onMilestone, onBack}) {
 function LearnTabNew({words, state, setState, onMilestone, initialMode=null, onStartNuance}) {
   const [mode, setMode] = useState(initialMode);
   const seenWords = useMemo(() => words.filter(w => readP(state, w.id).seen > 0), [state, words]);
-  const errorWords = useMemo(() => words.filter(w => (readP(state, w.id).wrong||0) > 0), [state, words]);
+  const errorWords = useMemo(() => words.filter(w => isDue(state,w) && wordStatus(state,w)==="Fragile"), [state, words]);
   const dueWords = useMemo(() => words.filter(w => isDue(state, w) && readP(state, w.id).seen > 0), [state, words]);
   const recallWords = useMemo(() => {
     const seen = seenWords.length ? seenWords : words;
@@ -3660,7 +3743,7 @@ function LearnTabNew({words, state, setState, onMilestone, initialMode=null, onS
   if (mode === "active-recall") return <ActiveRecallSession words={recallWords.length ? recallWords : words} allWords={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)}/>;
   if (mode === "quiz-review") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="Quiz de révision" color={C.purple} filterFn={w=>readP(state,w.id).seen>0}/>;
   if (mode === "quiz-due") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="À revoir" color={C.orange} filterFn={w=>isDue(state,w)&&readP(state,w.id).seen>0}/>;
-  if (mode === "quiz-errors") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="Quiz erreurs" color={C.red} filterFn={w=>(readP(state,w.id).wrong||0)>0}/>;
+  if (mode === "quiz-errors") return <QuizSession words={words} state={state} setState={setState} onMilestone={onMilestone} onBack={()=>setMode(null)} title="Quiz erreurs" color={C.red} filterFn={w=>isDue(state,w)&&wordStatus(state,w)==="Fragile"}/>;
 
   const card = (col, disabled, onClick, icon, title, desc, badge) => (
     <button onClick={disabled ? undefined : onClick} style={{textAlign:"left",background:C.solid,border:"1.5px solid "+col+"30",borderRadius:18,padding:"18px 20px",cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.55:1,boxShadow:"0 1px 10px rgba(0,0,0,0.04)",width:"100%"}}>
@@ -3683,9 +3766,9 @@ function LearnTabNew({words, state, setState, onMilestone, initialMode=null, onS
       </div>
       {card(C.purple, false, ()=>setMode("cards"), "📚", "Définitions", "Revois les mots par lot de 20. Retourne la carte pour voir la définition.", seenWords.length+" mots vus disponibles")}
       {card(C.green, recallWords.length<1, ()=>setMode("active-recall"), "⌨️", "Rappel actif", "Retrouve le mot à partir de sa définition, sans choix. Les erreurs reviennent dans la session.", recallWords.length+" mots prioritaires")}
-      {card(C.orange, dueWords.length<5, ()=>setMode("quiz-due"), "↻", "À revoir", "QCM ciblé sur les mots dus selon la répétition espacée.", dueWords.length>=5 ? dueWords.length+" mots à revoir" : dueWords.length+" mots à revoir (5 min.)")}
+      {card(C.orange, dueWords.length<1, ()=>setMode("quiz-due"), "↻", "À revoir", "Révision des mots arrivés à échéance.", dueWords.length+" mots à revoir")}
       {card(C.blue, seenWords.length<5, ()=>setMode("quiz-review"), "⚡", "Quiz des mots vus", "QCM ciblé sur les mots déjà rencontrés, sans inclure les mots totalement nouveaux.", seenWords.length>=5 ? seenWords.length+" mots disponibles" : "Il faut au moins 5 mots vus")}
-      {card(C.red, errorWords.length<5, ()=>setMode("quiz-errors"), "🎯", "Quiz erreurs", "QCM sur les mots déjà ratés. Sessions de 5, 10, 15 ou 20 mots.", errorWords.length>=5 ? errorWords.length+" mots avec erreurs" : errorWords.length+" mots avec erreurs (5 min.)")}
+      {card(C.red, errorWords.length<1, ()=>setMode("quiz-errors"), "🎯", "Quiz erreurs", "Révision des mots fragiles arrivés à échéance.", errorWords.length+" mots fragiles à revoir")}
       {card(C.indigo, words.length<4, onStartNuance, "🎯", "Nuance", "Distingue les mots proches et choisis le terme le plus precis dans un contexte.", words.length>=4 ? "Mode precision" : "Il faut au moins 4 mots")}
     </div>
   );
@@ -3727,26 +3810,31 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   const quiz = useMemo(() => w ? {w, options: shuffle([w,...smartDistractors(w, words, 3)])} : null, [w, words]);
 
   const getNext = useCallback(() => {
-    const next = candidates(stateRef.current, words, "smart", 1, askedRef.current)[0];
-    if (next) return next;
-    askedRef.current = new Set();
-    return candidates(stateRef.current, words, "smart", 1)[0];
+    const next = candidates(stateRef.current, words, "practice", 1, askedRef.current)[0];
+    return next || null;
   }, [words]);
 
   const startQuiz = () => {
     askedRef.current = new Set();
     setCount(0); setScore(0); setDone(false); setSelected(null);
     setHearts(3); setStreak(0); setXpSession(0); setBonusAwarded(false);
+    const eligible = candidates(stateRef.current, words, "practice", words.length).length;
+    if (!eligible) return;
+    setMaxQ(Math.min(maxQ, eligible));
     setW(getNext()); setStarted(true);
   };
 
   const moveNext = (nextCount) => {
     setCount(nextCount);
     if (nextCount >= maxQ) { setDone(true); setStarted(false); }
-    else { setSelected(null); setW(getNext()); }
+    else {
+      const next = getNext();
+      if (!next) { setMaxQ(nextCount); setDone(true); setStarted(false); }
+      else { setSelected(null); setW(next); }
+    }
   };
 
-  const handleAnswer = (o) => {
+  const handleAnswer = (o, responseMode="recog") => {
     if (selected || !w) return;
     setSelected(o.id);
     askedRef.current.add(w.id);
@@ -3756,7 +3844,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
     let xp = 0;
     if (ok) { xp = calcXP(stateRef.current, w, "recog"); xp += calcStreakBonus(streak, newStreak); }
     const newHearts = ok ? hearts : hearts - 1;
-    const ns = gradeWord(stateRef.current, w.id, ok ? "good" : "again", "recog", xp);
+    const ns = gradeWord(stateRef.current, w.id, ok ? "good" : "again", responseMode, xp);
     stateRef.current = ns; setState(ns); setStreak(newStreak);
     if (!ok) setHearts(newHearts);
     setXpSession(x => x + xp);
@@ -3810,6 +3898,11 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   }
 
   if (!w || !quiz) return <div style={{color:C.sub,textAlign:"center",padding:48}}>Chargement…</div>;
+  if (quiz.options.length < 3) return <Card>
+    <p style={{color:C.sub,marginBottom:8}}>Question {count+1}/{maxQ} · {hearts} ♥ · +{xpSession} XP</p>
+    <Bar value={(count/maxQ)*100} color={C.blue}/>
+    <SafeRecallFallback key={w.id} word={w}
+    onAnswer={ok=>{handleAnswer({id:ok?w.id:"__wrong__"},"prod");if(!ok&&hearts>1)moveNext(count+1);}}/></Card>;
   const wrong = selected && selected !== w.id;
 
   return (
@@ -4202,3 +4295,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
+
