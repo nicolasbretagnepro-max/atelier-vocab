@@ -52,7 +52,7 @@ Le lot 1 peut techniquement être livré sans le lot 2, et le lot 5 sans le lot 
 
 ### Lot 0 Vérifier et intégrer le socle corrigé
 
-**État :** correctifs locaux déjà présents ; intégration GitHub et publication non faites.
+**État :** lots 0 à 5 intégrés sur la branche locale `codex/learning-improvements` ; publication non effectuée.
 
 **Files:** index.html, sw.js, atelier-vocab-corrections.patch, tests/learning.test.cjs, tests/compile.cjs.
 
@@ -169,5 +169,5 @@ Le lot 1 peut techniquement être livré sans le lot 2, et le lot 5 sans le lot 
 
 ## Statut
 
-Plan préparé. Lots fonctionnels non implémentés par cette demande. L'exécution recommandée est séquentielle dans le chat actuel ; aucun nouveau chat n'a été créé.
+Lots 0 à 5 implémentés et vérifiés. Voir [le bilan de livraison](../../livraison-ameliorations.md) et [le journal](../../execution-progress.md). Les cases ci-dessus conservent le détail du plan initial ; le journal décrit les validations effectivement exécutées. Vérification hors ligne automatisée avec réseau simulé ; réouverture hors ligne sur l’hébergement cible à effectuer après publication. Aucun nouveau chat utilisateur créé.
 
