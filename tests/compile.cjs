@@ -7,3 +7,5 @@ console.log('JSX compilation OK');
 const examples = Babel.transform(fs.readFileSync('engagement-examples.jsx','utf8'), {presets:['react'],filename:'engagement-examples.jsx'}).code;
 new Function(examples);
 console.log('Engagement examples JSX compilation OK');
+new Function(Babel.transform(fs.readFileSync('crossword-ui.jsx','utf8'),{presets:['react'],filename:'crossword-ui.jsx'}).code);
+console.log('Crossword UI JSX compilation OK');

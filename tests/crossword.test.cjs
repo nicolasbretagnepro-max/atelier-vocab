@@ -38,3 +38,32 @@ test('incompatible corpus and computation budget never publish a partial grid',(
  assert.equal(cw.createPuzzle(items,{maxAttempts:0}).puzzle,null);
 });
 module.exports={items};
+test('typing advances within the word, paste and deletion preserve shared locked letters',()=>{
+ const p=cw.createPuzzle(items).puzzle;let s=cw.newGame();const e=p.entries[0];
+ let change=cw.input(s,p,e.id,e.keys[0],'é');assert.equal(change.game.values[e.keys[0]],'E');assert.equal(change.focus,e.keys[1]);
+ change=cw.input(change.game,p,e.id,e.keys[1],'oe',true);assert.equal(change.game.values[e.keys[1]],'O');assert.equal(change.game.values[e.keys[2]],'E');
+ const back=cw.erase(change.game,p,e.id,e.keys[3]);assert.equal(back.focus,e.keys[2]);assert.equal(back.game.values[e.keys[2]],'');
+ s=cw.check(change.game,p,e.id,true).game;
+ const locked=e.keys[0];assert.equal(cw.input(s,p,e.id,locked,'Z').game.values[locked],e.answer[0]);
+});
+test('incomplete is ungraded, errors and reveals are graded once; later corrections cannot farm XP',()=>{
+ const p=cw.createPuzzle(items).puzzle;const e=p.entries.find(e=>e.role==='due');let s=cw.newGame();
+ assert.equal(cw.check(s,p,e.id).evaluation,null);
+ for(const k of e.keys)s=cw.input(s,p,e.id,k,'Z').game;
+ let checked=cw.check(s,p,e.id);assert.equal(checked.evaluation.rating,'again');s=checked.game;
+ assert.equal(cw.check(s,p,e.id).evaluation,null);
+ checked=cw.check(s,p,e.id,true);assert.equal(checked.evaluation,null);assert.equal(checked.game.results[e.id].done,true);
+ assert.equal(cw.check(checked.game,p,e.id).evaluation,null);
+});
+test('correct due word emits context result; known support never emits an SRS result',()=>{
+ const p=cw.createPuzzle(items).puzzle;
+ for(const role of ['due','known']){const e=p.entries.find(e=>e.role===role);let s=cw.newGame();s=cw.input(s,p,e.id,e.keys[0],e.answer,true).game;
+ const result=cw.check(s,p,e.id);assert.equal(result.game.results[e.id].done,true);
+ assert.equal(result.evaluation?.rating||null,role==='due'?'good':null);
+ }
+});
+test('fully supplied word is solved without a recalled-success grade',()=>{
+ const p={entries:[{id:'a',role:'known',answer:'ABC',keys:['0:0','0:1','0:2']},{id:'b',role:'due',answer:'ABC',keys:['0:0','0:1','0:2']} ]};
+ const s={values:{'0:0':'A','0:1':'B','0:2':'C'},results:{a:{done:true}}};
+ const result=cw.check(s,p,'b');assert.equal(result.evaluation,null);assert.equal(result.game.results.b.supplied,true);
+});

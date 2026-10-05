@@ -112,5 +112,41 @@
     }
     return {puzzle:null,reason:hadPool?'no-intersections':'insufficient-pool',available:last?.available||{due:0,known:0}};
   }
-  return {letters,key,selectCandidates,place,createPuzzle};
+  const newGame=()=>({values:{},results:{}});
+  const lockedKeys=(game,puzzle)=>new Set(puzzle.entries.filter(e=>game.results[e.id]?.done).flatMap(e=>e.keys));
+  function input(game,puzzle,id,k,text,paste=false){
+    const entry=puzzle.entries.find(e=>e.id===id),locked=lockedKeys(game,puzzle);
+    if(!entry||!entry.keys.includes(k)||locked.has(k))return {game,focus:null};
+    const raw=letters(text),chars=paste?raw:raw.slice(-1),index=entry.keys.indexOf(k);
+    const values={...game.values},results={...game.results},changed=[];
+    if(!chars){values[k]='';changed.push(k);}
+    for(let i=0;i<chars.length&&index+i<entry.keys.length;i++){
+      const target=entry.keys[index+i];if(locked.has(target))continue;
+      values[target]=chars[i];changed.push(target);
+    }
+    for(const e of puzzle.entries)if(!results[e.id]?.done&&e.keys.some(k=>changed.includes(k))){results[e.id]={...results[e.id],wrong:false};}
+    const focus=chars?entry.keys.slice(index+Math.max(1,chars.length)).find(k=>!locked.has(k))||null:null;
+    return {game:{values,results},focus};
+  }
+  function erase(game,puzzle,id,k){
+    const entry=puzzle.entries.find(e=>e.id===id),locked=lockedKeys(game,puzzle);
+    if(!entry)return {game,focus:null};
+    const target=!locked.has(k)&&game.values[k]?k:entry.keys.slice(0,entry.keys.indexOf(k)).reverse().find(k=>!locked.has(k));
+    if(!target)return {game,focus:null};
+    return {game:input(game,puzzle,id,target,'').game,focus:target};
+  }
+  function check(game,puzzle,id,reveal=false){
+    const entry=puzzle.entries.find(e=>e.id===id),previous=game.results[id]||{};
+    if(!entry||previous.done)return {game,evaluation:null,message:'Ce mot est déjà terminé.'};
+    const typed=entry.keys.map(k=>game.values[k]||'').join('');
+    if(!reveal&&typed.length!==entry.answer.length)return {game,evaluation:null,message:'Complète le mot avant de le vérifier.'};
+    const correct=typed===entry.answer,locked=lockedKeys(game,puzzle);
+    const supplied=!reveal&&correct&&entry.keys.every(k=>locked.has(k));
+    const evaluation=entry.role==='due'&&!previous.evaluated&&!supplied?{id:entry.id,role:entry.role,rating:reveal||!correct?'again':'good',mode:'context'}:null;
+    const values={...game.values};if(reveal)entry.keys.forEach((k,i)=>values[k]=entry.answer[i]);
+    const result={...previous,done:reveal||correct,wrong:!reveal&&!correct,helped:reveal,supplied,evaluated:previous.evaluated||!!evaluation};
+    const message=reveal?`Réponse : ${entry.term}. À revoir.`:supplied?'Mot complété grâce aux intersections.':correct?'Correct ! Passe au mot suivant.':'À revoir : vérifie les lettres et les intersections.';
+    return {game:{values,results:{...game.results,[id]:result}},evaluation,message};
+  }
+  return {letters,key,selectCandidates,place,createPuzzle,newGame,lockedKeys,input,erase,check};
 });
