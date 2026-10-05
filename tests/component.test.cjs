@@ -9,7 +9,7 @@ test('the primary daily action opens the full discovery-to-Boss routine',()=>{
 test('the full daily routine reaches the Boss after discovery and learning steps',()=>{
  const a=app();a.run(`var ws=buildWords(SEED_WORDS).filter(w=>w.word==='Anaphore');var s={progress:{},meta:{}};`);
  const expr=`DailyTab({words:ws,state:s,setState:next=>s=typeof next==='function'?next(s):next,onMilestone:()=>{}})`;
- for(const name of ['StepDiscover','StepChoice','StepContext','StepProd']){
+ for(const name of ['StepDiscover','StepChoice','StepContext']){
   const question=find(a.render(expr),t=>t.type?.name===name);assert.ok(question,`Expected ${name}`);
   if(name==='StepDiscover')question.props.onNext();else question.props.onAnswer(true);
   const timer=a.timers.shift();assert.equal(typeof timer,'function');timer();

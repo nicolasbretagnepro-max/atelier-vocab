@@ -1441,12 +1441,7 @@ function learningLoad(state, words) {
 }
 
 function dailyNewWordLimit(state, words) {
-  const load = learningLoad(state, words);
-  const pressure = load.due;
-  if (pressure >= 12) return 0;
-  if (pressure >= 6) return 2;
-  if (pressure >= 3) return 3;
-  return 5;
+  return AtelierLearning.selectDaily(words,state,loadProfile().learningSettings,localDateKey(),Date.now()).discover.length;
 }
 
 function shuffleAwayFrom(items, reference = []) {
@@ -1487,6 +1482,20 @@ function buildDailyQueues(session) {
   ].map(step => [...step]);
 }
 
+function insertDailyRetry(queues,step,index,word,ref) {
+  if(ref.current[word.id]||(ref.current.total||0)>=2)return {queues,inserted:false};
+  const next=queues.map(q=>[...q]);
+  let target=step,at=Math.min(next[step].length,index+3);
+  if(index+1>=next[step].length){
+    target=next.findIndex((q,i)=>i>step&&q.some(w=>w.id!==word.id));
+    if(target<0)return {queues,inserted:false};
+    at=Math.min(2,next[target].length);
+  }
+  next[target].splice(at,0,word);
+  ref.current={...ref.current,[word.id]:1,total:(ref.current.total||0)+1};
+  return {queues:next,inserted:true};
+}
+
 function getMotDuJour(words) {
   if (!words.length) return null;
   const day = Math.floor(Date.now() / (1000 * 60 * 60 * 24));
@@ -1495,25 +1504,17 @@ function getMotDuJour(words) {
   return src[day % src.length];
 }
 
-function buildDailySession(state, words) {
-  const newLimit = dailyNewWordLimit(state, words);
-  const discover = shuffle(candidates(state, words, "new", newLimit));
-  const discoverIds = new Set(discover.map(w => w.id));
-  const reviewCount = Math.min(10, Math.max(8, 8 + (5 - newLimit)));
-  let review = uniqueById([...candidates(state, words, "due", reviewCount, discoverIds), ...discover]).slice(0,reviewCount);
-
-  // Si le vocabulaire est très court, exclure les mots de découverte peut vider
-  // les étapes Association/Contexte/Production. Dans ce cas, on réutilise le
-  // même petit corpus plutôt que de bloquer la routine.
-  // Newly discovered words may be practised today; future scheduled words may not.
-  if (!review.length) review = [...discover];
-
-  const association = shuffle(review);
-  const context = shuffleAwayFrom(review, association);
-  const production = shuffleAwayFrom(review, context);
-  const bossBase = uniqueById([...discover, ...review]).slice(0, Math.min(8, words.length));
-  const boss = shuffleAwayFrom(bossBase, production);
-  return { discover, review, association, context, production, boss, newLimit };
+function buildDailySession(state, words, options=loadProfile().learningSettings) {
+  const selected=AtelierLearning.selectDaily(words,state,options,localDateKey(),Date.now());
+  const {discover,active,due,waiting,newLimit}=selected;
+  const review=uniqueById([...discover,...active,...due]);
+  const levels=Object.fromEntries(review.map(w=>[w.id,AtelierLearning.level(readP(state,w.id),localDateKey())]));
+  const association=shuffle(review.filter(w=>levels[w.id]<3));
+  const production=shuffle(review.filter(w=>levels[w.id]>=3));
+  const context=shuffleAwayFrom(uniqueById([...discover,...shuffle(active)]).filter(w=>w.hasRealExample).slice(0,4),association);
+  const boss=shuffleAwayFrom(uniqueById([...discover,...shuffle(active),...due]).slice(0,3),context);
+  const questionCount=discover.length+association.length+context.length+production.length+boss.length;
+  return {discover,review,association,context,production,boss,active,due,waiting,newLimit,levels,questionCount};
 }
 
 function buildCrosswordCandidates(state,words) {
@@ -2088,7 +2089,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
   const wordsSignature = useMemo(()=>words.map(w=>w.id).join("|"),[words]);
   const [session,setSession] = useState(()=>buildDailySession(state,words));
   const [stepQueues,setStepQueues] = useState(null);
-  const [step,setStep] = useState(0);
+  const [step,setStep] = useState(()=>Math.max(0,buildDailyQueues(session).findIndex(q=>q.length)));
   const [idx,setIdx] = useState(0);
   const [xpToday,setXpToday] = useState(0);
   const [sessionStreak,setSessionStreak] = useState(0);
@@ -2125,7 +2126,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     const nextSession = buildDailySession(state, words);
     setSession(nextSession);
     setStepQueues(buildDailyQueues(nextSession));
-    setStep(0); setIdx(0);  setXpToday(0); setSessionStreak(0); setFeedback(null); setInputVal(""); setShown(false); setLog([]);
+    setStep(Math.max(0,buildDailyQueues(nextSession).findIndex(q=>q.length))); setIdx(0);  setXpToday(0); setSessionStreak(0); setFeedback(null); setInputVal(""); setShown(false); setLog([]);
     advancingRef.current = false;
     retryRef.current = {};
     completionBonusRef.current = false;
@@ -2136,12 +2137,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
 
   const sources = useMemo(() => {
     if (stepQueues && stepQueues[step]) return stepQueues[step];
-    if (step === 0) return session.discover.slice(0,5);
-    if (step === 1) return (session.association || session.review).slice(0,8);
-    if (step === 2) return (session.context || session.review).slice(0,8);
-    if (step === 3) return (session.production || session.review).slice(0,8);
-    if (step === 4) return session.boss.slice(0,8);
-    return session.review.slice(0,8);
+    return buildDailyQueues(session)[step]||[];
   }, [step, session, stepQueues]);
 
   const current = sources[idx];
@@ -2178,15 +2174,13 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
     setLog(l=>[...l,{word:current,ok}]);
     setFeedback(ok?"correct":"wrong");
     let effectiveLength = sources.length;
+    let effectiveQueues=stepQueues||buildDailyQueues(session);
     if (!ok) {
-      const retry = insertRetryItem(sources, idx, current, retryRef, `daily-${step}`);
-      effectiveLength = retry.list.length;
+      const retry = insertDailyRetry(effectiveQueues,step,idx,current,retryRef);
+      effectiveQueues=retry.queues;
+      effectiveLength = effectiveQueues[step].length;
       if (retry.inserted) {
-        setStepQueues(q => {
-          const next = q ? q.map(stepItems => [...stepItems]) : buildDailyQueues(session);
-          next[step] = retry.list;
-          return next;
-        });
+        setStepQueues(effectiveQueues);
       }
     }
 
@@ -2197,8 +2191,9 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
       setFeedback(null); setShown(false); setInputVal("");
       advancingRef.current = false;
       if (idx + 1 >= effectiveLength) {
-        if (step + 1 >= STEPS.length) finishRoutine();
-        else { setStep(s=>s+1); setIdx(0); }
+        const nextStep=effectiveQueues.findIndex((q,i)=>i>step&&q.length);
+        if (nextStep<0) finishRoutine();
+        else { setStep(nextStep); setIdx(0); }
       } else setIdx(i=>i+1);
     }, 600);
   }, [current, feedback, state, setState, words, onMilestone, idx, sources.length, step, sessionStreak, finishRoutine]);

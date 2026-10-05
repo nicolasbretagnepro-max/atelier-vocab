@@ -88,5 +88,5 @@ test('low easiness and invalid imported interval cannot cause zero-day reviews',
   const a=app(); assert.ok(a.run(`scheduleReview({seen:1,repetitions:4,intervalDays:0,easeFactor:1.3,next:addDays(-1)},'hard').intervalDays`)>0);
 });
 test('daily new-word quota cannot be exceeded by unseen review fillers',()=>{
-  const a=app(); assert.equal(a.run(`(() => {const session=buildDailySession({progress:{}},buildWords(SEED_WORDS));return new Set([...session.discover,...session.review,...session.boss].map(w=>w.id)).size;})()`),5);
+  const a=app(); assert.equal(a.run(`(() => {const session=buildDailySession({progress:{}},buildWords(SEED_WORDS));return new Set([...session.discover,...session.review,...session.boss].map(w=>w.id)).size;})()`),2);
 });
