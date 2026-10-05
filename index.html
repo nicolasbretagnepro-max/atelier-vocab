@@ -194,6 +194,55 @@ function localDateKey(d = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function dailyGoalStatus(meta = {}, goal = 5, now = new Date()) {
+  const ids = meta.practiceDays?.[localDateKey(now)];
+  const count = new Set(Array.isArray(ids) ? ids.filter(id=>typeof id === "string" && id) : []).size;
+  return {count, goal, completed:count >= goal};
+}
+
+function metaDayKey(lastDay) {
+  if (!lastDay) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(lastDay)) return lastDay;
+  const parsed = new Date(lastDay);
+  return Number.isFinite(parsed.getTime()) ? localDateKey(parsed) : null;
+}
+
+function visibleDailyStreak(meta = {}, now = new Date()) {
+  const last = metaDayKey(meta.lastDay);
+  const today = localDateKey(now);
+  if (!last || last > today) return 0;
+  return dayDiff(last,today) <= 1 ? Math.max(0,Number(meta.streak)||0) : 0;
+}
+
+function recordDailyPractice(meta = {}, id, now = new Date()) {
+  const today = localDateKey(now);
+  const previousDay = metaDayKey(meta.lastDay);
+  const streak = previousDay === today ? Math.max(1,Number(meta.streak)||1)
+    : previousDay && previousDay < today && dayDiff(previousDay,today) === 1 ? (Number(meta.streak)||0)+1 : 1;
+  const practiceDays = {...(meta.practiceDays || {})};
+  const ids = Array.isArray(practiceDays[today]) ? practiceDays[today] : [];
+  practiceDays[today] = [...new Set([...ids,id].filter(value=>typeof value === "string" && value))];
+  const cutoff = new Date(now); cutoff.setDate(cutoff.getDate()-29);
+  for (const day of Object.keys(practiceDays)) if (day < localDateKey(cutoff) || day > today) delete practiceDays[day];
+  return {...meta,practiceDays,lastDay:today,streak};
+}
+
+function useLocalNow() {
+  const [now,setNow] = useState(()=>new Date());
+  useEffect(()=>{
+    let timer;
+    const refresh = ()=>{
+      const current = new Date(); setNow(current);
+      const midnight = new Date(current); midnight.setHours(24,0,0,0);
+      clearTimeout(timer); timer=setTimeout(refresh,Math.min(60000,midnight-current));
+    };
+    const onVisible = ()=>{if(document.visibilityState !== "hidden")refresh();};
+    refresh(); window.addEventListener("focus",refresh); document.addEventListener("visibilitychange",onVisible);
+    return ()=>{clearTimeout(timer);window.removeEventListener("focus",refresh);document.removeEventListener("visibilitychange",onVisible);};
+  },[]);
+  return now;
+}
+
 function inferNature(w) {
   const d = String(w.definition || "").trimStart();
   if (/^verbe pronominal/i.test(d)) return "Verbe pronominal";
@@ -1276,7 +1325,7 @@ function gradeWord(state, id, rating, mode = "recog", customXp) {
     if (!x.next) x.next = addDays(1);
     const meta = { ...DEFAULT_META, ...(ns.meta || {}) };
     meta.xp += typeof customXp === "number" ? customXp : 0;
-    ns.meta = meta;
+    ns.meta = recordDailyPractice(meta,id);
     recordActivity(rating, mode, customXp);
     saveProgress(ns);
     return ns;
@@ -1337,7 +1386,7 @@ function gradeWord(state, id, rating, mode = "recog", customXp) {
     meta.lastDay = today;
   }
   const _xpD = (typeof customXp === "number") ? customXp : (rating === "again" ? 0 : 10); meta.xp = (meta.xp || 0) + _xpD;
-  ns.meta = meta;
+  ns.meta = recordDailyPractice(meta,id);
   recordActivity(rating, mode, customXp);
   saveProgress(ns);
   return ns;
@@ -1881,7 +1930,16 @@ function TabBar({active,onSelect,dueCount}) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
-function Dashboard({words,figures,state,onStartDaily,onStartReview,onStartFragile,onStartDue,onStartQuiz,onStartNuance,onStartFigures}) {
+function DailyGoal({meta,goal=5,now=new Date()}) {
+  const status = dailyGoalStatus(meta,goal,now);
+  return <Card style={{marginBottom:2}}>
+    <p style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:8}}>Ton objectif du jour</p>
+    <progress value={Math.min(status.count,goal)} max={goal} aria-label="Mots travaillés aujourd'hui" style={{width:"100%",accentColor:C.green,height:12}}/>
+    <p aria-live="polite" style={{fontSize:13,color:C.sub,marginTop:8}}>{Math.min(status.count,goal)}/{goal} mots distincts travaillés · {status.completed ? "Objectif atteint !" : "Les erreurs comptent aussi : chaque essai aide à apprendre."}</p>
+  </Card>;
+}
+
+function Dashboard({words,figures,state,now=new Date(),onStartDaily,onStartReview,onStartFragile,onStartDue,onStartQuiz,onStartNuance,onStartFigures}) {
   const total = words.length;
   const figuresTotal = figures.length;
   const figuresSeen = figures.filter(w=>readP(state,w.id).seen>0).length;
@@ -1897,6 +1955,7 @@ function Dashboard({words,figures,state,onStartDaily,onStartReview,onStartFragil
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.25s ease"}}>
+      <DailyGoal meta={state.meta} now={now}/>
       <Card style={{background:`linear-gradient(135deg, ${C.blue}12 0%, ${C.purple}09 100%)`}}>
         <p style={{fontSize:11,fontWeight:800,color:C.blue,textTransform:"uppercase",letterSpacing:1,margin:"0 0 6px"}}>Aujourd'hui</p>
         <h2 style={{fontSize:24,fontWeight:850,color:C.text,letterSpacing:-0.8,margin:"0 0 8px"}}>{recommended}</h2>
@@ -3936,6 +3995,7 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
 }
 
 function App() {
+  const now = useLocalNow();
   const initialStoredWords = useMemo(()=>loadCustomWords(),[]);
   const initialStoredFigures = useMemo(()=>loadCustomFigures(),[]);
   const initialExtraSources = useMemo(()=>loadExtraSources(),[]);
@@ -4223,7 +4283,7 @@ function App() {
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",flexWrap:"wrap",gap:10}}>
             <h1 style={{fontSize:28,fontWeight:800,color:C.text,letterSpacing:-1.2,margin:0}}>Français avancé</h1>
             <div style={{display:"flex",gap:6}}>
-              <div style={{background:`${C.orange}18`,color:C.orange,borderRadius:11,padding:"5px 11px",fontSize:12,fontWeight:700}}>🔥 {state.meta.streak||0}j</div>
+              <div style={{background:`${C.orange}18`,color:C.orange,borderRadius:11,padding:"5px 11px",fontSize:12,fontWeight:700}}>🔥 {visibleDailyStreak(state.meta,now)}j</div>
               <div style={{background:`${C.blue}12`, color:C.blue, borderRadius:11,padding:"5px 11px",fontSize:12,fontWeight:700}}>⚡ {state.meta.xp||0} XP</div>
             </div>
           </div>
@@ -4272,7 +4332,7 @@ function App() {
           <>
             <TabBar active={tab} onSelect={selectTab} dueCount={dueCount}/>
 
-            {tab==="home"    && <Dashboard words={words} figures={figures} state={state} onStartDaily={startDaily} onStartReview={()=>startReview("smart")} onStartFragile={()=>startReview("fragile")} onStartDue={()=>startReview("due")} onStartQuiz={()=>startQuiz("quick")} onStartNuance={()=>startQuiz("nuance")} onStartFigures={startFigures}/>} 
+            {tab==="home"    && <Dashboard words={words} figures={figures} state={state} now={now} onStartDaily={startDaily} onStartReview={()=>startReview("smart")} onStartFragile={()=>startReview("fragile")} onStartDue={()=>startReview("due")} onStartQuiz={()=>startQuiz("quick")} onStartNuance={()=>startQuiz("nuance")} onStartFigures={startFigures}/>} 
             {tab==="daily"   && <DailyTab   words={words} state={state} setState={setState} onMilestone={setMilestone} onGoReview={()=>startReview("fragile")} onGoQuiz={()=>startQuiz("quick")} onGoNuance={()=>startQuiz("nuance")}/>} 
             {tab==="learn"   && <LearnTabNew words={words} state={state} setState={setState} onMilestone={setMilestone} initialMode={learnMode} onStartNuance={()=>startQuiz("nuance")}/>} 
             {tab==="quiz"    && <QuizTabNew  key={"quiz-"+quizMode} words={words} state={state} setState={setState} onMilestone={setMilestone} mode={quizMode} onModeChange={setQuizMode}/>} 

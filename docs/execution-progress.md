@@ -9,3 +9,4 @@ Ruling: conserver un journal Markdown et exécuter directement les tests sous Wi
 Prévol : les lots 1 et 3 partagent meta.practiceDays ; les lots 2 et 4 partagent LearningFeedback ; les lots 4 et 5 partagent smartDistractors. Garder ces interfaces stables.
 
 Lot 0 : clone complet et icônes conservées ; seize régressions et compilation JSX passent.
+Lot 1 : objectif et flamme intégrés ; cinq tests de fonctionnalité et seize régressions passent. Les clés lastDay legacy sont lues, puis écrites en date locale ISO.
