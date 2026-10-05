@@ -12,3 +12,4 @@ Lot 0 : clone complet et icônes conservées ; seize régressions et compilation
 Lot 1 : objectif et flamme intégrés ; cinq tests de fonctionnalité et seize régressions passent. Les clés lastDay legacy sont lues, puis écrites en date locale ISO.
 Lot 2 : corrections partagées avec exemple réel, astuce et différence explicite ; suppression de toutes les vies et des écrans éliminatoires. Trois tests passent et le JSX compile. Vérification navigateur finale prévue.
 Lot 3 : file figée, cinq mots maximum et deux nouveautés maximum ; priorité aux échéances, bilan et file vide. Deux tests de sélection et compilation passent.
+Lot 4 : flashcard autoévaluée, QCM contrôlé, saisie et phrase à trou selon progression ; retournement sans notation, entraînement libre sans XP. Trois tests de séance passent et compilation réussie.

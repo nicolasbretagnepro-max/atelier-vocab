@@ -1499,6 +1499,19 @@ function buildDailySession(state, words) {
   return { discover, review, association, context, production, boss, newLimit };
 }
 
+function validClozePrompt(word) {
+  if(!word.hasRealExample)return null;
+  const prompt=getExampleText(word,true);
+  if(!/(________|\[…\])/.test(prompt)||textContainsAnswer(prompt,word))return null;
+  return prompt;
+}
+function chooseLearningFormat(word,progress,words) {
+  if(!progress.seen||progress.relearning)return "flashcard";
+  if((progress.repetitions||0)===0)return smartDistractors(word,words,2).length>=2?"qcm":"typing";
+  if(progress.repetitions>=2&&validClozePrompt(word))return "cloze";
+  return "typing";
+}
+
 function buildShortSession(state,words,now=new Date()) {
   const unique=[...new Map(words.map(w=>[w.id,w])).values()];
   const due=unique.filter(w=>isDue(state,w,now)).sort((a,b)=>new Date(readP(state,a.id).next||0)-new Date(readP(state,b.id).next||0));
@@ -3946,11 +3959,33 @@ function QuizTabNew({words, state, setState, onMilestone, mode="quick", onModeCh
   );
 }
 
-function ShortSession({words,state,setState,onBack,onPractice}) {
-  const [queue,setQueue]=useState(()=>buildShortSession(state,words));
-  const [index,setIndex]=useState(0);
+function ShortExercise({word,progress,words,onAnswer}) {
+  const [format]=useState(()=>chooseLearningFormat(word,progress,words));
+  const [shown,setShown]=useState(false);
   const [input,setInput]=useState("");
-  const [discovered,setDiscovered]=useState(false);
+  const [result,setResult]=useState(null);
+  if(format==="flashcard")return <div>
+    <p>Flashcard · retrouve le sens du mot</p><h2>{word.word}</h2>
+    {!shown?<Btn label="Afficher la réponse" full onClick={()=>setShown(true)}/>:<>
+      <LearningFeedback word={word}/><p>Comment l'avais-tu retrouvé avant de retourner la carte ?</p>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>{[["again","À revoir"],["hard","Difficile"],["good","Retrouvé"],["easy","Facile"]].map(([r,label])=><Btn key={r} label={label} onClick={()=>onAnswer(r,"recog")}/>)}</div>
+    </>}
+  </div>;
+  if(format==="qcm")return <StepChoice word={word} words={words} mode="term" onAnswer={ok=>onAnswer(ok?"good":"again","recog")}/>;
+  if(format==="typing")return <StepProd word={word} inputVal={input} setInputVal={setInput} hideExample onAnswer={ok=>onAnswer(ok?"good":"again","prod")}/>;
+  const submit=()=>{if(result)return;setResult(answerMatches(input,word)?"ok":"wrong");};
+  return <div><p>Complète la phrase</p><p style={{fontSize:18,lineHeight:1.6}}>{validClozePrompt(word)}</p>
+    <input aria-label="Mot manquant" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} disabled={!!result} autoFocus style={{width:"100%",padding:12,fontSize:16,marginBottom:12}}/>
+    {!result?<><Btn label="Valider" disabled={!input.trim()} onClick={submit}/><Btn label="Passer" onClick={()=>setResult("wrong")}/></>:
+      <><LearningFeedback word={word}/><Btn label={result==="ok"?"Correct · suite":"J'ai compris"} onClick={()=>onAnswer(result==="ok"?"good":"again","context")}/></>}
+  </div>;
+}
+
+function ShortSession({words,state,setState,onBack}) {
+  const [queue,setQueue]=useState(()=>buildShortSession(state,words));
+  const [freePractice,setFreePractice]=useState(false);
+  const [index,setIndex]=useState(0);
+
   const answered=useRef(false);
   const retries=useRef({});
   const [finished,setFinished]=useState([]);
@@ -3959,18 +3994,18 @@ function ShortSession({words,state,setState,onBack,onPractice}) {
   const answer=(rating,mode="prod")=>{
     if(answered.current||!word)return;
     answered.current=true;
-    const next=gradeWord(state,word.id,rating,mode);
+    const next=gradeWord(state,word.id,rating,mode,freePractice?0:undefined);
     setState(next);
     setFinished(ids=>[...new Set([...ids,word.id])]);
     if(rating==="again")setQueue(q=>insertRetryItem(q,index,word,retries,"short").list);
-    setInput("");setDiscovered(false);setIndex(i=>i+1);
+    setIndex(i=>i+1);
   };
   useEffect(()=>{answered.current=false;},[index]);
   if(!word)return <Card>
     <h2>{initialCount.current?"Séance terminée":"Tout est à jour"}</h2>
     <p>{finished.length} mot{finished.length>1?"s":""} travaillé{finished.length>1?"s":""}.</p>
     {!initialCount.current&&<p>Prochaine révision : {getNextDueAt(state,words)?new Date(getNextDueAt(state,words)).toLocaleString("fr-FR"):"aucune prévue"}.</p>}
-    {!initialCount.current&&<Btn label="Entraînement libre" onClick={onPractice}/>}
+    {!initialCount.current&&<Btn label="Entraînement libre · sans XP" disabled={!words.length} onClick={()=>{const list=words.slice(0,5);setFreePractice(true);setQueue(list);setIndex(0);setFinished([]);initialCount.current=list.length;answered.current=false;}}/>}
     <Btn label="Retour à l'accueil" onClick={onBack}/>
   </Card>;
   return <Card>
@@ -3978,8 +4013,7 @@ function ShortSession({words,state,setState,onBack,onPractice}) {
     <h2>Séance courte</h2>
     <p>{finished.length}/{initialCount.current} mots travaillés · les erreurs font partie de l'apprentissage</p>
     <progress aria-label="Progression de la séance" value={finished.length} max={initialCount.current} style={{width:"100%"}}/>
-    {!readP(state,word.id).seen&&!discovered?<div><LearningFeedback word={word}/><Btn label="Je suis prêt à essayer" onClick={()=>setDiscovered(true)}/></div>:
-      <StepProd key={index+word.id} word={word} inputVal={input} setInputVal={setInput} hideExample onAnswer={ok=>answer(ok?"good":"again")}/>}
+    <ShortExercise key={index+word.id} word={word} progress={readP(state,word.id)} words={words} onAnswer={answer}/>
   </Card>;
 }
 
