@@ -1,3 +1,4 @@
+require('./mobile-display.test.cjs');
 require('./classic-routine.test.cjs');
 require('./learning.test.cjs');
 require('./acquisition.test.cjs');

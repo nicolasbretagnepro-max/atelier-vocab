@@ -49,13 +49,18 @@
     }
     #root { min-height: 100vh; }
     .word-title { overflow-wrap: anywhere; word-break: break-word; }
-    .choice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .choice-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
     .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .scroll-list { display: flex; flex-direction: column; gap: 6px; max-height: calc(100vh - 260px); overflow-y: auto; -webkit-overflow-scrolling: touch; }
     @media (max-width: 560px) {
       .choice-grid { grid-template-columns: 1fr; }
       .stats-grid { grid-template-columns: repeat(2, 1fr); }
       .hide-small { display: none !important; }
+      button { min-height: 44px; }
+    }
+    @media (max-width: 360px) {
+      .app-tabs { flex-wrap: wrap; }
+      .app-tabs [role="tab"] { flex: 1 0 22% !important; }
     }
     @keyframes fadeSlideIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
     @keyframes pop { 0%{transform:scale(0.7);opacity:0} 60%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
@@ -73,10 +78,10 @@
 <body>
 <div id="root"></div>
 
-<link rel="stylesheet" href="./crossword.css?v=14" />
-<script src="./learning-engine.js?v=14"></script>
-<script src="./crossword-engine.js?v=14"></script>
-<script type="text/babel" src="./crossword-ui.jsx?v=14"></script>
+<link rel="stylesheet" href="./crossword.css?v=15" />
+<script src="./learning-engine.js?v=15"></script>
+<script src="./crossword-engine.js?v=15"></script>
+<script type="text/babel" src="./crossword-ui.jsx?v=15"></script>
 <script type="text/babel">
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
@@ -1701,6 +1706,15 @@ const Bar = ({value, color}) => (
   </div>
 );
 
+function ProgressMeter({value,max,label,color=C.blue}) {
+  const limit=Math.max(1,Number(max)||1);
+  const current=Math.min(limit,Math.max(0,Number(value)||0));
+  return <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={current}
+    style={{width:"100%",height:10,borderRadius:99,background:"#E5E5EA",overflow:"hidden"}}>
+    <div style={{height:"100%",width:`${current/limit*100}%`,background:color,borderRadius:99,transition:"width 0.2s ease"}}/>
+  </div>;
+}
+
 const ExampleBlock = ({word, showLabel=true, fontSize=15, cloze=false, exampleIndex=null}) => {
   // Si exampleIndex est fourni, on fixe l'exemple à cet index (0 ou 1) plutôt que de le tirer au sort.
   const text = useMemo(() => {
@@ -1870,7 +1884,7 @@ function ImportModal({open, onClose, onImport, currentCount}) {
         </label>
         <p style={{fontSize:12,color:C.ter,textAlign:"center",marginBottom:8}}>— ou coller le contenu JSON —</p>
         <textarea value={text} onChange={e=>setText(e.target.value)} placeholder='[{"word":"...","definition":"...","definition_compacte":"...","example":"..."}, ...]'
-          style={{width:"100%",minHeight:140,padding:"12px 14px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:13,color:C.text,fontFamily:"ui-monospace,Menlo,monospace",resize:"vertical",outline:"none",background:"#F8F8FA"}}/>
+          style={{width:"100%",minHeight:140,padding:"12px 14px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:16,color:C.text,fontFamily:"ui-monospace,Menlo,monospace",resize:"vertical",outline:"none",background:"#F8F8FA"}}/>
         {feedback&&<p style={{fontSize:14,fontWeight:600,color:feedback.type==="ok"?C.green:C.red,marginTop:10}}>{feedback.msg}</p>}
         <div style={{display:"flex",gap:10,marginTop:16,justifyContent:"flex-end"}}>
           <Btn label="Annuler" variant="ghost" onClick={requestClose}/>
@@ -1968,8 +1982,8 @@ function SourcesModal({open,onClose,sources,onAddSource,onRemoveSource,onToggleS
         </p>
 
         <div style={{display:"grid",gridTemplateColumns:"1fr",gap:8,marginBottom:14}}>
-          <input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Nom de la source, ex. Philosophie" style={{padding:"11px 13px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:14,outline:"none",background:C.solid,color:C.text}} />
-          <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="URL raw du Gist, ex. https://gist.githubusercontent.com/.../raw/" style={{padding:"11px 13px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:14,outline:"none",background:C.solid,color:C.text}} />
+          <input value={label} onChange={e=>setLabel(e.target.value)} placeholder="Nom de la source, ex. Philosophie" style={{padding:"11px 13px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:16,outline:"none",background:C.solid,color:C.text}} />
+          <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="URL raw du Gist, ex. https://gist.githubusercontent.com/.../raw/" style={{padding:"11px 13px",borderRadius:12,border:`1.5px solid ${C.border}`,fontSize:16,outline:"none",background:C.solid,color:C.text}} />
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <Btn label="Ajouter la source" variant="primary" onClick={handleAdd} disabled={!url.trim()} />
             <Btn label={status==="loading"?"Chargement…":"Recharger les sources"} variant="ghost" onClick={onReloadSources} disabled={status==="loading" || !(sources||[]).length} />
@@ -2039,7 +2053,7 @@ const TABS = [
 
 function TabBar({active,onSelect,dueCount}) {
   return (
-    <div role="tablist" aria-label="Navigation principale" style={{display:"flex",gap:2,background:"rgba(255,255,255,0.75)",backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,padding:"5px",marginBottom:20}}>
+    <div className="app-tabs" role="tablist" aria-label="Navigation principale" style={{display:"flex",gap:2,background:"rgba(255,255,255,0.75)",backdropFilter:"blur(20px)",border:`1px solid ${C.border}`,borderRadius:18,padding:"5px",marginBottom:20}}>
       {TABS.map(t=>(
         <button key={t.id} role="tab" aria-selected={active===t.id} onClick={()=>onSelect(t.id)} style={{
           flex:1,padding:"8px 4px",borderRadius:13,border:"none",
@@ -2062,7 +2076,7 @@ function DailyGoal({meta,goal=5,now=new Date()}) {
   const status = dailyGoalStatus(meta,goal,now);
   return <Card style={{marginBottom:2}}>
     <p style={{fontSize:15,fontWeight:800,color:C.text,marginBottom:8}}>Ton objectif du jour</p>
-    <progress value={Math.min(status.count,goal)} max={goal} aria-label="Mots travaillés aujourd'hui" style={{width:"100%",accentColor:C.green,height:12}}/>
+    <ProgressMeter value={status.count} max={goal} label="Mots travaillés aujourd'hui" color={C.green}/>
     <p aria-live="polite" style={{fontSize:13,color:C.sub,marginTop:8}}>{Math.min(status.count,goal)}/{goal} mots distincts travaillés · {status.completed ? "Objectif atteint !" : "Les erreurs comptent aussi : chaque essai aide à apprendre."}</p>
   </Card>;
 }
@@ -2131,7 +2145,7 @@ function Dashboard({words,figures,state,settings=loadProfile().learningSettings,
           </div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}><Pill label={`${total} mots`} color={C.blue}/><Pill label={`${figuresTotal} figures`} color={C.indigo}/></div>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}} className="choice-grid">
+        <div className="choice-grid">
           <SessionButton title="Routine complète" subtitle="Découverte, contexte, rappel actif et boss." icon="☀️" color={C.blue} onClick={onStartDaily}/>
           <SessionButton title="Séance courte" subtitle="Flashcards et rappel de quelques mots." icon="⏱" color={C.blue} onClick={onStartShort}/>
           <SessionButton title="Révision rapide" subtitle="Revoir les mots déjà rencontrés." icon="📚" color={C.purple} onClick={onStartReview}/>
@@ -2365,7 +2379,7 @@ function DailyTab({words,state,setState,onMilestone,onGoReview,onGoQuiz,onGoNuan
         <span style={{fontSize:14,color:C.orange,fontWeight:700}}>+{xpToday}</span>
       </div>
       <div style={{fontSize:12,color:C.sub,fontWeight:600,letterSpacing:0.8,textTransform:"uppercase"}}>{STEPS[step]} · {idx+1} / {sources.length}</div>
-      <progress aria-label="Progression de la routine" value={log.length} max={session.questionCount+(retryRef.current.total||0)} style={{width:"100%",accentColor:C.blue}}/>
+      <ProgressMeter label="Progression de la routine" value={log.length} max={session.questionCount+(retryRef.current.total||0)}/>
       <p style={{fontSize:13,color:C.sub,margin:0}}>{Math.min(log.length+1,session.questionCount+(retryRef.current.total||0))}/{session.questionCount+(retryRef.current.total||0)} rencontres · découvre, reconnais, puis retrouve le mot</p>
       {feedback==="neutral"&&<p role="status" style={{color:C.blue}}>Consultation sans notation : aucune erreur ni réussite enregistrée.</p>}
 
@@ -3313,8 +3327,8 @@ function FiguresTab({figures,state,setState,onMilestone,onReloadFigures,figuresS
           {onReloadFigures && <Btn label={figuresStatus==="loading"?"Chargement…":"Recharger"} variant="ghost" small onClick={onReloadFigures} disabled={figuresStatus==="loading"}/>}
         </div>
         <div style={{display:"flex",gap:8,alignItems:"stretch",marginBottom:10}}>
-          <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Rechercher une figure…" style={{flex:1,minWidth:0,padding:"10px 14px",borderRadius:12,fontSize:14,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none"}}/>
-          <select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"10px 12px",borderRadius:12,fontSize:13,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none",maxWidth:190}}>
+          <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Rechercher une figure…" style={{flex:1,minWidth:0,padding:"10px 14px",borderRadius:12,fontSize:16,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none"}}/>
+          <select value={filter} onChange={e=>setFilter(e.target.value)} style={{padding:"10px 12px",borderRadius:12,fontSize:16,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none",maxWidth:190}}>
             {families.map(t=><option key={t}>{t}</option>)}
           </select>
         </div>
@@ -3359,9 +3373,9 @@ function LibraryTab({words, state, initialFilter="Tous"}) {
     <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <div style={{display:"flex",gap:8,alignItems:"stretch"}}>
         <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Rechercher…"
-          style={{flex:1,minWidth:0,padding:"10px 14px",borderRadius:12,fontSize:14,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none"}}/>
+          style={{flex:1,minWidth:0,padding:"10px 14px",borderRadius:12,fontSize:16,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none"}}/>
         <select value={filter} onChange={e=>setFilter(e.target.value)}
-          style={{padding:"10px 12px",borderRadius:12,fontSize:13,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none",maxWidth:180}}>
+          style={{padding:"10px 12px",borderRadius:12,fontSize:16,border:`1.5px solid ${C.border}`,background:C.solid,color:C.text,outline:"none",maxWidth:180}}>
           {themes.map(t=><option key={t}>{t}</option>)}
         </select>
       </div>
@@ -3460,10 +3474,10 @@ function StatsTab({words,figures=[],state,onOpenImport,onReset,onExport,onSync,o
         <StatCard icon="📖" label="Total" value={total} color={C.blue} filterKey="Tous"/>
         <StatCard icon="✅" label="Maîtrisés" value={mastered} color={C.green} sub="4 jours, 14j d'écart, 85%+" filterKey="Maîtrisé"/>
         <StatCard icon="🔄" label="À revoir" value={dueN} color={C.red} filterKey="À revoir"/>
-        <StatCard icon="⚠️" label="Fragiles" value={fragile} color={C.orange} sub="≥2 erreurs, taux<70%" filterKey="Fragile"/>
+        <StatCard icon="⚠️" label="Fragiles" value={fragile} color={C.orange} sub="Difficultés récentes" filterKey="Fragile"/>
         <StatCard icon="👁" label="Vus" value={seen} color={C.purple} filterKey="En cours"/>
         <StatCard icon="✨" label="Nouveaux" value={newCount} color={C.blue} filterKey="Nouveau"/>
-        <StatCard icon="🔥" label="Série" value={`${state.meta.streak||0}j`} color={C.orange}/>
+        <StatCard icon="🔥" label="Série" value={`${visibleDailyStreak(state.meta)}j`} color={C.orange}/>
         <StatCard icon="✒️" label="Figures" value={figureTotal} color={C.indigo} sub={`${figureSeen} vues · ${figureMastered} maîtrisées`}/>
       </div>
 
@@ -4197,7 +4211,7 @@ function ShortSession({words,state,setState,onBack}) {
     <Btn label="Retour" variant="ghost" onClick={onBack}/>
     <h2>Séance courte</h2>
     <p>{finished.length}/{initialCount.current} mots travaillés · les erreurs font partie de l'apprentissage</p>
-    <progress aria-label="Progression de la séance" value={finished.length} max={initialCount.current} style={{width:"100%"}}/>
+    <ProgressMeter label="Progression de la séance" value={finished.length} max={initialCount.current}/>
     <ShortExercise key={index+word.id} word={word} progress={readP(state,word.id)} words={words} onAnswer={answer}/>
   </Card>;
 }
@@ -4269,7 +4283,7 @@ function App() {
     stopCrosswordWorker();const id=++crosswordRequest.current;
     crosswordGraded.current=new Set();setCrosswordOpen(true);setCrossword({status:"loading"});
     try{
-      const worker=new Worker("./crossword-worker.js?v=14");crosswordWorker.current=worker;
+      const worker=new Worker("./crossword-worker.js?v=15");crosswordWorker.current=worker;
       worker.onmessage=event=>{
         if(event.data.id!==crosswordRequest.current||crosswordWorker.current!==worker)return;
         const result=event.data.result;stopCrosswordWorker();

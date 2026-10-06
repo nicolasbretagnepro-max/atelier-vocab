@@ -73,7 +73,7 @@ function CrosswordGame({puzzle,open=true,onEvaluate,onClose,onNewGame}) {
     <header className="cw-header"><div><h2 id="cw-title">Grille découverte</h2><p>{puzzle.entries.length} mots · prends d’abord connaissance de leur sens</p></div><button ref={closeRef} onClick={onClose}>Fermer</button></header>
     <div className="cw-board-scroll" style={{display:"block",padding:16}}>{puzzle.entries.map(e=><article key={e.id} style={{padding:16,borderRadius:14,background:"#fff",marginBottom:12}}><h3 style={{fontSize:22,margin:"0 0 8px"}}>{e.term}</h3><p style={{fontSize:17,lineHeight:1.6}}>{e.definition||e.clue}</p>{e.example&&<p style={{fontSize:16,lineHeight:1.6,fontStyle:"italic"}}>{e.example}</p>}</article>)}</div>
     <article className="cw-clue"><p>Ces mots sont nouveaux : le jeu t’aide à les découvrir et ne les compte pas comme maîtrisés.</p></article>
-    <footer className="cw-actions"><button onClick={()=>setPreparing(false)}>Commencer la grille</button></footer>
+    <footer className="cw-actions cw-discovery-actions"><button onClick={()=>setPreparing(false)}>Commencer la grille</button></footer>
   </section>;
   return <section ref={panelRef} className="cw-screen" role="dialog" aria-modal="true" aria-labelledby="cw-title" onKeyDown={trap} style={{top:viewport.top,height:viewport.height,"--cw-cell":`${cellSize}px`}}>
     <header className="cw-header"><div><h2 id="cw-title">{puzzle.discovery?"Grille découverte":"Mots croisés"}</h2><p>{finished}/{puzzle.entries.length} mots · {puzzle.entries.filter(e=>e.role==="due").length} à revoir · aides disponibles</p></div><button ref={closeRef} onClick={onClose}>{complete?"Terminer":"Fermer"}</button></header>
