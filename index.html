@@ -3659,8 +3659,8 @@ function QuizSession({words, state, setState, onMilestone, onBack, title, color,
 
 
   if (done || !current) {
-    const nOk = log.filter(e => e.ok).length; const nWrong = log.filter(e => !e.ok).length;
-    const perfect = nWrong === 0 && nOk > 0; const totalXp = xpSession + (perfect ? 20 : 0);
+    const nOk = log.filter(e => e.ok&&!e.neutral).length; const nWrong = log.filter(e => !e.ok&&!e.neutral).length;
+    const perfect = perfectSession; const totalXp = xpSession + (perfect ? 20 : 0);
     return (
       <div style={{display:"flex",flexDirection:"column",gap:14,animation:"fadeSlideIn 0.3s ease"}}>
         <div style={{textAlign:"center",padding:"24px 0 12px"}}>
