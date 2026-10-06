@@ -1,3 +1,5 @@
+> Historique : cette livraison a été remplacée par la [routine classique du 6 octobre 2026](livraison-routine-classique.md).
+
 # Livraison — routine quotidienne guidée
 
 Cette livraison remplace les passages des anciennes notes qui proposaient une saisie sans aide lorsqu’un QCM n’avait pas de distracteurs validés. Le point d’entrée sur l’accueil est **Ma routine du jour**.
