@@ -1,0 +1,2641 @@
+{
+  "total": 780,
+  "selected": 330,
+  "ready": 309,
+  "report": [
+    {
+      "word": "Abduction",
+      "status": "card",
+      "reason": "Group too close under conservative filter"
+    },
+    {
+      "word": "Déduction",
+      "status": "card",
+      "reason": "Group too close under conservative filter"
+    },
+    {
+      "word": "Induction",
+      "status": "card",
+      "reason": "Group too close under conservative filter"
+    },
+    {
+      "word": "A priori",
+      "correct": "Avant examen, sans vérification par l'expérience.",
+      "distractors": [
+        "Après coup, à partir des faits.",
+        "À partir de rien."
+      ]
+    },
+    {
+      "word": "A posteriori",
+      "correct": "Après coup, à partir des faits.",
+      "distractors": [
+        "Avant examen, sans vérification par l'expérience.",
+        "À partir de rien."
+      ]
+    },
+    {
+      "word": "Ex nihilo",
+      "correct": "À partir de rien.",
+      "distractors": [
+        "Avant examen, sans vérification par l'expérience.",
+        "Après coup, à partir des faits."
+      ]
+    },
+    {
+      "word": "Biais d'ancrage",
+      "correct": "Influence excessive d'une première information.",
+      "distractors": [
+        "Tendance à retenir ce qui confirme ses croyances.",
+        "Jugement guidé par les exemples les plus faciles à rappeler."
+      ]
+    },
+    {
+      "word": "Biais de confirmation",
+      "correct": "Tendance à retenir ce qui confirme ses croyances.",
+      "distractors": [
+        "Influence excessive d'une première information.",
+        "Jugement guidé par les exemples les plus faciles à rappeler."
+      ]
+    },
+    {
+      "word": "Biais de disponibilité",
+      "correct": "Jugement guidé par les exemples les plus faciles à rappeler.",
+      "distractors": [
+        "Influence excessive d'une première information.",
+        "Tendance à retenir ce qui confirme ses croyances."
+      ]
+    },
+    {
+      "word": "Éthos",
+      "correct": "Crédibilité et image de l'orateur perçues par le public.",
+      "distractors": [
+        "Appel aux émotions pour toucher ou convaincre.",
+        "Arguments logiques et preuves."
+      ]
+    },
+    {
+      "word": "Pathos",
+      "correct": "Appel aux émotions pour toucher ou convaincre.",
+      "distractors": [
+        "Crédibilité et image de l'orateur perçues par le public.",
+        "Arguments logiques et preuves."
+      ]
+    },
+    {
+      "word": "Logos",
+      "correct": "Arguments logiques et preuves.",
+      "distractors": [
+        "Crédibilité et image de l'orateur perçues par le public.",
+        "Appel aux émotions pour toucher ou convaincre."
+      ]
+    },
+    {
+      "word": "Ad ignorantiam",
+      "correct": "Argument fondé sur l'absence de preuve contraire.",
+      "distractors": [
+        "Appel à la pitié pour convaincre.",
+        "Appel à l'opinion majoritaire supposée.",
+        "Appel abusif à l'autorité."
+      ]
+    },
+    {
+      "word": "Ad misericordiam",
+      "correct": "Appel à la pitié pour convaincre.",
+      "distractors": [
+        "Argument fondé sur l'absence de preuve contraire.",
+        "Appel à l'opinion majoritaire supposée.",
+        "Appel abusif à l'autorité."
+      ]
+    },
+    {
+      "word": "Ad populum",
+      "correct": "Appel à l'opinion majoritaire supposée.",
+      "distractors": [
+        "Argument fondé sur l'absence de preuve contraire.",
+        "Appel à la pitié pour convaincre.",
+        "Appel abusif à l'autorité."
+      ]
+    },
+    {
+      "word": "Ad verecundiam",
+      "correct": "Appel abusif à l'autorité.",
+      "distractors": [
+        "Argument fondé sur l'absence de preuve contraire.",
+        "Appel à la pitié pour convaincre.",
+        "Appel à l'opinion majoritaire supposée."
+      ]
+    },
+    {
+      "word": "Faux dilemme",
+      "correct": "Réduire artificiellement les options à deux.",
+      "distractors": [
+        "Attribution à tort d'un lien de cause à effet, souvent à partir d'une simple corrélation.",
+        "Caricaturer la position adverse pour la réfuter.",
+        "Raisonnement circulaire (la conclusion est présupposée)."
+      ]
+    },
+    {
+      "word": "Fausse causalité",
+      "correct": "Attribution à tort d'un lien de cause à effet, souvent à partir d'une simple corrélation.",
+      "distractors": [
+        "Réduire artificiellement les options à deux.",
+        "Caricaturer la position adverse pour la réfuter.",
+        "Raisonnement circulaire (la conclusion est présupposée)."
+      ]
+    },
+    {
+      "word": "Homme de paille",
+      "correct": "Caricaturer la position adverse pour la réfuter.",
+      "distractors": [
+        "Réduire artificiellement les options à deux.",
+        "Attribution à tort d'un lien de cause à effet, souvent à partir d'une simple corrélation.",
+        "Raisonnement circulaire (la conclusion est présupposée)."
+      ]
+    },
+    {
+      "word": "Pétition de principe",
+      "correct": "Raisonnement circulaire (la conclusion est présupposée).",
+      "distractors": [
+        "Réduire artificiellement les options à deux.",
+        "Attribution à tort d'un lien de cause à effet, souvent à partir d'une simple corrélation.",
+        "Caricaturer la position adverse pour la réfuter."
+      ]
+    },
+    {
+      "word": "Contre-exemple",
+      "correct": "Cas réel qui infirme une thèse.",
+      "distractors": [
+        "Proposition centrale défendue.",
+        "Énoncé de base sur lequel on raisonne."
+      ]
+    },
+    {
+      "word": "Thèse",
+      "correct": "Proposition centrale défendue.",
+      "distractors": [
+        "Cas réel qui infirme une thèse.",
+        "Énoncé de base sur lequel on raisonne."
+      ]
+    },
+    {
+      "word": "Prémisse",
+      "correct": "Énoncé de base sur lequel on raisonne.",
+      "distractors": [
+        "Cas réel qui infirme une thèse.",
+        "Proposition centrale défendue."
+      ]
+    },
+    {
+      "word": "Focalisation externe",
+      "correct": "Point de vue narratif limité aux faits observables.",
+      "distractors": [
+        "Narration depuis la conscience d'un personnage.",
+        "Narrateur omniscient."
+      ]
+    },
+    {
+      "word": "Focalisation interne",
+      "correct": "Narration depuis la conscience d'un personnage.",
+      "distractors": [
+        "Point de vue narratif limité aux faits observables.",
+        "Narrateur omniscient."
+      ]
+    },
+    {
+      "word": "Focalisation zéro",
+      "correct": "Narrateur omniscient.",
+      "distractors": [
+        "Point de vue narratif limité aux faits observables.",
+        "Narration depuis la conscience d'un personnage."
+      ]
+    },
+    {
+      "word": "Analepse",
+      "correct": "Retour en arrière dans un récit.",
+      "distractors": [
+        "Anticipation d'un événement futur.",
+        "Récit contenant un récit qui renvoie à lui-même; procédé consistant à représenter une œuvre dans une œuvre similaire."
+      ]
+    },
+    {
+      "word": "Prolepse",
+      "correct": "Anticipation d'un événement futur.",
+      "distractors": [
+        "Retour en arrière dans un récit.",
+        "Récit contenant un récit qui renvoie à lui-même; procédé consistant à représenter une œuvre dans une œuvre similaire."
+      ]
+    },
+    {
+      "word": "Mise en abyme",
+      "correct": "Récit contenant un récit qui renvoie à lui-même; procédé consistant à représenter une œuvre dans une œuvre similaire.",
+      "distractors": [
+        "Retour en arrière dans un récit.",
+        "Anticipation d'un événement futur."
+      ]
+    },
+    {
+      "word": "Anagramme",
+      "status": "card",
+      "reason": "Group too close under conservative filter"
+    },
+    {
+      "word": "Homonyme",
+      "status": "card",
+      "reason": "Group too close under conservative filter"
+    },
+    {
+      "word": "Paronyme",
+      "status": "card",
+      "reason": "Group too close under conservative filter"
+    },
+    {
+      "word": "Anthologie",
+      "correct": "Recueil de morceaux choisis.",
+      "distractors": [
+        "Traité présentant une étude exhaustive sur un sujet précis.",
+        "Lettre adressée à quelqu'un."
+      ]
+    },
+    {
+      "word": "Monographie",
+      "correct": "Traité présentant une étude exhaustive sur un sujet précis.",
+      "distractors": [
+        "Recueil de morceaux choisis.",
+        "Lettre adressée à quelqu'un."
+      ]
+    },
+    {
+      "word": "Missive",
+      "correct": "Lettre adressée à quelqu'un.",
+      "distractors": [
+        "Recueil de morceaux choisis.",
+        "Traité présentant une étude exhaustive sur un sujet précis."
+      ]
+    },
+    {
+      "word": "Litote",
+      "correct": "Figure d'atténuation qui dit moins pour suggérer plus (ex. « ce n'est pas mauvais »).",
+      "distractors": [
+        "Alliance de deux termes contradictoires.",
+        "Répétition d'un mot en début de phrase ou de vers.",
+        "Croisement de termes en ordre inversé."
+      ]
+    },
+    {
+      "word": "Oxymore",
+      "correct": "Alliance de deux termes contradictoires.",
+      "distractors": [
+        "Figure d'atténuation qui dit moins pour suggérer plus (ex. « ce n'est pas mauvais »).",
+        "Répétition d'un mot en début de phrase ou de vers.",
+        "Croisement de termes en ordre inversé."
+      ]
+    },
+    {
+      "word": "Anaphore",
+      "correct": "Répétition d'un mot en début de phrase ou de vers.",
+      "distractors": [
+        "Figure d'atténuation qui dit moins pour suggérer plus (ex. « ce n'est pas mauvais »).",
+        "Alliance de deux termes contradictoires.",
+        "Croisement de termes en ordre inversé."
+      ]
+    },
+    {
+      "word": "Chiasme",
+      "correct": "Croisement de termes en ordre inversé.",
+      "distractors": [
+        "Figure d'atténuation qui dit moins pour suggérer plus (ex. « ce n'est pas mauvais »).",
+        "Alliance de deux termes contradictoires.",
+        "Répétition d'un mot en début de phrase ou de vers."
+      ]
+    },
+    {
+      "word": "Épicène",
+      "correct": "Dont la forme est identique au masculin et au féminin.",
+      "distractors": [
+        "Multiplicité de sens d'un même mot.",
+        "Mot nouveau, sens nouveau donné à un mot existant ou emprunt récent."
+      ]
+    },
+    {
+      "word": "Polysémie",
+      "correct": "Multiplicité de sens d'un même mot.",
+      "distractors": [
+        "Dont la forme est identique au masculin et au féminin.",
+        "Mot nouveau, sens nouveau donné à un mot existant ou emprunt récent."
+      ]
+    },
+    {
+      "word": "Néologisme",
+      "correct": "Mot nouveau, sens nouveau donné à un mot existant ou emprunt récent.",
+      "distractors": [
+        "Dont la forme est identique au masculin et au féminin.",
+        "Multiplicité de sens d'un même mot."
+      ]
+    },
+    {
+      "word": "Biocénose",
+      "correct": "Ensemble des êtres vivants d'un même milieu.",
+      "distractors": [
+        "Ensemble des éléments non vivants d'un écosystème : sol, air, humidité, température, lumière.",
+        "Zone de transition entre deux écosystèmes."
+      ]
+    },
+    {
+      "word": "Biotope",
+      "correct": "Ensemble des éléments non vivants d'un écosystème : sol, air, humidité, température, lumière.",
+      "distractors": [
+        "Ensemble des êtres vivants d'un même milieu.",
+        "Zone de transition entre deux écosystèmes."
+      ]
+    },
+    {
+      "word": "Écotone",
+      "correct": "Zone de transition entre deux écosystèmes.",
+      "distractors": [
+        "Ensemble des êtres vivants d'un même milieu.",
+        "Ensemble des éléments non vivants d'un écosystème : sol, air, humidité, température, lumière."
+      ]
+    },
+    {
+      "word": "Bioaccumulation",
+      "correct": "Accumulation d'une substance dans un organisme.",
+      "distractors": [
+        "Concentration croissante d'un polluant le long de la chaîne alimentaire.",
+        "Enrichissement excessif d'un milieu en nutriments."
+      ]
+    },
+    {
+      "word": "Biomagnification",
+      "correct": "Concentration croissante d'un polluant le long de la chaîne alimentaire.",
+      "distractors": [
+        "Accumulation d'une substance dans un organisme.",
+        "Enrichissement excessif d'un milieu en nutriments."
+      ]
+    },
+    {
+      "word": "Eutrophisation",
+      "correct": "Enrichissement excessif d'un milieu en nutriments.",
+      "distractors": [
+        "Accumulation d'une substance dans un organisme.",
+        "Concentration croissante d'un polluant le long de la chaîne alimentaire."
+      ]
+    },
+    {
+      "word": "Commensalisme",
+      "correct": "Bénéfice pour l'une, effet neutre pour l'autre.",
+      "distractors": [
+        "Bénéfice pour le parasite, dommage pour l'hôte.",
+        "Interaction bénéfique aux deux espèces."
+      ]
+    },
+    {
+      "word": "Parasitisme",
+      "correct": "Bénéfice pour le parasite, dommage pour l'hôte.",
+      "distractors": [
+        "Bénéfice pour l'une, effet neutre pour l'autre.",
+        "Interaction bénéfique aux deux espèces."
+      ]
+    },
+    {
+      "word": "Mutualisme",
+      "correct": "Interaction bénéfique aux deux espèces.",
+      "distractors": [
+        "Bénéfice pour l'une, effet neutre pour l'autre.",
+        "Bénéfice pour le parasite, dommage pour l'hôte."
+      ]
+    },
+    {
+      "word": "Spéciation",
+      "correct": "Formation de nouvelles espèces.",
+      "distractors": [
+        "Science de la classification du vivant.",
+        "Espèce limitée à une aire géographique."
+      ]
+    },
+    {
+      "word": "Taxonomie",
+      "correct": "Science de la classification du vivant.",
+      "distractors": [
+        "Formation de nouvelles espèces.",
+        "Espèce limitée à une aire géographique."
+      ]
+    },
+    {
+      "word": "Endémisme",
+      "correct": "Espèce limitée à une aire géographique.",
+      "distractors": [
+        "Formation de nouvelles espèces.",
+        "Science de la classification du vivant."
+      ]
+    },
+    {
+      "word": "Albédo",
+      "correct": "Fraction de rayonnement solaire réfléchie par une surface.",
+      "distractors": [
+        "Sol qui reste gelé pendant au moins deux années consécutives.",
+        "Système absorbant plus de CO₂ qu'il n'en émet."
+      ]
+    },
+    {
+      "word": "Pergélisol",
+      "correct": "Sol qui reste gelé pendant au moins deux années consécutives.",
+      "distractors": [
+        "Fraction de rayonnement solaire réfléchie par une surface.",
+        "Système absorbant plus de CO₂ qu'il n'en émet."
+      ]
+    },
+    {
+      "word": "Puits de carbone",
+      "correct": "Système absorbant plus de CO₂ qu'il n'en émet.",
+      "distractors": [
+        "Fraction de rayonnement solaire réfléchie par une surface.",
+        "Sol qui reste gelé pendant au moins deux années consécutives."
+      ]
+    },
+    {
+      "word": "Ripisylve",
+      "correct": "Végétation des berges d'un cours d'eau.",
+      "distractors": [
+        "Plaine des pays froids à végétation discontinue.",
+        "Association d'arbres avec des cultures ou de l'élevage."
+      ]
+    },
+    {
+      "word": "Toundra",
+      "correct": "Plaine des pays froids à végétation discontinue.",
+      "distractors": [
+        "Végétation des berges d'un cours d'eau.",
+        "Association d'arbres avec des cultures ou de l'élevage."
+      ]
+    },
+    {
+      "word": "Agroforesterie",
+      "correct": "Association d'arbres avec des cultures ou de l'élevage.",
+      "distractors": [
+        "Végétation des berges d'un cours d'eau.",
+        "Plaine des pays froids à végétation discontinue."
+      ]
+    },
+    {
+      "word": "Ressac",
+      "correct": "Retour des vagues après leur choc contre un obstacle.",
+      "distractors": [
+        "Vent régulier des régions tropicales.",
+        "Lieu où un affluent se jette dans un autre cours d'eau; rencontre."
+      ]
+    },
+    {
+      "word": "Alizé",
+      "correct": "Vent régulier des régions tropicales.",
+      "distractors": [
+        "Retour des vagues après leur choc contre un obstacle.",
+        "Lieu où un affluent se jette dans un autre cours d'eau; rencontre."
+      ]
+    },
+    {
+      "word": "Confluence",
+      "correct": "Lieu où un affluent se jette dans un autre cours d'eau; rencontre.",
+      "distractors": [
+        "Retour des vagues après leur choc contre un obstacle.",
+        "Vent régulier des régions tropicales."
+      ]
+    },
+    {
+      "word": "Autarcie",
+      "correct": "État de se suffire à soi-même; consommation limitée à sa propre production.",
+      "distractors": [
+        "Mouvement de défense des consommateurs; par extension, tendance à valoriser la consommation.",
+        "Doctrine prônant le libre jeu des forces économiques tout en acceptant une intervention limitée de l'État."
+      ]
+    },
+    {
+      "word": "Consumérisme",
+      "correct": "Mouvement de défense des consommateurs; par extension, tendance à valoriser la consommation.",
+      "distractors": [
+        "État de se suffire à soi-même; consommation limitée à sa propre production.",
+        "Doctrine prônant le libre jeu des forces économiques tout en acceptant une intervention limitée de l'État."
+      ]
+    },
+    {
+      "word": "Néolibéralisme",
+      "correct": "Doctrine prônant le libre jeu des forces économiques tout en acceptant une intervention limitée de l'État.",
+      "distractors": [
+        "État de se suffire à soi-même; consommation limitée à sa propre production.",
+        "Mouvement de défense des consommateurs; par extension, tendance à valoriser la consommation."
+      ]
+    },
+    {
+      "word": "Népotisme",
+      "correct": "Favoritisme familial pour les postes/pouvoirs.",
+      "distractors": [
+        "Défense exclusive des intérêts professionnels d'une catégorie déterminée de travailleurs.",
+        "Exclusion ou mise à l'écart d'une personne ou d'un groupe."
+      ]
+    },
+    {
+      "word": "Corporatisme",
+      "correct": "Défense exclusive des intérêts professionnels d'une catégorie déterminée de travailleurs.",
+      "distractors": [
+        "Favoritisme familial pour les postes/pouvoirs.",
+        "Exclusion ou mise à l'écart d'une personne ou d'un groupe."
+      ]
+    },
+    {
+      "word": "Ostracisme",
+      "correct": "Exclusion ou mise à l'écart d'une personne ou d'un groupe.",
+      "distractors": [
+        "Favoritisme familial pour les postes/pouvoirs.",
+        "Défense exclusive des intérêts professionnels d'une catégorie déterminée de travailleurs."
+      ]
+    },
+    {
+      "word": "Concession",
+      "correct": "Fait d'accorder quelque chose; en argumentation, fait d'admettre un point adverse pour renforcer sa position.",
+      "distractors": [
+        "Sommation, ordre.",
+        "Perte d'un droit pour action hors délai."
+      ]
+    },
+    {
+      "word": "Injonction",
+      "correct": "Sommation, ordre.",
+      "distractors": [
+        "Fait d'accorder quelque chose; en argumentation, fait d'admettre un point adverse pour renforcer sa position.",
+        "Perte d'un droit pour action hors délai."
+      ]
+    },
+    {
+      "word": "Forclusion",
+      "correct": "Perte d'un droit pour action hors délai.",
+      "distractors": [
+        "Fait d'accorder quelque chose; en argumentation, fait d'admettre un point adverse pour renforcer sa position.",
+        "Sommation, ordre."
+      ]
+    },
+    {
+      "word": "Diffamation",
+      "correct": "Allégation d'un fait qui est de nature à porter atteinte à l'honneur ou à la considération de quelqu'un.",
+      "distractors": [
+        "Faux serment; violation d'un serment.",
+        "Manœuvre frauduleuse destinée à tromper (en droit des contrats)."
+      ]
+    },
+    {
+      "word": "Parjure",
+      "correct": "Faux serment; violation d'un serment.",
+      "distractors": [
+        "Allégation d'un fait qui est de nature à porter atteinte à l'honneur ou à la considération de quelqu'un.",
+        "Manœuvre frauduleuse destinée à tromper (en droit des contrats)."
+      ]
+    },
+    {
+      "word": "Dol",
+      "correct": "Manœuvre frauduleuse destinée à tromper (en droit des contrats).",
+      "distractors": [
+        "Allégation d'un fait qui est de nature à porter atteinte à l'honneur ou à la considération de quelqu'un.",
+        "Faux serment; violation d'un serment."
+      ]
+    },
+    {
+      "word": "Déontologie",
+      "correct": "Ensemble de règles et de devoirs d'une profession.",
+      "distractors": [
+        "Honnêteté scrupuleuse.",
+        "Honneur, dignité, droit attaché à certaines fonctions."
+      ]
+    },
+    {
+      "word": "Probité",
+      "correct": "Honnêteté scrupuleuse.",
+      "distractors": [
+        "Ensemble de règles et de devoirs d'une profession.",
+        "Honneur, dignité, droit attaché à certaines fonctions."
+      ]
+    },
+    {
+      "word": "Prérogative",
+      "correct": "Honneur, dignité, droit attaché à certaines fonctions.",
+      "distractors": [
+        "Ensemble de règles et de devoirs d'une profession.",
+        "Honnêteté scrupuleuse."
+      ]
+    },
+    {
+      "word": "Récuser",
+      "correct": "Refuser d'accepter quelqu'un comme juge, arbitre, témoin.",
+      "distractors": [
+        "Destituer de sa fonction.",
+        "Prolonger la durée (mandat, délai…)."
+      ]
+    },
+    {
+      "word": "Révoquer",
+      "correct": "Destituer de sa fonction.",
+      "distractors": [
+        "Refuser d'accepter quelqu'un comme juge, arbitre, témoin.",
+        "Prolonger la durée (mandat, délai…)."
+      ]
+    },
+    {
+      "word": "Proroger",
+      "correct": "Prolonger la durée (mandat, délai…).",
+      "distractors": [
+        "Refuser d'accepter quelqu'un comme juge, arbitre, témoin.",
+        "Destituer de sa fonction."
+      ]
+    },
+    {
+      "word": "Entériner",
+      "correct": "Ratifier, valider officiellement.",
+      "distractors": [
+        "Prouver, confirmer.",
+        "Tracer les limites d'un espace; empêcher l'extension de quelque chose."
+      ]
+    },
+    {
+      "word": "Corroborer",
+      "correct": "Prouver, confirmer.",
+      "distractors": [
+        "Ratifier, valider officiellement.",
+        "Tracer les limites d'un espace; empêcher l'extension de quelque chose."
+      ]
+    },
+    {
+      "word": "Circonscrire",
+      "correct": "Tracer les limites d'un espace; empêcher l'extension de quelque chose.",
+      "distractors": [
+        "Ratifier, valider officiellement.",
+        "Prouver, confirmer."
+      ]
+    },
+    {
+      "word": "Déconfiture",
+      "correct": "Échec complet et peu glorieux.",
+      "distractors": [
+        "Suspension provisoire d'une obligation, d'une activité, d'une action en justice.",
+        "Gaspillage dû à une mauvaise gestion."
+      ]
+    },
+    {
+      "word": "Moratoire",
+      "correct": "Suspension provisoire d'une obligation, d'une activité, d'une action en justice.",
+      "distractors": [
+        "Échec complet et peu glorieux.",
+        "Gaspillage dû à une mauvaise gestion."
+      ]
+    },
+    {
+      "word": "Gabegie",
+      "correct": "Gaspillage dû à une mauvaise gestion.",
+      "distractors": [
+        "Échec complet et peu glorieux.",
+        "Suspension provisoire d'une obligation, d'une activité, d'une action en justice."
+      ]
+    },
+    {
+      "word": "Animisme",
+      "correct": "Croyance attribuant une âme aux êtres et aux choses.",
+      "distractors": [
+        "Croyance en l'avènement d'un messie, d'un monde idéal sur terre.",
+        "Fusion d'éléments issus de doctrines, religions ou cultures différentes."
+      ]
+    },
+    {
+      "word": "Messianisme",
+      "correct": "Croyance en l'avènement d'un messie, d'un monde idéal sur terre.",
+      "distractors": [
+        "Croyance attribuant une âme aux êtres et aux choses.",
+        "Fusion d'éléments issus de doctrines, religions ou cultures différentes."
+      ]
+    },
+    {
+      "word": "Syncrétisme",
+      "correct": "Fusion d'éléments issus de doctrines, religions ou cultures différentes.",
+      "distractors": [
+        "Croyance attribuant une âme aux êtres et aux choses.",
+        "Croyance en l'avènement d'un messie, d'un monde idéal sur terre."
+      ]
+    },
+    {
+      "word": "Animiste",
+      "correct": "Qui attribue une âme ou des esprits aux êtres et aux éléments de la nature.",
+      "distractors": [
+        "Qui estime que le divin est inconnaissable.",
+        "Étranger au sacré ou non initié à un domaine."
+      ]
+    },
+    {
+      "word": "Agnostique",
+      "correct": "Qui estime que le divin est inconnaissable.",
+      "distractors": [
+        "Qui attribue une âme ou des esprits aux êtres et aux éléments de la nature.",
+        "Étranger au sacré ou non initié à un domaine."
+      ]
+    },
+    {
+      "word": "Profane",
+      "correct": "Étranger au sacré ou non initié à un domaine.",
+      "distractors": [
+        "Qui attribue une âme ou des esprits aux êtres et aux éléments de la nature.",
+        "Qui estime que le divin est inconnaissable."
+      ]
+    },
+    {
+      "word": "Liturgique",
+      "correct": "Relatif aux rites et aux cérémonies du culte.",
+      "distractors": [
+        "Relatif aux moines; austère et retiré comme dans un monastère.",
+        "Relatif au soir, au couchant."
+      ]
+    },
+    {
+      "word": "Monacale",
+      "correct": "Relatif aux moines; austère et retiré comme dans un monastère.",
+      "distractors": [
+        "Relatif aux rites et aux cérémonies du culte.",
+        "Relatif au soir, au couchant."
+      ]
+    },
+    {
+      "word": "Vespéral",
+      "correct": "Relatif au soir, au couchant.",
+      "distractors": [
+        "Relatif aux rites et aux cérémonies du culte.",
+        "Relatif aux moines; austère et retiré comme dans un monastère."
+      ]
+    },
+    {
+      "word": "Ablution",
+      "correct": "Lavage rituel ou purification par l'eau.",
+      "distractors": [
+        "Offrande rituelle d'un liquide; boisson abondante.",
+        "Action d'ensevelir un mort; lieu où repose son corps."
+      ]
+    },
+    {
+      "word": "Libation",
+      "correct": "Offrande rituelle d'un liquide; boisson abondante.",
+      "distractors": [
+        "Lavage rituel ou purification par l'eau.",
+        "Action d'ensevelir un mort; lieu où repose son corps."
+      ]
+    },
+    {
+      "word": "Sépulture",
+      "correct": "Action d'ensevelir un mort; lieu où repose son corps.",
+      "distractors": [
+        "Lavage rituel ou purification par l'eau.",
+        "Offrande rituelle d'un liquide; boisson abondante."
+      ]
+    },
+    {
+      "word": "Bréviaire",
+      "correct": "Livre de prières ou ouvrage consulté comme référence constante.",
+      "distractors": [
+        "Assemblée d'ecclésiastiques.",
+        "Fonction sacerdotale; au figuré, activité exigeant un grand dévouement."
+      ]
+    },
+    {
+      "word": "Synode",
+      "correct": "Assemblée d'ecclésiastiques.",
+      "distractors": [
+        "Livre de prières ou ouvrage consulté comme référence constante.",
+        "Fonction sacerdotale; au figuré, activité exigeant un grand dévouement."
+      ]
+    },
+    {
+      "word": "Sacerdoce",
+      "correct": "Fonction sacerdotale; au figuré, activité exigeant un grand dévouement.",
+      "distractors": [
+        "Livre de prières ou ouvrage consulté comme référence constante.",
+        "Assemblée d'ecclésiastiques."
+      ]
+    },
+    {
+      "word": "Ascèse",
+      "correct": "Discipline de vie visant à la perfection spirituelle, qui s'impose des privations.",
+      "distractors": [
+        "Explication critique d'un texte sacré.",
+        "Blâme solennel ou rejet violent."
+      ]
+    },
+    {
+      "word": "Exégèse",
+      "correct": "Explication critique d'un texte sacré.",
+      "distractors": [
+        "Discipline de vie visant à la perfection spirituelle, qui s'impose des privations.",
+        "Blâme solennel ou rejet violent."
+      ]
+    },
+    {
+      "word": "Anathème",
+      "correct": "Blâme solennel ou rejet violent.",
+      "distractors": [
+        "Discipline de vie visant à la perfection spirituelle, qui s'impose des privations.",
+        "Explication critique d'un texte sacré."
+      ]
+    },
+    {
+      "word": "Abjurer",
+      "correct": "Renoncer solennellement à une religion, une opinion.",
+      "distractors": [
+        "Sacrifier une victime; tuer par sacrifice.",
+        "Intervenir en faveur de quelqu'un."
+      ]
+    },
+    {
+      "word": "Immoler",
+      "correct": "Sacrifier une victime; tuer par sacrifice.",
+      "distractors": [
+        "Renoncer solennellement à une religion, une opinion.",
+        "Intervenir en faveur de quelqu'un."
+      ]
+    },
+    {
+      "word": "Intercéder",
+      "correct": "Intervenir en faveur de quelqu'un.",
+      "distractors": [
+        "Renoncer solennellement à une religion, une opinion.",
+        "Sacrifier une victime; tuer par sacrifice."
+      ]
+    },
+    {
+      "word": "Anachorète",
+      "correct": "Religieux ou ermite qui mène une vie solitaire, retirée du monde.",
+      "distractors": [
+        "Louangeur excessif et servile.",
+        "Personne qui fait des sophismes; maître de rhétorique et de philosophie qui enseigne l'art de parler en public."
+      ]
+    },
+    {
+      "word": "Thuriféraire",
+      "correct": "Louangeur excessif et servile.",
+      "distractors": [
+        "Religieux ou ermite qui mène une vie solitaire, retirée du monde.",
+        "Personne qui fait des sophismes; maître de rhétorique et de philosophie qui enseigne l'art de parler en public."
+      ]
+    },
+    {
+      "word": "Sophiste",
+      "correct": "Personne qui fait des sophismes; maître de rhétorique et de philosophie qui enseigne l'art de parler en public.",
+      "distractors": [
+        "Religieux ou ermite qui mène une vie solitaire, retirée du monde.",
+        "Louangeur excessif et servile."
+      ]
+    },
+    {
+      "word": "Ataraxie",
+      "correct": "Tranquillité de l'âme, notamment chez les épicuriens et les stoïciens.",
+      "distractors": [
+        "Doctrine ou attitude qui fait du plaisir un bien essentiel, voire le but principal de la vie.",
+        "Doctrine selon laquelle rien n'existe hors du moi."
+      ]
+    },
+    {
+      "word": "Hédonisme",
+      "correct": "Doctrine ou attitude qui fait du plaisir un bien essentiel, voire le but principal de la vie.",
+      "distractors": [
+        "Tranquillité de l'âme, notamment chez les épicuriens et les stoïciens.",
+        "Doctrine selon laquelle rien n'existe hors du moi."
+      ]
+    },
+    {
+      "word": "Solipsisme",
+      "correct": "Doctrine selon laquelle rien n'existe hors du moi.",
+      "distractors": [
+        "Tranquillité de l'âme, notamment chez les épicuriens et les stoïciens.",
+        "Doctrine ou attitude qui fait du plaisir un bien essentiel, voire le but principal de la vie."
+      ]
+    },
+    {
+      "word": "Épistémologie",
+      "correct": "Étude critique des sciences, de leurs méthodes, de leur valeur et de leur portée.",
+      "distractors": [
+        "Théorie des valeurs (morales, esthétiques, etc.).",
+        "Étude de l'être; en informatique, vocabulaire formalisé d'un domaine."
+      ]
+    },
+    {
+      "word": "Axiologie",
+      "correct": "Théorie des valeurs (morales, esthétiques, etc.).",
+      "distractors": [
+        "Étude critique des sciences, de leurs méthodes, de leur valeur et de leur portée.",
+        "Étude de l'être; en informatique, vocabulaire formalisé d'un domaine."
+      ]
+    },
+    {
+      "word": "Ontologie",
+      "correct": "Étude de l'être; en informatique, vocabulaire formalisé d'un domaine.",
+      "distractors": [
+        "Étude critique des sciences, de leurs méthodes, de leur valeur et de leur portée.",
+        "Théorie des valeurs (morales, esthétiques, etc.)."
+      ]
+    },
+    {
+      "word": "Intellection",
+      "correct": "Acte de comprendre; activité de l'intelligence.",
+      "distractors": [
+        "Observation intérieure des états de conscience.",
+        "Fait de faire une découverte par hasard."
+      ]
+    },
+    {
+      "word": "Introspection",
+      "correct": "Observation intérieure des états de conscience.",
+      "distractors": [
+        "Acte de comprendre; activité de l'intelligence.",
+        "Fait de faire une découverte par hasard."
+      ]
+    },
+    {
+      "word": "Sérendipité",
+      "correct": "Fait de faire une découverte par hasard.",
+      "distractors": [
+        "Acte de comprendre; activité de l'intelligence.",
+        "Observation intérieure des états de conscience."
+      ]
+    },
+    {
+      "word": "Dimorphisme",
+      "correct": "Existence de deux formes distinctes.",
+      "distractors": [
+        "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels.",
+        "Diminution du volume ou du poids d'un organe ou d'un membre."
+      ]
+    },
+    {
+      "word": "Atavisme",
+      "correct": "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels.",
+      "distractors": [
+        "Existence de deux formes distinctes.",
+        "Diminution du volume ou du poids d'un organe ou d'un membre."
+      ]
+    },
+    {
+      "word": "Atrophie",
+      "correct": "Diminution du volume ou du poids d'un organe ou d'un membre.",
+      "distractors": [
+        "Existence de deux formes distinctes.",
+        "Réapparition d'un caractère ancestral; héritage de traits physiques, psychologiques ou culturels."
+      ]
+    },
+    {
+      "word": "Dopamine",
+      "correct": "Neurotransmetteur impliqué dans motivation, plaisir et mouvement.",
+      "distractors": [
+        "Épuisement par manque de nourriture.",
+        "Syndrome psychomoteur marqué par l'inertie, le mutisme, la rigidité ou parfois l'agitation."
+      ]
+    },
+    {
+      "word": "Inanition",
+      "correct": "Épuisement par manque de nourriture.",
+      "distractors": [
+        "Neurotransmetteur impliqué dans motivation, plaisir et mouvement.",
+        "Syndrome psychomoteur marqué par l'inertie, le mutisme, la rigidité ou parfois l'agitation."
+      ]
+    },
+    {
+      "word": "Catatonie",
+      "correct": "Syndrome psychomoteur marqué par l'inertie, le mutisme, la rigidité ou parfois l'agitation.",
+      "distractors": [
+        "Neurotransmetteur impliqué dans motivation, plaisir et mouvement.",
+        "Épuisement par manque de nourriture."
+      ]
+    },
+    {
+      "word": "Escadron",
+      "correct": "Unité militaire, notamment de cavalerie ou de gendarmerie.",
+      "distractors": [
+        "Officier de l'armée romaine placé à la tête d'une centurie.",
+        "Soldat rémunéré ou personne guidée par l'intérêt."
+      ]
+    },
+    {
+      "word": "Centurion",
+      "correct": "Officier de l'armée romaine placé à la tête d'une centurie.",
+      "distractors": [
+        "Unité militaire, notamment de cavalerie ou de gendarmerie.",
+        "Soldat rémunéré ou personne guidée par l'intérêt."
+      ]
+    },
+    {
+      "word": "Mercenaire",
+      "correct": "Soldat rémunéré ou personne guidée par l'intérêt.",
+      "distractors": [
+        "Unité militaire, notamment de cavalerie ou de gendarmerie.",
+        "Officier de l'armée romaine placé à la tête d'une centurie."
+      ]
+    },
+    {
+      "word": "Reddition",
+      "correct": "Acte par lequel une troupe/forteresse met bas les armes et se rend.",
+      "distractors": [
+        "Combat à coups de poings.",
+        "Morcellement politique d'un pays en unités autonomes."
+      ]
+    },
+    {
+      "word": "Pugilat",
+      "correct": "Combat à coups de poings.",
+      "distractors": [
+        "Acte par lequel une troupe/forteresse met bas les armes et se rend.",
+        "Morcellement politique d'un pays en unités autonomes."
+      ]
+    },
+    {
+      "word": "Balkanisation",
+      "correct": "Morcellement politique d'un pays en unités autonomes.",
+      "distractors": [
+        "Acte par lequel une troupe/forteresse met bas les armes et se rend.",
+        "Combat à coups de poings."
+      ]
+    },
+    {
+      "word": "Courroux",
+      "correct": "Vive colère, emportement.",
+      "distractors": [
+        "Joie très vive, souvent manifeste.",
+        "Trouble, agitation affective."
+      ]
+    },
+    {
+      "word": "Allégresse",
+      "correct": "Joie très vive, souvent manifeste.",
+      "distractors": [
+        "Vive colère, emportement.",
+        "Trouble, agitation affective."
+      ]
+    },
+    {
+      "word": "Émoi",
+      "correct": "Trouble, agitation affective.",
+      "distractors": [
+        "Vive colère, emportement.",
+        "Joie très vive, souvent manifeste."
+      ]
+    },
+    {
+      "word": "Exulter",
+      "correct": "Être transporté d'une joie extrême, difficile à contenir ou à dissimuler.",
+      "distractors": [
+        "Prendre un air fier et satisfait.",
+        "Rendre sa sérénité."
+      ]
+    },
+    {
+      "word": "Se rengorger",
+      "correct": "Prendre un air fier et satisfait.",
+      "distractors": [
+        "Être transporté d'une joie extrême, difficile à contenir ou à dissimuler.",
+        "Rendre sa sérénité."
+      ]
+    },
+    {
+      "word": "Rasséréner",
+      "correct": "Rendre sa sérénité.",
+      "distractors": [
+        "Être transporté d'une joie extrême, difficile à contenir ou à dissimuler.",
+        "Prendre un air fier et satisfait."
+      ]
+    },
+    {
+      "word": "Aiguillonner",
+      "correct": "Stimuler vivement, pousser à agir.",
+      "distractors": [
+        "Retenir, empêcher de se manifester.",
+        "Égarer quelqu'un ou le conduire dans l'erreur."
+      ]
+    },
+    {
+      "word": "Réfréner",
+      "correct": "Retenir, empêcher de se manifester.",
+      "distractors": [
+        "Stimuler vivement, pousser à agir.",
+        "Égarer quelqu'un ou le conduire dans l'erreur."
+      ]
+    },
+    {
+      "word": "Fourvoyer",
+      "correct": "Égarer quelqu'un ou le conduire dans l'erreur.",
+      "distractors": [
+        "Stimuler vivement, pousser à agir.",
+        "Retenir, empêcher de se manifester."
+      ]
+    },
+    {
+      "word": "Bâfrer",
+      "correct": "Manger avidement et avec excès.",
+      "distractors": [
+        "Se promener en flânant.",
+        "Dire en s'exprimant fortement ou avec emphase."
+      ]
+    },
+    {
+      "word": "Baguenauder",
+      "correct": "Se promener en flânant.",
+      "distractors": [
+        "Manger avidement et avec excès.",
+        "Dire en s'exprimant fortement ou avec emphase."
+      ]
+    },
+    {
+      "word": "Déclamer",
+      "correct": "Dire en s'exprimant fortement ou avec emphase.",
+      "distractors": [
+        "Manger avidement et avec excès.",
+        "Se promener en flânant."
+      ]
+    },
+    {
+      "word": "Sustenter",
+      "correct": "Soutenir quelqu'un en le nourrissant; fournir à quelqu'un ce qui peut nourrir son esprit.",
+      "distractors": [
+        "Rejeter par la bouche ce qui vient des voies respiratoires.",
+        "Suinter; s'écouler goutte à goutte."
+      ]
+    },
+    {
+      "word": "Expectorer",
+      "correct": "Rejeter par la bouche ce qui vient des voies respiratoires.",
+      "distractors": [
+        "Soutenir quelqu'un en le nourrissant; fournir à quelqu'un ce qui peut nourrir son esprit.",
+        "Suinter; s'écouler goutte à goutte."
+      ]
+    },
+    {
+      "word": "Exsuder",
+      "correct": "Suinter; s'écouler goutte à goutte.",
+      "distractors": [
+        "Soutenir quelqu'un en le nourrissant; fournir à quelqu'un ce qui peut nourrir son esprit.",
+        "Rejeter par la bouche ce qui vient des voies respiratoires."
+      ]
+    },
+    {
+      "word": "Abraser",
+      "correct": "User ou polir par frottement.",
+      "distractors": [
+        "Retirer ce qui est enfoui, déterrer.",
+        "Ensevelir, enterrer."
+      ]
+    },
+    {
+      "word": "Exhumer",
+      "correct": "Retirer ce qui est enfoui, déterrer.",
+      "distractors": [
+        "User ou polir par frottement.",
+        "Ensevelir, enterrer."
+      ]
+    },
+    {
+      "word": "Inhumer",
+      "correct": "Ensevelir, enterrer.",
+      "distractors": [
+        "User ou polir par frottement.",
+        "Retirer ce qui est enfoui, déterrer."
+      ]
+    },
+    {
+      "word": "Admonester",
+      "correct": "Réprimander sévèrement.",
+      "distractors": [
+        "Pardonner ou déclarer non coupable.",
+        "Attribuer par décision (justice, adjudication); accorder."
+      ]
+    },
+    {
+      "word": "Absoudre",
+      "correct": "Pardonner ou déclarer non coupable.",
+      "distractors": [
+        "Réprimander sévèrement.",
+        "Attribuer par décision (justice, adjudication); accorder."
+      ]
+    },
+    {
+      "word": "Adjuger",
+      "correct": "Attribuer par décision (justice, adjudication); accorder.",
+      "distractors": [
+        "Réprimander sévèrement.",
+        "Pardonner ou déclarer non coupable."
+      ]
+    },
+    {
+      "word": "Enjoliver",
+      "correct": "Rendre plus joli.",
+      "distractors": [
+        "Critiquer avec virulence; stigmatiser l'attitude ou le travail de quelqu'un.",
+        "Percer un navire pour le faire couler; détruire volontairement quelque chose."
+      ]
+    },
+    {
+      "word": "Fustiger",
+      "correct": "Critiquer avec virulence; stigmatiser l'attitude ou le travail de quelqu'un.",
+      "distractors": [
+        "Rendre plus joli.",
+        "Percer un navire pour le faire couler; détruire volontairement quelque chose."
+      ]
+    },
+    {
+      "word": "Saborder",
+      "correct": "Percer un navire pour le faire couler; détruire volontairement quelque chose.",
+      "distractors": [
+        "Rendre plus joli.",
+        "Critiquer avec virulence; stigmatiser l'attitude ou le travail de quelqu'un."
+      ]
+    },
+    {
+      "word": "Louvoyer",
+      "correct": "Avancer indirectement pour éviter l'obstacle.",
+      "distractors": [
+        "Porter un coup avec force; lancer une parole de manière brutale.",
+        "Introduire goutte à goutte ou progressivement."
+      ]
+    },
+    {
+      "word": "Asséner",
+      "correct": "Porter un coup avec force; lancer une parole de manière brutale.",
+      "distractors": [
+        "Avancer indirectement pour éviter l'obstacle.",
+        "Introduire goutte à goutte ou progressivement."
+      ]
+    },
+    {
+      "word": "Instiller",
+      "correct": "Introduire goutte à goutte ou progressivement.",
+      "distractors": [
+        "Avancer indirectement pour éviter l'obstacle.",
+        "Porter un coup avec force; lancer une parole de manière brutale."
+      ]
+    },
+    {
+      "word": "Subodorer",
+      "correct": "Deviner, pressentir par intuition quelque chose de caché ou de latent.",
+      "distractors": [
+        "Évaluer une quantité, une valeur de façon approximative.",
+        "Esquiver habilement, se soustraire."
+      ]
+    },
+    {
+      "word": "Supputer",
+      "correct": "Évaluer une quantité, une valeur de façon approximative.",
+      "distractors": [
+        "Deviner, pressentir par intuition quelque chose de caché ou de latent.",
+        "Esquiver habilement, se soustraire."
+      ]
+    },
+    {
+      "word": "Éluder",
+      "correct": "Esquiver habilement, se soustraire.",
+      "distractors": [
+        "Deviner, pressentir par intuition quelque chose de caché ou de latent.",
+        "Évaluer une quantité, une valeur de façon approximative."
+      ]
+    },
+    {
+      "word": "Se rebiffer",
+      "correct": "Résister vivement, se révolter.",
+      "distractors": [
+        "Prendre des manières affectées pour plaire.",
+        "S'évanouir ou manifester une admiration excessive."
+      ]
+    },
+    {
+      "word": "Minauder",
+      "correct": "Prendre des manières affectées pour plaire.",
+      "distractors": [
+        "Résister vivement, se révolter.",
+        "S'évanouir ou manifester une admiration excessive."
+      ]
+    },
+    {
+      "word": "Se pâmer",
+      "correct": "S'évanouir ou manifester une admiration excessive.",
+      "distractors": [
+        "Résister vivement, se révolter.",
+        "Prendre des manières affectées pour plaire."
+      ]
+    },
+    {
+      "word": "Opiner",
+      "correct": "Exprimer son avis; acquiescer, notamment par un signe de tête.",
+      "distractors": [
+        "Dire du mal de quelqu'un.",
+        "Parler ou crier d'une voix tonnante."
+      ]
+    },
+    {
+      "word": "Médire",
+      "correct": "Dire du mal de quelqu'un.",
+      "distractors": [
+        "Exprimer son avis; acquiescer, notamment par un signe de tête.",
+        "Parler ou crier d'une voix tonnante."
+      ]
+    },
+    {
+      "word": "Tonitruer",
+      "correct": "Parler ou crier d'une voix tonnante.",
+      "distractors": [
+        "Exprimer son avis; acquiescer, notamment par un signe de tête.",
+        "Dire du mal de quelqu'un."
+      ]
+    },
+    {
+      "word": "Séditieux",
+      "correct": "Qui incite à se révolter; qui est provocant.",
+      "distractors": [
+        "Qui manifeste une politesse excessive et servile pour s'attirer les bonnes grâces de quelqu'un.",
+        "Relatif à un groupe; qui reproduit les comportements de la foule."
+      ]
+    },
+    {
+      "word": "Obséquieux",
+      "correct": "Qui manifeste une politesse excessive et servile pour s'attirer les bonnes grâces de quelqu'un.",
+      "distractors": [
+        "Qui incite à se révolter; qui est provocant.",
+        "Relatif à un groupe; qui reproduit les comportements de la foule."
+      ]
+    },
+    {
+      "word": "Grégaire",
+      "correct": "Relatif à un groupe; qui reproduit les comportements de la foule.",
+      "distractors": [
+        "Qui incite à se révolter; qui est provocant.",
+        "Qui manifeste une politesse excessive et servile pour s'attirer les bonnes grâces de quelqu'un."
+      ]
+    },
+    {
+      "word": "Malingre",
+      "correct": "Faible, maigre et d'apparence maladive.",
+      "distractors": [
+        "Robuste, trapu et solidement charpenté.",
+        "Qui a l'air effaré, hébété."
+      ]
+    },
+    {
+      "word": "Râblée",
+      "correct": "Robuste, trapu et solidement charpenté.",
+      "distractors": [
+        "Faible, maigre et d'apparence maladive.",
+        "Qui a l'air effaré, hébété."
+      ]
+    },
+    {
+      "word": "Hagard",
+      "correct": "Qui a l'air effaré, hébété.",
+      "distractors": [
+        "Faible, maigre et d'apparence maladive.",
+        "Robuste, trapu et solidement charpenté."
+      ]
+    },
+    {
+      "word": "Fugace",
+      "correct": "Qui ne dure pas, disparaît, échappe facilement.",
+      "distractors": [
+        "Qui arrive par hasard, de manière imprévue.",
+        "Qui n'est pas sujet à changement."
+      ]
+    },
+    {
+      "word": "Fortuit",
+      "correct": "Qui arrive par hasard, de manière imprévue.",
+      "distractors": [
+        "Qui ne dure pas, disparaît, échappe facilement.",
+        "Qui n'est pas sujet à changement."
+      ]
+    },
+    {
+      "word": "Immuable",
+      "correct": "Qui n'est pas sujet à changement.",
+      "distractors": [
+        "Qui ne dure pas, disparaît, échappe facilement.",
+        "Qui arrive par hasard, de manière imprévue."
+      ]
+    },
+    {
+      "word": "Erratique",
+      "correct": "Irrégulier, imprévisible, sans trajectoire stable.",
+      "distractors": [
+        "Qui se produit de façon irrégulière, çà et là.",
+        "Qui dure depuis des siècles; ou qui se produit une fois par siècle."
+      ]
+    },
+    {
+      "word": "Sporadique",
+      "correct": "Qui se produit de façon irrégulière, çà et là.",
+      "distractors": [
+        "Irrégulier, imprévisible, sans trajectoire stable.",
+        "Qui dure depuis des siècles; ou qui se produit une fois par siècle."
+      ]
+    },
+    {
+      "word": "Séculaire",
+      "correct": "Qui dure depuis des siècles; ou qui se produit une fois par siècle.",
+      "distractors": [
+        "Irrégulier, imprévisible, sans trajectoire stable.",
+        "Qui se produit de façon irrégulière, çà et là."
+      ]
+    },
+    {
+      "word": "Endogène",
+      "correct": "Produit de l'intérieur d'un système.",
+      "distractors": [
+        "Qui provient du dehors, de l'extérieur.",
+        "Qui existe de manière diffuse sans s'exprimer mais qui peut à tout moment se manifester."
+      ]
+    },
+    {
+      "word": "Exogène",
+      "correct": "Qui provient du dehors, de l'extérieur.",
+      "distractors": [
+        "Produit de l'intérieur d'un système.",
+        "Qui existe de manière diffuse sans s'exprimer mais qui peut à tout moment se manifester."
+      ]
+    },
+    {
+      "word": "Latent",
+      "correct": "Qui existe de manière diffuse sans s'exprimer mais qui peut à tout moment se manifester.",
+      "distractors": [
+        "Produit de l'intérieur d'un système.",
+        "Qui provient du dehors, de l'extérieur."
+      ]
+    },
+    {
+      "word": "Septentrional",
+      "correct": "Du nord, situé au nord; contraire de méridional.",
+      "distractors": [
+        "Du sud, situé au sud; s'oppose à septentrional.",
+        "Relatif aux lacs; qui vit ou se situe dans les lacs ou sur leurs bords."
+      ]
+    },
+    {
+      "word": "Méridional",
+      "correct": "Du sud, situé au sud; s'oppose à septentrional.",
+      "distractors": [
+        "Du nord, situé au nord; contraire de méridional.",
+        "Relatif aux lacs; qui vit ou se situe dans les lacs ou sur leurs bords."
+      ]
+    },
+    {
+      "word": "Lacustre",
+      "correct": "Relatif aux lacs; qui vit ou se situe dans les lacs ou sur leurs bords.",
+      "distractors": [
+        "Du nord, situé au nord; contraire de méridional.",
+        "Du sud, situé au sud; s'oppose à septentrional."
+      ]
+    },
+    {
+      "word": "Onéreux",
+      "correct": "Qui entraîne des frais importants.",
+      "distractors": [
+        "Qui a trait à l'argent.",
+        "Animé par le seul appât du gain, du profit; relatif au commerce."
+      ]
+    },
+    {
+      "word": "Pécuniaire",
+      "correct": "Qui a trait à l'argent.",
+      "distractors": [
+        "Qui entraîne des frais importants.",
+        "Animé par le seul appât du gain, du profit; relatif au commerce."
+      ]
+    },
+    {
+      "word": "Mercantile",
+      "correct": "Animé par le seul appât du gain, du profit; relatif au commerce.",
+      "distractors": [
+        "Qui entraîne des frais importants.",
+        "Qui a trait à l'argent."
+      ]
+    },
+    {
+      "word": "Laconique",
+      "correct": "Qui s'exprime en peu de mots.",
+      "distractors": [
+        "Qui parle avec aisance et abondance.",
+        "Sous-entendu, non exprimé explicitement."
+      ]
+    },
+    {
+      "word": "Volubile",
+      "correct": "Qui parle avec aisance et abondance.",
+      "distractors": [
+        "Qui s'exprime en peu de mots.",
+        "Sous-entendu, non exprimé explicitement."
+      ]
+    },
+    {
+      "word": "Tacite",
+      "correct": "Sous-entendu, non exprimé explicitement.",
+      "distractors": [
+        "Qui s'exprime en peu de mots.",
+        "Qui parle avec aisance et abondance."
+      ]
+    },
+    {
+      "word": "Présomptueux",
+      "correct": "Qui a une opinion trop avantageuse de lui-même ou de ses capacités.",
+      "distractors": [
+        "Prudent, réfléchi, attentif aux conséquences.",
+        "Craintif, hésitant, qui manque d'audace."
+      ]
+    },
+    {
+      "word": "Circonspect",
+      "correct": "Prudent, réfléchi, attentif aux conséquences.",
+      "distractors": [
+        "Qui a une opinion trop avantageuse de lui-même ou de ses capacités.",
+        "Craintif, hésitant, qui manque d'audace."
+      ]
+    },
+    {
+      "word": "Timoré",
+      "correct": "Craintif, hésitant, qui manque d'audace.",
+      "distractors": [
+        "Qui a une opinion trop avantageuse de lui-même ou de ses capacités.",
+        "Prudent, réfléchi, attentif aux conséquences."
+      ]
+    },
+    {
+      "word": "Affable",
+      "correct": "Aimable et facile d'abord.",
+      "distractors": [
+        "Qui s'emporte, s'irrite facilement.",
+        "Borné, peu ouvert ou peu subtil."
+      ]
+    },
+    {
+      "word": "Irascible",
+      "correct": "Qui s'emporte, s'irrite facilement.",
+      "distractors": [
+        "Aimable et facile d'abord.",
+        "Borné, peu ouvert ou peu subtil."
+      ]
+    },
+    {
+      "word": "Obtus",
+      "correct": "Borné, peu ouvert ou peu subtil.",
+      "distractors": [
+        "Aimable et facile d'abord.",
+        "Qui s'emporte, s'irrite facilement."
+      ]
+    },
+    {
+      "word": "Magnanime",
+      "correct": "Généreux dans le pardon ou la victoire.",
+      "distractors": [
+        "Qui aime à se venger; rancunier.",
+        "Lâche, peureux devant le danger."
+      ]
+    },
+    {
+      "word": "Vindicatif",
+      "correct": "Qui aime à se venger; rancunier.",
+      "distractors": [
+        "Généreux dans le pardon ou la victoire.",
+        "Lâche, peureux devant le danger."
+      ]
+    },
+    {
+      "word": "Couard",
+      "correct": "Lâche, peureux devant le danger.",
+      "distractors": [
+        "Généreux dans le pardon ou la victoire.",
+        "Qui aime à se venger; rancunier."
+      ]
+    },
+    {
+      "word": "Indolent",
+      "correct": "Mou, nonchalant, peu enclin à l'effort.",
+      "distractors": [
+        "Combatif, tenace.",
+        "Qui manifeste une liberté trop familière ou un manque de sérieux."
+      ]
+    },
+    {
+      "word": "Pugnace",
+      "correct": "Combatif, tenace.",
+      "distractors": [
+        "Mou, nonchalant, peu enclin à l'effort.",
+        "Qui manifeste une liberté trop familière ou un manque de sérieux."
+      ]
+    },
+    {
+      "word": "Désinvolte",
+      "correct": "Qui manifeste une liberté trop familière ou un manque de sérieux.",
+      "distractors": [
+        "Mou, nonchalant, peu enclin à l'effort.",
+        "Combatif, tenace."
+      ]
+    },
+    {
+      "word": "Placide",
+      "correct": "Qui est doux et calme.",
+      "distractors": [
+        "Dont l'impulsion est violente et rapide.",
+        "D'humeur sombre, chagrin."
+      ]
+    },
+    {
+      "word": "Impétueux",
+      "correct": "Dont l'impulsion est violente et rapide.",
+      "distractors": [
+        "Qui est doux et calme.",
+        "D'humeur sombre, chagrin."
+      ]
+    },
+    {
+      "word": "Morose",
+      "correct": "D'humeur sombre, chagrin.",
+      "distractors": [
+        "Qui est doux et calme.",
+        "Dont l'impulsion est violente et rapide."
+      ]
+    },
+    {
+      "word": "Bucolique",
+      "correct": "Qui évoque une campagne paisible et idéalisée.",
+      "distractors": [
+        "Grandiose et terrifiant.",
+        "Relatif au rêve."
+      ]
+    },
+    {
+      "word": "Dantesque",
+      "correct": "Grandiose et terrifiant.",
+      "distractors": [
+        "Qui évoque une campagne paisible et idéalisée.",
+        "Relatif au rêve."
+      ]
+    },
+    {
+      "word": "Onirique",
+      "correct": "Relatif au rêve.",
+      "distractors": [
+        "Qui évoque une campagne paisible et idéalisée.",
+        "Grandiose et terrifiant."
+      ]
+    },
+    {
+      "word": "Apodictique",
+      "correct": "Présenté comme nécessaire et indubitable.",
+      "distractors": [
+        "Fondé sur l'expérience ou l'observation.",
+        "Qui contient une allusion, qui procède par allusion."
+      ]
+    },
+    {
+      "word": "Empirique",
+      "correct": "Fondé sur l'expérience ou l'observation.",
+      "distractors": [
+        "Présenté comme nécessaire et indubitable.",
+        "Qui contient une allusion, qui procède par allusion."
+      ]
+    },
+    {
+      "word": "Allusif",
+      "correct": "Qui contient une allusion, qui procède par allusion.",
+      "distractors": [
+        "Présenté comme nécessaire et indubitable.",
+        "Fondé sur l'expérience ou l'observation."
+      ]
+    },
+    {
+      "word": "Univoque",
+      "correct": "Qui n'a qu'un seul sens possible, sans ambiguïté.",
+      "distractors": [
+        "Qui comporte des manques.",
+        "Très difficile à comprendre."
+      ]
+    },
+    {
+      "word": "Lacunaire",
+      "correct": "Qui comporte des manques.",
+      "distractors": [
+        "Qui n'a qu'un seul sens possible, sans ambiguïté.",
+        "Très difficile à comprendre."
+      ]
+    },
+    {
+      "word": "Abscons",
+      "correct": "Très difficile à comprendre.",
+      "distractors": [
+        "Qui n'a qu'un seul sens possible, sans ambiguïté.",
+        "Qui comporte des manques."
+      ]
+    },
+    {
+      "word": "Adipeux",
+      "correct": "Relatif à la graisse.",
+      "distractors": [
+        "Qui rougit ou tire vers le rouge.",
+        "Qui boite."
+      ]
+    },
+    {
+      "word": "Rubescent",
+      "correct": "Qui rougit ou tire vers le rouge.",
+      "distractors": [
+        "Relatif à la graisse.",
+        "Qui boite."
+      ]
+    },
+    {
+      "word": "Claudicant",
+      "correct": "Qui boite.",
+      "distractors": [
+        "Relatif à la graisse.",
+        "Qui rougit ou tire vers le rouge."
+      ]
+    },
+    {
+      "word": "Gibbeuse",
+      "correct": "Qui présente une forme bombée, surtout pour la Lune.",
+      "distractors": [
+        "Très étroit, restreint.",
+        "Qui s'emboîte dans des éléments semblables plus grands ou plus petits."
+      ]
+    },
+    {
+      "word": "Exigu",
+      "correct": "Très étroit, restreint.",
+      "distractors": [
+        "Qui présente une forme bombée, surtout pour la Lune.",
+        "Qui s'emboîte dans des éléments semblables plus grands ou plus petits."
+      ]
+    },
+    {
+      "word": "Gigogne",
+      "correct": "Qui s'emboîte dans des éléments semblables plus grands ou plus petits.",
+      "distractors": [
+        "Qui présente une forme bombée, surtout pour la Lune.",
+        "Très étroit, restreint."
+      ]
+    },
+    {
+      "word": "Idoine",
+      "correct": "Parfaitement approprié.",
+      "distractors": [
+        "Qui n'est pas attendu dans une circonstance donnée; qui ne se comporte pas comme il devrait.",
+        "Qui constitue un obstacle décisif, éliminatoire."
+      ]
+    },
+    {
+      "word": "Incongru",
+      "correct": "Qui n'est pas attendu dans une circonstance donnée; qui ne se comporte pas comme il devrait.",
+      "distractors": [
+        "Parfaitement approprié.",
+        "Qui constitue un obstacle décisif, éliminatoire."
+      ]
+    },
+    {
+      "word": "Rédhibitoire",
+      "correct": "Qui constitue un obstacle décisif, éliminatoire.",
+      "distractors": [
+        "Parfaitement approprié.",
+        "Qui n'est pas attendu dans une circonstance donnée; qui ne se comporte pas comme il devrait."
+      ]
+    },
+    {
+      "word": "Déférence",
+      "correct": "Respect marqué envers quelqu'un.",
+      "distractors": [
+        "Bienveillance mêlée de mépris; air hautain, arrogant.",
+        "Répulsion vive et durable."
+      ]
+    },
+    {
+      "word": "Condescendance",
+      "correct": "Bienveillance mêlée de mépris; air hautain, arrogant.",
+      "distractors": [
+        "Respect marqué envers quelqu'un.",
+        "Répulsion vive et durable."
+      ]
+    },
+    {
+      "word": "Aversion",
+      "correct": "Répulsion vive et durable.",
+      "distractors": [
+        "Respect marqué envers quelqu'un.",
+        "Bienveillance mêlée de mépris; air hautain, arrogant."
+      ]
+    },
+    {
+      "word": "Abnégation",
+      "correct": "Renoncement volontaire à son intérêt personnel.",
+      "distractors": [
+        "Satisfaction de soi-même qui s'étale d'une manière insolente, déplacée ou ridicule.",
+        "Désir des biens et plaisirs terrestres; désir sexuel."
+      ]
+    },
+    {
+      "word": "Fatuité",
+      "correct": "Satisfaction de soi-même qui s'étale d'une manière insolente, déplacée ou ridicule.",
+      "distractors": [
+        "Renoncement volontaire à son intérêt personnel.",
+        "Désir des biens et plaisirs terrestres; désir sexuel."
+      ]
+    },
+    {
+      "word": "Concupiscence",
+      "correct": "Désir des biens et plaisirs terrestres; désir sexuel.",
+      "distractors": [
+        "Renoncement volontaire à son intérêt personnel.",
+        "Satisfaction de soi-même qui s'étale d'une manière insolente, déplacée ou ridicule."
+      ]
+    },
+    {
+      "word": "Sollicitude",
+      "correct": "Attention affectueuse, soin attentif.",
+      "distractors": [
+        "Sentiment d'hostilité à l'égard de quelqu'un.",
+        "Sincérité candide; simplicité naïve."
+      ]
+    },
+    {
+      "word": "Animosité",
+      "correct": "Sentiment d'hostilité à l'égard de quelqu'un.",
+      "distractors": [
+        "Attention affectueuse, soin attentif.",
+        "Sincérité candide; simplicité naïve."
+      ]
+    },
+    {
+      "word": "Ingénuité",
+      "correct": "Sincérité candide; simplicité naïve.",
+      "distractors": [
+        "Attention affectueuse, soin attentif.",
+        "Sentiment d'hostilité à l'égard de quelqu'un."
+      ]
+    },
+    {
+      "word": "Incartade",
+      "correct": "Écart de conduite, souvent irréfléchi.",
+      "distractors": [
+        "Acte ou parole de défi, provocation insolente.",
+        "Erreur grossière ou maladresse regrettable."
+      ]
+    },
+    {
+      "word": "Bravade",
+      "correct": "Acte ou parole de défi, provocation insolente.",
+      "distractors": [
+        "Écart de conduite, souvent irréfléchi.",
+        "Erreur grossière ou maladresse regrettable."
+      ]
+    },
+    {
+      "word": "Bévue",
+      "correct": "Erreur grossière ou maladresse regrettable.",
+      "distractors": [
+        "Écart de conduite, souvent irréfléchi.",
+        "Acte ou parole de défi, provocation insolente."
+      ]
+    },
+    {
+      "word": "Velléité",
+      "correct": "Volonté faible ou intention qui ne va pas jusqu'à l'action.",
+      "distractors": [
+        "État d'indifférence, d'absence d'énergie ou de réaction.",
+        "Satisfaction de soi-même qui s'étale d'une manière insolente, déplacée ou ridicule."
+      ]
+    },
+    {
+      "word": "Apathie",
+      "correct": "État d'indifférence, d'absence d'énergie ou de réaction.",
+      "distractors": [
+        "Volonté faible ou intention qui ne va pas jusqu'à l'action.",
+        "Satisfaction de soi-même qui s'étale d'une manière insolente, déplacée ou ridicule."
+      ]
+    },
+    {
+      "word": "Fatuité",
+      "correct": "Satisfaction de soi-même qui s'étale d'une manière insolente, déplacée ou ridicule.",
+      "distractors": [
+        "Volonté faible ou intention qui ne va pas jusqu'à l'action.",
+        "État d'indifférence, d'absence d'énergie ou de réaction."
+      ]
+    },
+    {
+      "word": "Réminiscence",
+      "correct": "Retour à l'esprit d'un souvenir non identifié comme tel; souvenir vague ou incomplet.",
+      "distractors": [
+        "Persistance d'un phénomène après disparition de sa cause.",
+        "Ce qui reste dû."
+      ]
+    },
+    {
+      "word": "Rémanence",
+      "correct": "Persistance d'un phénomène après disparition de sa cause.",
+      "distractors": [
+        "Retour à l'esprit d'un souvenir non identifié comme tel; souvenir vague ou incomplet.",
+        "Ce qui reste dû."
+      ]
+    },
+    {
+      "word": "Reliquat",
+      "correct": "Ce qui reste dû.",
+      "distractors": [
+        "Retour à l'esprit d'un souvenir non identifié comme tel; souvenir vague ou incomplet.",
+        "Persistance d'un phénomène après disparition de sa cause."
+      ]
+    },
+    {
+      "word": "Simagrées",
+      "correct": "Comédie, manières affectées pour attirer l'attention; feinte.",
+      "distractors": [
+        "Plaintes ou réclamations adressées à un supérieur.",
+        "Parade, vantardise."
+      ]
+    },
+    {
+      "word": "Doléances",
+      "correct": "Plaintes ou réclamations adressées à un supérieur.",
+      "distractors": [
+        "Comédie, manières affectées pour attirer l'attention; feinte.",
+        "Parade, vantardise."
+      ]
+    },
+    {
+      "word": "Fanfaronnade",
+      "correct": "Parade, vantardise.",
+      "distractors": [
+        "Comédie, manières affectées pour attirer l'attention; feinte.",
+        "Plaintes ou réclamations adressées à un supérieur."
+      ]
+    },
+    {
+      "word": "Camaïeu",
+      "correct": "Ensemble de tons voisins d'une même couleur.",
+      "distractors": [
+        "Veine ou trace rappelant le marbre.",
+        "Mélange de couleurs ou d'éléments variés."
+      ]
+    },
+    {
+      "word": "Marbrure",
+      "correct": "Veine ou trace rappelant le marbre.",
+      "distractors": [
+        "Ensemble de tons voisins d'une même couleur.",
+        "Mélange de couleurs ou d'éléments variés."
+      ]
+    },
+    {
+      "word": "Bigarrure",
+      "correct": "Mélange de couleurs ou d'éléments variés.",
+      "distractors": [
+        "Ensemble de tons voisins d'une même couleur.",
+        "Veine ou trace rappelant le marbre."
+      ]
+    },
+    {
+      "word": "Alcôve",
+      "correct": "Renfoncement destiné à accueillir un lit.",
+      "distractors": [
+        "Petite rue étroite; ruelle.",
+        "Espace situé entre les éléments d'un tout."
+      ]
+    },
+    {
+      "word": "Venelle",
+      "correct": "Petite rue étroite; ruelle.",
+      "distractors": [
+        "Renfoncement destiné à accueillir un lit.",
+        "Espace situé entre les éléments d'un tout."
+      ]
+    },
+    {
+      "word": "Interstice",
+      "correct": "Espace situé entre les éléments d'un tout.",
+      "distractors": [
+        "Renfoncement destiné à accueillir un lit.",
+        "Petite rue étroite; ruelle."
+      ]
+    },
+    {
+      "word": "Agora",
+      "correct": "Place publique de la cité grecque antique.",
+      "distractors": [
+        "Terrain ou territoire situé à l'intérieur d'un autre.",
+        "Limites d'un territoire au contact d'un autre."
+      ]
+    },
+    {
+      "word": "Enclave",
+      "correct": "Terrain ou territoire situé à l'intérieur d'un autre.",
+      "distractors": [
+        "Place publique de la cité grecque antique.",
+        "Limites d'un territoire au contact d'un autre."
+      ]
+    },
+    {
+      "word": "Confins",
+      "correct": "Limites d'un territoire au contact d'un autre.",
+      "distractors": [
+        "Place publique de la cité grecque antique.",
+        "Terrain ou territoire situé à l'intérieur d'un autre."
+      ]
+    },
+    {
+      "word": "Parangon",
+      "correct": "Modèle accompli, exemple parfait d'une qualité.",
+      "distractors": [
+        "Successeur, continuateur.",
+        "Personne qui s'occupe de tout, surtout des travaux mineurs."
+      ]
+    },
+    {
+      "word": "Épigone",
+      "correct": "Successeur, continuateur.",
+      "distractors": [
+        "Modèle accompli, exemple parfait d'une qualité.",
+        "Personne qui s'occupe de tout, surtout des travaux mineurs."
+      ]
+    },
+    {
+      "word": "Factotum",
+      "correct": "Personne qui s'occupe de tout, surtout des travaux mineurs.",
+      "distractors": [
+        "Modèle accompli, exemple parfait d'une qualité.",
+        "Successeur, continuateur."
+      ]
+    },
+    {
+      "word": "Rentier",
+      "correct": "Personne vivant de revenus de patrimoine.",
+      "distractors": [
+        "Personne chargée de l'éducation ou de l'instruction d'un enfant à domicile.",
+        "Auteur ou orateur qui combat par la controverse."
+      ]
+    },
+    {
+      "word": "Précepteur",
+      "correct": "Personne chargée de l'éducation ou de l'instruction d'un enfant à domicile.",
+      "distractors": [
+        "Personne vivant de revenus de patrimoine.",
+        "Auteur ou orateur qui combat par la controverse."
+      ]
+    },
+    {
+      "word": "Polémiste",
+      "correct": "Auteur ou orateur qui combat par la controverse.",
+      "distractors": [
+        "Personne vivant de revenus de patrimoine.",
+        "Personne chargée de l'éducation ou de l'instruction d'un enfant à domicile."
+      ]
+    },
+    {
+      "word": "Éminent",
+      "correct": "Remarquablement supérieur ou reconnu.",
+      "distractors": [
+        "De rang inférieur ou secondaire.",
+        "Qui sait tout (ou paraît tout savoir)."
+      ]
+    },
+    {
+      "word": "Subalterne",
+      "correct": "De rang inférieur ou secondaire.",
+      "distractors": [
+        "Remarquablement supérieur ou reconnu.",
+        "Qui sait tout (ou paraît tout savoir)."
+      ]
+    },
+    {
+      "word": "Omniscient",
+      "correct": "Qui sait tout (ou paraît tout savoir).",
+      "distractors": [
+        "Remarquablement supérieur ou reconnu.",
+        "De rang inférieur ou secondaire."
+      ]
+    },
+    {
+      "word": "Dogme",
+      "correct": "Point de doctrine établi ou regardé comme une vérité fondamentale, incontestable.",
+      "distractors": [
+        "Hypothèse fondée sur des indices, mais non encore prouvée.",
+        "Proposition évidente dont la vérité est reconnue sans démonstration."
+      ]
+    },
+    {
+      "word": "Conjecture",
+      "correct": "Hypothèse fondée sur des indices, mais non encore prouvée.",
+      "distractors": [
+        "Point de doctrine établi ou regardé comme une vérité fondamentale, incontestable.",
+        "Proposition évidente dont la vérité est reconnue sans démonstration."
+      ]
+    },
+    {
+      "word": "Axiome",
+      "correct": "Proposition évidente dont la vérité est reconnue sans démonstration.",
+      "distractors": [
+        "Point de doctrine établi ou regardé comme une vérité fondamentale, incontestable.",
+        "Hypothèse fondée sur des indices, mais non encore prouvée."
+      ]
+    },
+    {
+      "word": "Catharsis",
+      "correct": "Libération ou purification des émotions.",
+      "distractors": [
+        "Résistance psychique face aux aléas de la vie; capacité à absorber une perturbation.",
+        "Frein ou blocage d'une action, d'un comportement ou d'une réaction."
+      ]
+    },
+    {
+      "word": "Résilience",
+      "correct": "Résistance psychique face aux aléas de la vie; capacité à absorber une perturbation.",
+      "distractors": [
+        "Libération ou purification des émotions.",
+        "Frein ou blocage d'une action, d'un comportement ou d'une réaction."
+      ]
+    },
+    {
+      "word": "Inhibition",
+      "correct": "Frein ou blocage d'une action, d'un comportement ou d'une réaction.",
+      "distractors": [
+        "Libération ou purification des émotions.",
+        "Résistance psychique face aux aléas de la vie; capacité à absorber une perturbation."
+      ]
+    },
+    {
+      "word": "Précarité",
+      "correct": "Situation instable, fragile ou incertaine.",
+      "distractors": [
+        "État de ce qui est à son plus haut degré de développement.",
+        "Grande générosité, largesse remarquable."
+      ]
+    },
+    {
+      "word": "Plénitude",
+      "correct": "État de ce qui est à son plus haut degré de développement.",
+      "distractors": [
+        "Situation instable, fragile ou incertaine.",
+        "Grande générosité, largesse remarquable."
+      ]
+    },
+    {
+      "word": "Munificence",
+      "correct": "Grande générosité, largesse remarquable.",
+      "distractors": [
+        "Situation instable, fragile ou incertaine.",
+        "État de ce qui est à son plus haut degré de développement."
+      ]
+    },
+    {
+      "word": "Apparat",
+      "correct": "Déploiement solennel et ostentatoire.",
+      "distractors": [
+        "Collier de fer attaché au cou de personnes condamnées; ce qui emprisonne la liberté individuelle.",
+        "Charge pesante à porter; au figuré, responsabilité ou épreuve pénible."
+      ]
+    },
+    {
+      "word": "Carcan",
+      "correct": "Collier de fer attaché au cou de personnes condamnées; ce qui emprisonne la liberté individuelle.",
+      "distractors": [
+        "Déploiement solennel et ostentatoire.",
+        "Charge pesante à porter; au figuré, responsabilité ou épreuve pénible."
+      ]
+    },
+    {
+      "word": "Fardeau",
+      "correct": "Charge pesante à porter; au figuré, responsabilité ou épreuve pénible.",
+      "distractors": [
+        "Déploiement solennel et ostentatoire.",
+        "Collier de fer attaché au cou de personnes condamnées; ce qui emprisonne la liberté individuelle."
+      ]
+    },
+    {
+      "word": "Fragrance",
+      "correct": "Parfum subtil, odeur agréable.",
+      "distractors": [
+        "Émanation malsaine de matières en décomposition.",
+        "Chanson que l'on entend très souvent; propos banals répétés souvent."
+      ]
+    },
+    {
+      "word": "Miasme",
+      "correct": "Émanation malsaine de matières en décomposition.",
+      "distractors": [
+        "Parfum subtil, odeur agréable.",
+        "Chanson que l'on entend très souvent; propos banals répétés souvent."
+      ]
+    },
+    {
+      "word": "Rengaine",
+      "correct": "Chanson que l'on entend très souvent; propos banals répétés souvent.",
+      "distractors": [
+        "Parfum subtil, odeur agréable.",
+        "Émanation malsaine de matières en décomposition."
+      ]
+    },
+    {
+      "word": "Viatique",
+      "correct": "Provisions/argent pour un voyage; au fig., ce qui aide et soutient.",
+      "distractors": [
+        "Emploi de tout repos, bien payé pour peu de travail.",
+        "Liaison amoureuse de courte durée; engouement passager pour quelque chose."
+      ]
+    },
+    {
+      "word": "Sinécure",
+      "correct": "Emploi de tout repos, bien payé pour peu de travail.",
+      "distractors": [
+        "Provisions/argent pour un voyage; au fig., ce qui aide et soutient.",
+        "Liaison amoureuse de courte durée; engouement passager pour quelque chose."
+      ]
+    },
+    {
+      "word": "Passade",
+      "correct": "Liaison amoureuse de courte durée; engouement passager pour quelque chose.",
+      "distractors": [
+        "Provisions/argent pour un voyage; au fig., ce qui aide et soutient.",
+        "Emploi de tout repos, bien payé pour peu de travail."
+      ]
+    },
+    {
+      "word": "Jubilé",
+      "correct": "Anniversaire solennel célébré avec éclat, souvent après cinquante ans.",
+      "distractors": [
+        "Signe annonçant l'avenir; présage.",
+        "Mort, décès, dans un registre soutenu ou littéraire."
+      ]
+    },
+    {
+      "word": "Augure",
+      "correct": "Signe annonçant l'avenir; présage.",
+      "distractors": [
+        "Anniversaire solennel célébré avec éclat, souvent après cinquante ans.",
+        "Mort, décès, dans un registre soutenu ou littéraire."
+      ]
+    },
+    {
+      "word": "Trépas",
+      "correct": "Mort, décès, dans un registre soutenu ou littéraire.",
+      "distractors": [
+        "Anniversaire solennel célébré avec éclat, souvent après cinquante ans.",
+        "Signe annonçant l'avenir; présage."
+      ]
+    },
+    {
+      "word": "À l'aune de",
+      "correct": "En prenant pour mesure ou critère.",
+      "distractors": [
+        "Au bord d'un lieu, surtout d'un bois.",
+        "Avant examen, sans vérification par l'expérience."
+      ]
+    },
+    {
+      "word": "À l'orée",
+      "correct": "Au bord d'un lieu, surtout d'un bois.",
+      "distractors": [
+        "En prenant pour mesure ou critère.",
+        "Avant examen, sans vérification par l'expérience."
+      ]
+    },
+    {
+      "word": "A priori",
+      "correct": "Avant examen, sans vérification par l'expérience.",
+      "distractors": [
+        "En prenant pour mesure ou critère.",
+        "Au bord d'un lieu, surtout d'un bois."
+      ]
+    },
+    {
+      "word": "Abîme",
+      "correct": "Gouffre profond ou écart immense.",
+      "distractors": [
+        "Extrémité ou sommet pointu.",
+        "Limites d'un territoire au contact d'un autre."
+      ]
+    },
+    {
+      "word": "Apex",
+      "correct": "Extrémité ou sommet pointu.",
+      "distractors": [
+        "Gouffre profond ou écart immense.",
+        "Limites d'un territoire au contact d'un autre."
+      ]
+    },
+    {
+      "word": "Confins",
+      "correct": "Limites d'un territoire au contact d'un autre.",
+      "distractors": [
+        "Gouffre profond ou écart immense.",
+        "Extrémité ou sommet pointu."
+      ]
+    },
+    {
+      "word": "Absous",
+      "correct": "Pardonné ou déclaré non coupable.",
+      "distractors": [
+        "Rendu vil, abject, méprisable.",
+        "Qui marque le regret, qui se repent d'une faute."
+      ]
+    },
+    {
+      "word": "Avili",
+      "correct": "Rendu vil, abject, méprisable.",
+      "distractors": [
+        "Pardonné ou déclaré non coupable.",
+        "Qui marque le regret, qui se repent d'une faute."
+      ]
+    },
+    {
+      "word": "Contrit",
+      "correct": "Qui marque le regret, qui se repent d'une faute.",
+      "distractors": [
+        "Pardonné ou déclaré non coupable.",
+        "Rendu vil, abject, méprisable."
+      ]
+    },
+    {
+      "word": "Abyssal",
+      "correct": "Extrêmement profond ou considérable.",
+      "distractors": [
+        "Très fin, faible ou presque imperceptible.",
+        "Répandu dans tous les sens."
+      ]
+    },
+    {
+      "word": "Ténu",
+      "correct": "Très fin, faible ou presque imperceptible.",
+      "distractors": [
+        "Extrêmement profond ou considérable.",
+        "Répandu dans tous les sens."
+      ]
+    },
+    {
+      "word": "Diffus",
+      "correct": "Répandu dans tous les sens.",
+      "distractors": [
+        "Extrêmement profond ou considérable.",
+        "Très fin, faible ou presque imperceptible."
+      ]
+    },
+    {
+      "word": "Abysses",
+      "correct": "Grandes profondeurs marines ou gouffres infernaux.",
+      "distractors": [
+        "Zone de transition entre deux écosystèmes.",
+        "Lieu où un affluent se jette dans un autre cours d'eau; rencontre."
+      ]
+    },
+    {
+      "word": "Écotone",
+      "correct": "Zone de transition entre deux écosystèmes.",
+      "distractors": [
+        "Grandes profondeurs marines ou gouffres infernaux.",
+        "Lieu où un affluent se jette dans un autre cours d'eau; rencontre."
+      ]
+    },
+    {
+      "word": "Confluence",
+      "correct": "Lieu où un affluent se jette dans un autre cours d'eau; rencontre.",
+      "distractors": [
+        "Grandes profondeurs marines ou gouffres infernaux.",
+        "Zone de transition entre deux écosystèmes."
+      ]
+    },
+    {
+      "word": "Acerbe",
+      "correct": "Mordant, dur et blessant.",
+      "distractors": [
+        "Vif, joyeux et plein d'entrain.",
+        "Fier jusqu'à paraître hautain."
+      ]
+    },
+    {
+      "word": "Allègre",
+      "correct": "Vif, joyeux et plein d'entrain.",
+      "distractors": [
+        "Mordant, dur et blessant.",
+        "Fier jusqu'à paraître hautain."
+      ]
+    },
+    {
+      "word": "Altier",
+      "correct": "Fier jusqu'à paraître hautain.",
+      "distractors": [
+        "Mordant, dur et blessant.",
+        "Vif, joyeux et plein d'entrain."
+      ]
+    },
+    {
+      "word": "Achalandé",
+      "correct": "Fréquenté par de nombreux clients.",
+      "distractors": [
+        "Qui entraîne des frais importants.",
+        "Animé par le seul appât du gain, du profit; relatif au commerce."
+      ]
+    },
+    {
+      "word": "Onéreux",
+      "correct": "Qui entraîne des frais importants.",
+      "distractors": [
+        "Fréquenté par de nombreux clients.",
+        "Animé par le seul appât du gain, du profit; relatif au commerce."
+      ]
+    },
+    {
+      "word": "Mercantile",
+      "correct": "Animé par le seul appât du gain, du profit; relatif au commerce.",
+      "distractors": [
+        "Fréquenté par de nombreux clients.",
+        "Qui entraîne des frais importants."
+      ]
+    },
+    {
+      "word": "Ad hoc",
+      "correct": "Créé ou choisi pour un besoin précis.",
+      "distractors": [
+        "Condition indispensable.",
+        "De son propre genre, à part."
+      ]
+    },
+    {
+      "word": "Sine qua non",
+      "correct": "Condition indispensable.",
+      "distractors": [
+        "Créé ou choisi pour un besoin précis.",
+        "De son propre genre, à part."
+      ]
+    },
+    {
+      "word": "Sui generis",
+      "correct": "De son propre genre, à part.",
+      "distractors": [
+        "Créé ou choisi pour un besoin précis.",
+        "Condition indispensable."
+      ]
+    },
+    {
+      "word": "Ad vitam aeternam",
+      "correct": "Pour toujours, indéfiniment.",
+      "distractors": [
+        "Au bord d'un lieu, surtout d'un bois.",
+        "À partir de rien."
+      ]
+    },
+    {
+      "word": "À l'orée",
+      "correct": "Au bord d'un lieu, surtout d'un bois.",
+      "distractors": [
+        "Pour toujours, indéfiniment.",
+        "À partir de rien."
+      ]
+    },
+    {
+      "word": "Ex nihilo",
+      "correct": "À partir de rien.",
+      "distractors": [
+        "Pour toujours, indéfiniment.",
+        "Au bord d'un lieu, surtout d'un bois."
+      ]
+    },
+    {
+      "word": "Adage",
+      "correct": "Formule brève exprimant une vérité générale.",
+      "distractors": [
+        "Énoncé de base sur lequel on raisonne.",
+        "Mots proches par la forme mais de sens différents (ex. effraction/infraction)."
+      ]
+    },
+    {
+      "word": "Prémisse",
+      "correct": "Énoncé de base sur lequel on raisonne.",
+      "distractors": [
+        "Formule brève exprimant une vérité générale.",
+        "Mots proches par la forme mais de sens différents (ex. effraction/infraction)."
+      ]
+    },
+    {
+      "word": "Paronyme",
+      "correct": "Mots proches par la forme mais de sens différents (ex. effraction/infraction).",
+      "distractors": [
+        "Formule brève exprimant une vérité générale.",
+        "Énoncé de base sur lequel on raisonne."
+      ]
+    },
+    {
+      "word": "Adamantin",
+      "correct": "Dur ou éclatant comme le diamant.",
+      "distractors": [
+        "Fort, enivrant, presque entêtant.",
+        "Qui a une douceur exquise, délicieux."
+      ]
+    },
+    {
+      "word": "Capiteux",
+      "correct": "Fort, enivrant, presque entêtant.",
+      "distractors": [
+        "Dur ou éclatant comme le diamant.",
+        "Qui a une douceur exquise, délicieux."
+      ]
+    },
+    {
+      "word": "Suave",
+      "correct": "Qui a une douceur exquise, délicieux.",
+      "distractors": [
+        "Dur ou éclatant comme le diamant.",
+        "Fort, enivrant, presque entêtant."
+      ]
+    },
+    {
+      "word": "Adjuvant",
+      "correct": "Élément ou substance ajouté pour renforcer l'action d'un autre.",
+      "distractors": [
+        "Ce qui reçoit; contenant, récipient; lieu destiné à rassembler des choses.",
+        "Ce qui reste dû."
+      ]
+    },
+    {
+      "word": "Réceptacle",
+      "correct": "Ce qui reçoit; contenant, récipient; lieu destiné à rassembler des choses.",
+      "distractors": [
+        "Élément ou substance ajouté pour renforcer l'action d'un autre.",
+        "Ce qui reste dû."
+      ]
+    },
+    {
+      "word": "Reliquat",
+      "correct": "Ce qui reste dû.",
+      "distractors": [
+        "Élément ou substance ajouté pour renforcer l'action d'un autre.",
+        "Ce qui reçoit; contenant, récipient; lieu destiné à rassembler des choses."
+      ]
+    },
+    {
+      "word": "Admonestation",
+      "correct": "Avertissement, remontrance sévère.",
+      "distractors": [
+        "Plaintes ou réclamations adressées à un supérieur.",
+        "Acte par lequel on acquiesce, expressément ou tacitement, à une opinion ou à une proposition."
+      ]
+    },
+    {
+      "word": "Doléances",
+      "correct": "Plaintes ou réclamations adressées à un supérieur.",
+      "distractors": [
+        "Avertissement, remontrance sévère.",
+        "Acte par lequel on acquiesce, expressément ou tacitement, à une opinion ou à une proposition."
+      ]
+    },
+    {
+      "word": "Assentiment",
+      "correct": "Acte par lequel on acquiesce, expressément ou tacitement, à une opinion ou à une proposition.",
+      "distractors": [
+        "Avertissement, remontrance sévère.",
+        "Plaintes ou réclamations adressées à un supérieur."
+      ]
+    },
+    {
+      "word": "Acrimonie",
+      "correct": "Aigreur agressive dans les propos ou l'attitude.",
+      "distractors": [
+        "Attention affectueuse, soin attentif.",
+        "Satisfaction de soi-même qui s'étale d'une manière insolente, déplacée ou ridicule."
+      ]
+    },
+    {
+      "word": "Sollicitude",
+      "correct": "Attention affectueuse, soin attentif.",
+      "distractors": [
+        "Aigreur agressive dans les propos ou l'attitude.",
+        "Satisfaction de soi-même qui s'étale d'une manière insolente, déplacée ou ridicule."
+      ]
+    },
+    {
+      "word": "Fatuité",
+      "correct": "Satisfaction de soi-même qui s'étale d'une manière insolente, déplacée ou ridicule.",
+      "distractors": [
+        "Aigreur agressive dans les propos ou l'attitude.",
+        "Attention affectueuse, soin attentif."
+      ]
+    },
+    {
+      "word": "Biosphère",
+      "correct": "Enveloppe de la Terre où la vie est présente.",
+      "distractors": [
+        "Vaste région biogéographique caractérisée par un même climat et une même végétation/faune.",
+        "Ensemble des éléments non vivants d'un écosystème : sol, air, humidité, température, lumière."
+      ]
+    },
+    {
+      "word": "Biome",
+      "correct": "Vaste région biogéographique caractérisée par un même climat et une même végétation/faune.",
+      "distractors": [
+        "Enveloppe de la Terre où la vie est présente.",
+        "Ensemble des éléments non vivants d'un écosystème : sol, air, humidité, température, lumière."
+      ]
+    },
+    {
+      "word": "Biotope",
+      "correct": "Ensemble des éléments non vivants d'un écosystème : sol, air, humidité, température, lumière.",
+      "distractors": [
+        "Enveloppe de la Terre où la vie est présente.",
+        "Vaste région biogéographique caractérisée par un même climat et une même végétation/faune."
+      ]
+    }
+  ]
+}

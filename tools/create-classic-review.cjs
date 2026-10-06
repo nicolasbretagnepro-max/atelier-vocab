@@ -1,0 +1,133 @@
+// Editorial groups: each member has a distinct defining concept.
+// This is an explicit selection, not a similarity-based automatic approval.
+const fs=require('node:fs');const {api}=require('./audit-vocab.cjs');
+const raw=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));const words=api.buildWords(raw);
+const groups=[
+['Abduction','Déduction','Induction'],
+['A priori','A posteriori','Ex nihilo'],
+['Biais d’ancrage','Biais de confirmation','Biais de disponibilité'],
+['Éthos','Pathos','Logos'],
+['Ad ignorantiam','Ad misericordiam','Ad populum','Ad verecundiam'],
+['Faux dilemme','Fausse causalité','Homme de paille','Pétition de principe'],
+['Contre-exemple','Thèse','Prémisse'],
+['Focalisation externe','Focalisation interne','Focalisation zéro'],
+['Analepse','Prolepse','Mise en abyme'],
+['Anagramme','Homonyme','Paronyme'],
+['Anthologie','Monographie','Missive'],
+['Litote','Oxymore','Anaphore','Chiasme'],
+['Épicène','Polysémie','Néologisme'],
+['Biocénose','Biotope','Écotone'],
+['Bioaccumulation','Biomagnification','Eutrophisation'],
+['Commensalisme','Parasitisme','Mutualisme'],
+['Spéciation','Taxonomie','Endémisme'],
+['Albédo','Pergélisol','Puits de carbone'],
+['Ripisylve','Toundra','Agroforesterie'],
+['Ressac','Alizé','Confluence'],
+['Autarcie','Consumérisme','Néolibéralisme'],
+['Népotisme','Corporatisme','Ostracisme'],
+['Concession','Injonction','Forclusion'],
+['Diffamation','Parjure','Dol'],
+['Déontologie','Probité','Prérogative'],
+['Récuser','Révoquer','Proroger'],
+['Entériner','Corroborer','Circonscrire'],
+['Déconfiture','Moratoire','Gabegie'],
+['Animisme','Messianisme','Syncrétisme'],
+['Animiste','Agnostique','Profane'],
+['Liturgique','Monacale','Vespéral'],
+['Ablution','Libation','Sépulture'],
+['Bréviaire','Synode','Sacerdoce'],
+['Ascèse','Exégèse','Anathème'],
+['Abjurer','Immoler','Intercéder'],
+['Anachorète','Thuriféraire','Sophiste'],
+['Ataraxie','Hédonisme','Solipsisme'],
+['Épistémologie','Axiologie','Ontologie'],
+['Intellection','Introspection','Sérendipité'],
+['Dimorphisme','Atavisme','Atrophie'],
+['Dopamine','Inanition','Catatonie'],
+
+
+['Escadron','Centurion','Mercenaire'],
+['Reddition','Pugilat','Balkanisation'],
+['Courroux','Allégresse','Émoi'],
+['Exulter','Se rengorger','Rasséréner'],
+['Aiguillonner','Réfréner','Fourvoyer'],
+['Bâfrer','Baguenauder','Déclamer'],
+['Sustenter','Expectorer','Exsuder'],
+['Abraser','Exhumer','Inhumer'],
+['Admonester','Absoudre','Adjuger'],
+['Enjoliver','Fustiger','Saborder'],
+['Louvoyer','Asséner','Instiller'],
+['Subodorer','Supputer','Éluder'],
+['Se rebiffer','Minauder','Se pâmer'],
+['Opiner','Médire','Tonitruer'],
+['Séditieux','Obséquieux','Grégaire'],
+['Malingre','Râblée','Hagard'],
+['Fugace','Fortuit','Immuable'],
+['Erratique','Sporadique','Séculaire'],
+['Endogène','Exogène','Latent'],
+['Septentrional','Méridional','Lacustre'],
+['Onéreux','Pécuniaire','Mercantile'],
+['Laconique','Volubile','Tacite'],
+['Présomptueux','Circonspect','Timoré'],
+['Affable','Irascible','Obtus'],
+['Magnanime','Vindicatif','Couard'],
+['Indolent','Pugnace','Désinvolte'],
+['Placide','Impétueux','Morose'],
+['Bucolique','Dantesque','Onirique'],
+['Apodictique','Empirique','Allusif'],
+['Univoque','Lacunaire','Abscons'],
+['Adipeux','Rubescent','Claudicant'],
+['Gibbeuse','Exigu','Gigogne'],
+['Idoine','Incongru','Rédhibitoire'],
+['Déférence','Condescendance','Aversion'],
+['Abnégation','Fatuité','Concupiscence'],
+['Sollicitude','Animosité','Ingénuité'],
+['Incartade','Bravade','Bévue'],
+['Velléité','Apathie','Fatuité'],
+['Réminiscence','Rémanence','Reliquat'],
+['Simagrées','Doléances','Fanfaronnade'],
+['Camaïeu','Marbrure','Bigarrure'],
+['Alcôve','Venelle','Interstice'],
+['Agora','Enclave','Confins'],
+['Parangon','Épigone','Factotum'],
+['Rentier','Précepteur','Polémiste'],
+['Éminent','Subalterne','Omniscient'],
+['Dogme','Conjecture','Axiome'],
+['Catharsis','Résilience','Inhibition'],
+['Précarité','Plénitude','Munificence'],
+['Apparat','Carcan','Fardeau'],
+['Fragrance','Miasme','Rengaine'],
+['Viatique','Sinécure','Passade'],
+['Jubilé','Augure','Trépas'],
+['À l’aune de','À l’orée','A priori'],
+['Abîme','Apex','Confins'],
+['Absous','Avili','Contrit'],
+['Abyssal','Ténu','Diffus'],
+['Abysses','Écotone','Confluence'],
+['Acerbe','Allègre','Altier'],
+['Achalandé','Onéreux','Mercantile'],
+['Ad hoc','Sine qua non','Sui generis'],
+['Ad vitam aeternam','À l’orée','Ex nihilo'],
+['Adage','Prémisse','Paronyme'],
+['Adamantin','Capiteux','Suave'],
+['Adjuvant','Réceptacle','Reliquat'],
+['Admonestation','Doléances','Assentiment'],
+['Acrimonie','Sollicitude','Fatuité'],
+['Biosphère','Biome','Biotope']
+];
+const key=s=>api.norm(s).replace(/[’']/g,"'");const lookup=new Map(words.map(w=>[key(w.word),w]));
+const entries=new Map();
+const report=[];
+for(const labels of groups){const members=labels.map(label=>{const w=lookup.get(key(label));if(!w)throw Error('Missing '+label);return w;});
+for(const w of members){const ds=members.filter(d=>d.id!==w.id&&!api.isAmbiguousDistractor(w,d));
+const kept=[];for(const d of ds){if(!kept.some(k=>api.isAmbiguousDistractor(k,d)))kept.push(d);}
+if(kept.length<2){report.push({word:w.word,status:'card',reason:'Group too close under conservative filter'});continue;}
+const distractors=kept.slice(0,3).map(d=>({word:d.word,definition:d.compact,full_definition:d.definition,difference:'Ce choix signifie « '+d.compact+' » ; le mot recherché signifie « '+w.compact+' ».'}));
+entries.set(key(w.word),{word:w.word,kind:w.kind,qcm_definition:w.compact,qcm_full_definition:w.definition,qcm_distractors:distractors,qcm_context_distractors:[]});
+report.push({word:w.word,correct:w.compact,distractors:distractors.map(d=>d.definition)});
+}}
+const review={version:1,reviewedAt:'2026-10-06',note:'Groupes de sens distincts sélectionnés explicitement. Aucun remplissage automatique ; aucune phrase à trou validée par simple similarité. Les mots hors sélection restent en cartes de découverte.',entries:[...entries.values()]};
+fs.writeFileSync('data/qcm-reviewed.json',JSON.stringify(review,null,2)+'\n');
+fs.writeFileSync('data/qcm-editorial-groups.json',JSON.stringify({version:1,groups},null,2)+'\n');
+fs.writeFileSync('data/qcm-classic-audit.json',JSON.stringify({total:words.length,selected:report.length,ready:review.entries.length,report},null,2)+'\n');
+console.log(JSON.stringify({total:words.length,entries:review.entries.length,groups:groups.length,filtered:report.filter(r=>r.status==='card')}));
