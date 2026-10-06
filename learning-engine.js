@@ -35,7 +35,7 @@
       if(event.assisted)learning.supportedDays[day]=1;
       else if(learning.lastFailureDay!==day)learning.independentDays[day]=1;
     }
-    if(Object.keys(learning.meaningDays).length>=2&&Object.keys(learning.contextDays).length>=1&&Object.keys(learning.independentDays).length>=2)
+    if(Object.keys(learning.meaningDays).length>=2&&Object.keys(learning.independentDays).length>=2)
       learning.phase='consolidated';
     return learning;
   }
@@ -44,8 +44,8 @@
     if(l.phase==='consolidated')return 3;
     // Today's repeats cannot remove help intended for tomorrow's learning.
     const before=map=>Object.keys(map).filter(d=>d<day&&(!l.lastFailureDay||d>l.lastFailureDay)).length;
-    const meaning=before(l.meaningDays),supported=before(l.supportedDays);
-    if(meaning>=2&&supported>=1)return 3;
+    const meaning=before(l.meaningDays);
+    if(meaning>=2)return 3;
     if(meaning>=1)return 2;
     return 1;
   }
@@ -59,10 +59,11 @@
     const newPerDay=Math.max(1,Math.min(3,Math.round(Number(options.newPerDay)||2)));
     const hash=w=>[...`${day}:${w.id}`].reduce((h,c)=>(Math.imul(h,31)+c.charCodeAt(0))>>>0,0);
     const introducedToday=list.filter(w=>p(w).seen&&normalize(p(w),day).startedDay===day).length;
-    const discover=list.filter(w=>!p(w).seen).sort((a,b)=>hash(a)-hash(b)).slice(0,Math.min(Math.max(0,newPerDay-introducedToday),Math.max(0,10-active.length)));
+    const discover=list.filter(w=>!p(w).seen).sort((a,b)=>hash(a)-hash(b)).slice(0,Math.max(0,newPerDay-introducedToday));
     const due=list.filter(w=>p(w).seen&&normalize(p(w),day).phase==='consolidated'&&(!Number.isFinite(Date.parse(p(w).next))||Date.parse(p(w).next)<=now))
-      .sort((a,b)=>(Date.parse(p(a).next)||0)-(Date.parse(p(b).next)||0)).slice(0,4);
-    return {discover,active:active.slice(0,10),due,waiting:Math.max(0,active.length-10),newLimit:newPerDay};
+      .sort((a,b)=>(Date.parse(p(a).next)||0)-(Date.parse(p(b).next)||0)).slice(0,3);
+    const capacity=Math.max(0,10-discover.length-due.length);
+    return {discover,active:active.slice(0,capacity),due,waiting:Math.max(0,active.length-capacity),newLimit:newPerDay};
   }
   return {normalize,record,level,selectDaily};
 });

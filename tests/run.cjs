@@ -1,3 +1,4 @@
+require('./classic-routine.test.cjs');
 require('./learning.test.cjs');
 require('./acquisition.test.cjs');
 require('./daily-selection.test.cjs');

@@ -6,17 +6,18 @@ test('the primary daily action opens the full discovery-to-Boss routine',()=>{
  const primary=find(tree,t=>t.type?.name==='Btn');assert.ok(primary);
  primary.props.onClick();assert.equal(a.run('destination'),'daily');
 });
-test('the full daily routine reaches the Boss after discovery and learning steps',()=>{
+test('the full daily routine reaches every classic stage and its Boss',()=>{
  const a=app();a.run(`var ws=buildWords(SEED_WORDS).filter(w=>w.word==='Anaphore');var s={progress:{},meta:{}};`);
  const expr=`DailyTab({words:ws,state:s,setState:next=>s=typeof next==='function'?next(s):next,onMilestone:()=>{}})`;
- for(const name of ['StepDiscover','GuidedRecall','GuidedRecall']){
+ for(const name of ['StepDiscover','LearningCard','RoutineContext','RoutineRecall']){
   const question=find(a.render(expr),t=>t.type?.name===name);assert.ok(question,`Expected ${name}`);
-  if(name==='StepDiscover')question.props.onNext();else question.props.onAnswer({ok:true,assisted:true,kind:question.props.context?'context':'meaning'});
+  if(name==='StepDiscover')question.props.onNext();else question.props.onAnswer(true,'recog',{kind:'meaning',assisted:true});
   const timer=a.timers.shift();assert.equal(typeof timer,'function');timer();
  }
- const boss=find(a.render(expr),t=>t.type?.name==='GuidedRecall');assert.ok(boss);
- assert.equal(boss.props.level,1);assert.match(boss.props.key,/^boss-/);
+ const boss=find(a.render(expr),t=>t.type?.name==='RoutineRecall');assert.ok(boss);
+ assert.equal(boss.props.level,1);assert.equal(boss.props.boss,true);assert.match(boss.props.key,/^boss-/);
 });
+
 test('short-session QCM varies the correct position and keeps it stable while answering',()=>{
  const a=app();a.run('var ws=buildWords(SEED_WORDS);var w=ws.find(w=>w.word==="Anaphore");Math.random=()=>0.75');
  const expression='ShortExercise({word:w,progress:{seen:1,repetitions:0},words:ws,onAnswer:()=>{}})';

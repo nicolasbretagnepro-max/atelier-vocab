@@ -43,7 +43,7 @@ test('context uses the other source example when the selected gap cannot be alig
 });
 test('a missing safe QCM offers assisted learning instead of cold written recall',()=>{
  const a=fixture();const tree=a.render('SafeRecallFallback({word:w,onAnswer:()=>{}})');
- assert.equal(tree.type.name,'GuidedRecall');assert.equal(tree.props.level,1);
+ assert.equal(tree.type.name,'LearningCard');
 });
 test('a contextual mistake keeps its explanation until Continue and does not auto-advance',()=>{
  const a=fixture();const expr="GuidedRecall({word:w,level:1,context:true,onAnswer:r=>result=r})";

@@ -7,11 +7,11 @@ test('the routine introduces two words and keeps an active word despite its futu
  assert.equal(a.run('session.discover.length'),2);
  assert.equal(a.run('session.review.some(w=>w.id===ws[0].id)'),true);
 });
-test('all ten active words are served within a twenty-four encounter budget',()=>{
+test('active words rotate alongside newcomers within a thirty encounter budget',()=>{
  const a=app();a.run(`var ws=buildWords(SEED_WORDS);var s={progress:{},meta:{}};ws.slice(0,10).forEach(w=>s.progress[w.id]={...EMPTY_PROGRESS,seen:2,next:addDays(5),learning:{phase:'active'}});var session=buildDailySession(s,ws);var queues=buildDailyQueues(session);`);
  assert.equal(a.run('new Set(queues.flat().map(w=>w.id)).size'),10);
- assert.equal(a.run('session.discover.length'),0);
- assert.ok(a.run('queues.flat().length')<=24);
+ assert.equal(a.run('session.discover.filter(w=>!readP(s,w.id).seen).length'),2);
+ assert.ok(a.run('queues.flat().length')<=30);
  assert.ok(a.run('session.boss.length')<=3);
 });
 test('oversized legacy active pools rotate the least recently seen words',()=>{
@@ -34,10 +34,10 @@ test('a tiny corpus and an unreviewed imported word can still enter the routine'
  const a=app();a.run(`var ws=buildWords([{word:'Exulter',definition:'Manifester une joie intense.',example_1:'Les joueurs exultent de joie.',example_cloze_1:'Les joueurs […] de joie.'}]);var session=buildDailySession({progress:{}},ws);`);
  assert.equal(a.run('session.discover.length'),1);
  assert.equal(a.run('session.boss.length'),1);
- assert.equal(a.run('session.production.length'),0);
+ assert.equal(a.run('session.production.length'),1);
 });
 test('leaving and reopening the routine cannot introduce more new words that day',()=>{
  const a=app();a.run(`var ws=buildWords(SEED_WORDS);var s={progress:{},meta:{}};var first=buildDailySession(s,ws);first.discover.forEach(w=>s=gradeWord(s,w.id,'good','discover',0));var again=buildDailySession(s,ws);`);
- assert.equal(a.run('again.discover.length'),0);
+ assert.equal(a.run('again.discover.filter(w=>!readP(s,w.id).seen).length'),0);
  a.advance(86400000);assert.equal(a.run('buildDailySession(s,ws).discover.length'),2);
 });
